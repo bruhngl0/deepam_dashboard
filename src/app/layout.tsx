@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,8 +27,19 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Script id="theme-preference" strategy="beforeInteractive">
+          {`try {
+            const theme = localStorage.getItem('deepam-theme');
+            if (theme === 'light' || theme === 'dark') {
+              document.documentElement.dataset.theme = theme;
+            }
+          } catch {}`}
+        </Script>
+        {children}
+      </body>
     </html>
   );
 }

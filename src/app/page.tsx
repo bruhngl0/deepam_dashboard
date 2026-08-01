@@ -19,6 +19,7 @@ import { DataQualityPanel } from '@/components/data-quality';
 import { CustomerTable } from '@/components/customer-table';
 import { FilterBar, Pagination } from '@/components/filters';
 import { formatCurrency, formatNumber } from '@/lib/format';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,11 +58,14 @@ export default async function DashboardPage({
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Deepam CRM</h1>
-        <p className="mt-1 text-sm text-ink-2">
-          Lead-to-sale attribution across Instagram, WhatsApp and store walk-ins.
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Deepam CRM</h1>
+          <p className="mt-1 text-sm text-ink-2">
+            Lead-to-sale attribution across Instagram, WhatsApp and store walk-ins.
+          </p>
+        </div>
+        <ThemeToggle />
       </header>
 
       <div className="space-y-3">
