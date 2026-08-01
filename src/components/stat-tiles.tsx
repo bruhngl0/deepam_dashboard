@@ -61,80 +61,87 @@ export function KpiRow({
   totalLeads,
   leadsConverted,
   conversionRate,
-  grossSales,
-  showing,
+  attributedRevenue,
+  attributedBills,
 }: {
   totalLeads: number;
   leadsConverted: number;
   conversionRate: number;
-  grossSales: number;
-  showing: number;
+  attributedRevenue: number;
+  attributedBills: number;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <HeroTile
         label="Total leads"
         value={formatNumber(totalLeads)}
-        caption="New-customer prospects"
+        caption="Distinct people on the two lists"
       />
       <StatTile
         label="Leads converted"
         value={formatNumber(leadsConverted)}
-        caption="Leads with a purchase"
+        caption={`Matched a bill · ${formatNumber(attributedBills)} bills`}
       />
       <StatTile
-        label="Total sales"
-        value={formatCurrencyCompact(grossSales)}
-        caption={formatCurrency(grossSales)}
+        label="Attributed sales"
+        value={formatCurrencyCompact(attributedRevenue)}
+        caption={formatCurrency(attributedRevenue)}
       />
       <StatTile
         label="Conversion rate"
-        value={`${conversionRate.toFixed(1)}%`}
+        value={`${conversionRate.toFixed(2)}%`}
         caption="Converted ÷ total leads"
-      />
-      <StatTile
-        label="Showing"
-        value={formatNumber(showing)}
-        caption="On this page"
       />
     </div>
   );
 }
 
+/**
+ * The headline above counts every in-scope lead. This row splits it, because
+ * the two segments answer different questions: `newRevenue` is what the
+ * campaigns *acquired*, `existingRevenue` is spend from people who were already
+ * customers and would likely have bought regardless. Folding them together
+ * would overstate the campaigns; hiding the second would understate the money.
+ */
 export function SegmentRow({
+  newLeads,
+  newConverted,
   newRevenue,
-  existingRevenue,
   existingPeople,
   existingBuyers,
-  phonelessRevenue,
-  phonelessBills,
+  existingRevenue,
+  grossSales,
+  totalBills,
 }: {
+  newLeads: number;
+  newConverted: number;
   newRevenue: number;
-  existingRevenue: number;
   existingPeople: number;
   existingBuyers: number;
-  phonelessRevenue: number;
-  phonelessBills: number;
+  existingRevenue: number;
+  grossSales: number;
+  totalBills: number;
 }) {
-  const attributable = newRevenue + existingRevenue;
-  const newShare = attributable ? (100 * newRevenue) / attributable : 0;
+  const attributed = newRevenue + existingRevenue;
+  const share = grossSales ? (100 * attributed) / grossSales : 0;
 
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       <StatTile
         label="New customers"
         value={formatCurrencyCompact(newRevenue)}
-        caption={`${newShare.toFixed(0)}% of attributed revenue`}
+        caption={`${formatNumber(newConverted)} buyers of ${formatNumber(newLeads)} leads · foreign numbers excluded`}
+        emphasis
       />
       <StatTile
-        label="Existing customers"
+        label="Already customers"
         value={formatCurrencyCompact(existingRevenue)}
-        caption={`${formatNumber(existingBuyers)} buyers of ${formatNumber(existingPeople)} · ${(100 - newShare).toFixed(0)}% of revenue`}
+        caption={`${formatNumber(existingBuyers)} buyers of ${formatNumber(existingPeople)} · said so on the form`}
       />
       <StatTile
-        label="Unmatched"
-        value={formatCurrencyCompact(phonelessRevenue)}
-        caption={`${formatNumber(phonelessBills)} bills with no phone captured`}
+        label="Share of all revenue"
+        value={`${share.toFixed(1)}%`}
+        caption={`of ${formatCurrencyCompact(grossSales)} across ${formatNumber(totalBills)} bills, all channels`}
       />
     </div>
   );

@@ -1,9 +1,10 @@
 /**
- * Customer table.
+ * Customer table — Instagram and WhatsApp leads.
  *
- * Server-paginated. Every row shows *all* of its channel touches, not just the
- * attributed one — a row reading only "Walk-in" would hide that the same person
- * also came through Instagram. (D-79)
+ * Server-paginated. Every row shows *both* of its channel touches where it has
+ * them, not just the attributed one — a row reading only "Instagram" would hide
+ * that the same person was also on the WhatsApp broadcast. 198 people are on
+ * both lists. (D-79)
  *
  * Empty values render "Not provided" rather than a blank cell: 535 customers
  * have no city and most have no date of birth, and a blank cell reads as a bug
@@ -97,9 +98,6 @@ function Row({ row }: { row: CustomerRow }) {
           )}
         </td>
         <td className="tnum px-4 py-3 text-sm text-ink">{formatPhone(row.phoneE164)}</td>
-        <td className="px-4 py-3 text-sm text-ink-2">
-          {orNotProvided(row.purposeOfVisit)}
-        </td>
         <td className="px-4 py-3">
           <div className="flex flex-wrap gap-1">
             {row.channels.length === 0 ? (
@@ -133,7 +131,7 @@ function Row({ row }: { row: CustomerRow }) {
 
       {open && (
         <tr className="border-t border-grid bg-inset/40">
-          <td colSpan={8} className="px-4 py-4">
+          <td colSpan={7} className="px-4 py-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <DetailField label="Area" value={orNotProvided(row.area)} />
               <DetailField label="City" value={orNotProvided(row.city)} />
@@ -161,10 +159,6 @@ function Row({ row }: { row: CustomerRow }) {
                     ? `${formatNumber(row.billCount)} · ${formatCurrency(row.totalSales)}`
                     : 'No purchase'
                 }
-              />
-              <DetailField
-                label="How they heard"
-                value={orNotProvided(row.howDidYouHear)}
               />
               <DetailField
                 label="Follow-up"
@@ -201,10 +195,6 @@ function Row({ row }: { row: CustomerRow }) {
               />
               <DetailField label="First purchase" value={formatDateTime(row.firstSaleAt)} />
               <DetailField
-                label="Walk-in submissions"
-                value={row.submissionCount ? formatNumber(row.submissionCount) : 'None'}
-              />
-              <DetailField
                 label="Classified as"
                 value={
                   row.lifecycleBasis
@@ -240,7 +230,6 @@ export function CustomerTable({ rows }: { rows: CustomerRow[] }) {
             <th className="px-4 pb-3 font-medium">Customer</th>
             <th className="px-4 pb-3 font-medium">Store</th>
             <th className="px-4 pb-3 font-medium">Contact</th>
-            <th className="px-4 pb-3 font-medium">Visit purpose</th>
             <th className="px-4 pb-3 font-medium">Channels</th>
             <th className="px-4 pb-3 font-medium">Lifecycle</th>
             <th className="px-4 pb-3 text-right font-medium">Sales</th>

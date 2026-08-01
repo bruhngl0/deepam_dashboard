@@ -1,20 +1,27 @@
 /**
- * Dashboard.
+ * Dashboard — Instagram and WhatsApp.
  *
  * A Server Component reading straight from SQL — no client data-fetching layer.
  * Filter state lives in the URL, so every view is shareable.
+ *
+ * Walk-in is out of scope here (D-83). It is filtered out, not deleted — see
+ * the note at the top of `lib/queries/dashboard.ts` for why that distinction
+ * matters to the numbers on this page.
  */
 
 import { Suspense } from 'react';
 import {
   getKpis,
   getChannelBreakdown,
+  getCampaignBreakdown,
+  getReach,
   getStoreBreakdown,
   getDataQuality,
 } from '@/lib/queries/dashboard';
 import { getCustomers, getFilterOptions } from '@/lib/queries/customers';
 import { KpiRow, SegmentRow } from '@/components/stat-tiles';
 import { ChannelPerformance } from '@/components/channel-performance';
+import { CampaignTable } from '@/components/campaign-table';
 import { DataQualityPanel } from '@/components/data-quality';
 import { CustomerTable } from '@/components/customer-table';
 import { FilterBar, Pagination } from '@/components/filters';
@@ -47,14 +54,17 @@ export default async function DashboardPage({
     pageSize: Number(one(params.pageSize) ?? 25),
   };
 
-  const [kpis, channels, stores, quality, customers, options] = await Promise.all([
-    getKpis(),
-    getChannelBreakdown(),
-    getStoreBreakdown(),
-    getDataQuality(),
-    getCustomers(filters),
-    getFilterOptions(),
-  ]);
+  const [kpis, channels, campaigns, reach, stores, quality, customers, options] =
+    await Promise.all([
+      getKpis(),
+      getChannelBreakdown(),
+      getCampaignBreakdown(),
+      getReach(),
+      getStoreBreakdown(),
+      getDataQuality(),
+      getCustomers(filters),
+      getFilterOptions(),
+    ]);
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
@@ -62,7 +72,7 @@ export default async function DashboardPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Deepam CRM</h1>
           <p className="mt-1 text-sm text-ink-2">
-            Lead-to-sale attribution across Instagram, WhatsApp and store walk-ins.
+            Lead-to-sale attribution for Instagram and WhatsApp. Walk-in excluded.
           </p>
         </div>
         <ThemeToggle />
@@ -73,34 +83,37 @@ export default async function DashboardPage({
           totalLeads={kpis.totalLeads}
           leadsConverted={kpis.leadsConverted}
           conversionRate={kpis.conversionRate}
-          grossSales={kpis.grossSales}
-          showing={customers.rows.length}
+          attributedRevenue={kpis.attributedRevenue}
+          attributedBills={kpis.attributedBills}
         />
         <SegmentRow
-          newRevenue={kpis.newCustomerRevenue}
-          existingRevenue={kpis.existingRevenue}
+          newLeads={kpis.newLeads}
+          newConverted={kpis.newConverted}
+          newRevenue={kpis.newRevenue}
           existingPeople={kpis.existingPeople}
           existingBuyers={kpis.existingBuyers}
-          phonelessRevenue={kpis.phonelessRevenue}
-          phonelessBills={kpis.phonelessBills}
+          existingRevenue={kpis.existingRevenue}
+          grossSales={kpis.grossSales}
+          totalBills={kpis.totalBills}
         />
       </div>
 
       <div className="mt-6 grid gap-3 lg:grid-cols-2">
-        <ChannelPerformance rows={channels} />
+        <ChannelPerformance rows={channels} reach={reach} />
         <div className="space-y-3">
+          <CampaignTable rows={campaigns} />
           <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
             <h2 className="text-lg font-semibold tracking-tight text-ink">By store</h2>
             <p className="mt-1 text-sm text-ink-2">
-              Billed revenue and walk-in form submissions.
+              All billed revenue, and the share traceable to these two channels.
             </p>
             <table className="mt-4 w-full text-sm">
               <thead>
                 <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
                   <th className="pb-2 text-left font-medium">Store</th>
                   <th className="pb-2 text-right font-medium">Bills</th>
-                  <th className="pb-2 text-right font-medium">Submissions</th>
                   <th className="pb-2 text-right font-medium">Revenue</th>
+                  <th className="pb-2 text-right font-medium">Attributed</th>
                 </tr>
               </thead>
               <tbody>
@@ -113,11 +126,14 @@ export default async function DashboardPage({
                     <td className="tnum py-2.5 text-right text-ink-2">
                       {formatNumber(s.bills)}
                     </td>
-                    <td className="tnum py-2.5 text-right text-ink-2">
-                      {formatNumber(s.submissions)}
-                    </td>
                     <td className="tnum py-2.5 text-right font-medium text-ink">
                       {formatCurrency(s.revenue)}
+                    </td>
+                    <td className="tnum py-2.5 text-right text-ink-2">
+                      {formatCurrency(s.attributedRevenue)}
+                      <span className="ml-1.5 text-xs text-ink-muted">
+                        {formatNumber(s.attributedBills)} bills
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -133,7 +149,8 @@ export default async function DashboardPage({
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-ink">Customers</h2>
             <p className="mt-1 text-sm text-ink-2">
-              Search, filter and review every customer across all channels.
+              Every person on the Instagram or WhatsApp list — {formatNumber(customers.total)} in
+              this view.
             </p>
           </div>
           <Suspense fallback={<div className="h-10" />}>

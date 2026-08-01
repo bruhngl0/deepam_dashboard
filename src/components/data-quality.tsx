@@ -36,19 +36,19 @@ export function DataQualityPanel({ quality }: { quality: DataQuality }) {
 
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
         <Item
-          value={formatCurrency(quality.inferredExistingRevenue)}
-          label={`${formatNumber(quality.inferredExisting)} customers classified existing by inference`}
-          note="Bought with no matching lead record. Unverified — this group mixes genuine repeat customers with first-time walk-ins who never filled a form. Loading POS sales history resolves it provably."
+          value={formatCurrency(quality.unmatchedBuyerRevenue)}
+          label={`${formatNumber(quality.unmatchedBuyers)} buyers match neither list`}
+          note="They bought, but their number appears on no Instagram or WhatsApp sheet. Most came through the store directly. This is the ceiling on what these two channels can ever be shown to explain."
         />
         <Item
           value={formatCurrency(quality.phonelessRevenue)}
           label={`${formatNumber(quality.phonelessBills)} bills with no phone captured`}
-          note="Counted in gross revenue but attributable to nobody. Capturing phone at billing is the fix."
+          note="Counted in gross revenue but attributable to nobody — they cannot match any lead sheet even in principle. Capturing phone at billing is the fix."
         />
         <Item
-          value={formatNumber(quality.estimatedTouches)}
+          value={`${formatNumber(quality.estimatedTouches)} of ${formatNumber(quality.scopedTouches)}`}
           label="lead touches with an estimated date"
-          note="Instagram and WhatsApp exports carry no per-lead timestamp, so the campaign start date stands in. Time-to-convert is unreliable until those exports include a real one."
+          note="Neither export carries a per-lead timestamp, so the campaign start date stands in. Time-to-convert is unreliable until Meta exports include created_time — and it is why first touch falls back to channel priority when the two lists overlap."
         />
         <Item
           value={formatNumber(quality.rejectedUnresolved)}
