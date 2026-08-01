@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens.
+ *
+ * Values come from the validated reference palette. Dark mode is a selected set
+ * of steps for the dark surface, not an automatic inversion, and the theme
+ * toggle must win over the OS setting in both directions.
+ */
+
+:root {
+  --surface-1: #fcfcfb; /* card surface */
+  --surface-page: #f9f9f7; /* page plane */
+  --surface-inset: #f4f3f0; /* expanded row, chips */
+
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+
+  --accent: #2a78d6; /* sequential hue, light */
+  --accent-soft: #cde2fb;
+  --surface-dark-card: #1a1a19;
+  --ink-on-dark: #fcfcfb;
+
+  --status-good: #006300;
+  --status-critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-1: #1a1a19;
+    --surface-page: #0d0d0d;
+    --surface-inset: #222220;
+
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+
+    --accent: #3987e5;
+    --accent-soft: #184f95;
+    --surface-dark-card: #262624;
+
+    --status-good: #0ca30c;
+    --status-critical: #e66767;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface-1: #1a1a19;
+  --surface-page: #0d0d0d;
+  --surface-inset: #222220;
+
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+
+  --accent: #3987e5;
+  --accent-soft: #184f95;
+  --surface-dark-card: #262624;
+
+  --status-good: #0ca30c;
+  --status-critical: #e66767;
+}
+
+@theme inline {
+  --color-surface: var(--surface-1);
+  --color-page: var(--surface-page);
+  --color-inset: var(--surface-inset);
+  --color-ink: var(--text-primary);
+  --color-ink-2: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-line: var(--border);
+  --color-grid: var(--gridline);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-dark-card: var(--surface-dark-card);
+  --color-on-dark: var(--ink-on-dark);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Columns of numbers align vertically; large standalone values must not —
+   tabular figures make a hero number look loose at display sizes. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

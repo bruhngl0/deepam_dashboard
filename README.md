@@ -1,0 +1,99 @@
+# Deepam CRM
+
+Multi-channel lead → sale attribution CRM for Deepam (Ananta Silk Weaves Pvt Ltd).
+Ingests Meta lead forms, WhatsApp broadcast reports, in-store walk-in submissions and POS sales, resolves them all to a single customer identity by phone number, and reports what each channel actually produced.
+
+**Documentation**
+
+| Document | What's in it |
+|---|---|
+| [`SYSTEM_DESIGN.md`](./SYSTEM_DESIGN.md) | Architecture, schema, ingestion pipeline, metric definitions |
+| [`DECISIONS.md`](./DECISIONS.md) | Every rule decided (D-01…D-82), its evidence, confidence and reversal cost |
+
+Code comments reference decision IDs — `// D-20: junk placeholder filter` — so a rule can always be traced back to the reasoning and the data behind it.
+
+---
+
+## Setup
+
+```bash
+npm install
+cp .env.example .env.local        # add your Neon connection string
+npm run db:migrate                # create schema + attribution view
+npm run db:seed                   # stores and campaigns
+npm run dev
+```
+
+## Commands
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Development server |
+| `npm test` | Unit tests (phone normalization) |
+| `npm run db:generate` | Generate a migration from schema changes |
+| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:seed` | Seed stores and campaigns (idempotent) |
+| `npm run db:studio` | Drizzle Studio |
+| `npx tsx scripts/db-status.ts` | Show tables, views, enums, seeded data and settings |
+| `npx tsx scripts/import-sales.ts "<file>" [--commit]` | Import a POS sales report (preview by default) |
+| `npx tsx scripts/rollback-batch.ts [batch-id]` | List import batches, or roll one back |
+| `npx tsx scripts/verify-source-data.ts` | **Regression check: parser vs. the real files** |
+| `npx tsx scripts/import-leads.ts <meta\|whatsapp\|walkin\|all> [--commit]` | Import lead sources |
+| `npx tsx scripts/verify-db.ts` | **Regression check: what actually landed in the database** |
+| `npx tsx scripts/verify-metrics.ts` | **Acceptance test: dashboard KPIs vs. the design docs** |
+
+## Verifying the ingestion layer
+
+`scripts/verify-source-data.ts` runs `src/lib/phone.ts` over the four real spreadsheets and asserts every figure quoted in the design docs. Run it after any change to phone normalization or parsing:
+
+```
+847 bills   ·   ₹2,01,03,733 gross   ·   650 unique sale phones   ·   66 phone-less bills
+```
+
+If those four reconcile, the hardest part of the pipeline is correct. It expects the source files in `~/Downloads`; pass a directory to override.
+
+## Project structure
+
+```
+src/
+  app/page.tsx            Dashboard (Server Component, reads straight from SQL)
+  components/             Stat tiles, channel chart, customer table, filters
+  lib/phone.ts            Identity resolution — the join key for the whole system
+  lib/excel.ts            Serial-date + header-mapping helpers (timezone-safe)
+  lib/format.ts           Indian digit grouping, IST rendering
+  lib/parsers/            sales.ts · leads.ts (Meta, WhatsApp, walk-in)
+  lib/import/             Two-phase preview/commit per source
+  lib/queries/            One definition of every metric (D-76)
+  db/                     Drizzle schema, clients, seed
+drizzle/
+  0000  tables, enums, indexes            0003  name trust order (D-24)
+  0001  attribution view + settings       0004  prior_purchase window fix
+  0002  prior_purchase basis fix          0005  real timestamps beat estimates
+scripts/
+  import-sales.ts · import-leads.ts · rollback-batch.ts
+  verify-source-data.ts · verify-db.ts · verify-metrics.ts · db-status.ts
+```
+
+## Status
+
+| Phase | State |
+|---|---|
+| 0 · Foundation — scaffold, schema, migrations, seed | **done** |
+| 1 · Phone normalization + tests | **done** |
+| 2 · Sales importer | **done** — 847 bills, ₹2,01,03,733, 650 customers, 66 phone-less |
+| 3 · Lead importers (Meta ×5, WhatsApp, walk-in) | **done** — 5,866 leads, 6,412 touches, 793 submissions |
+| 4 · Lifecycle, attribution, KPI queries | **done** — reproduces §2.3 exactly |
+| 5 · Dashboard + customer table UI | **done** — KPI row, channel chart, data-quality panel, filters |
+| 6 · Import UI | next |
+| 7 · Auth, export, data-quality panel | |
+
+Phases 0–4 are the system; 5–7 are surface. Phase 4 is done when it reproduces the figures in `SYSTEM_DESIGN.md` §2.3 exactly.
+
+**Current database state** — all four sources loaded and reconciling:
+
+```
+Total Leads 5,723  ·  Converted 294  ·  CVR 5.1%  ·  Gross ₹2,01,03,733
+walk-in  598 / 257 buyers / 43.0%      existing (declared)  143 / 72
+meta   1,654 /  29 buyers /  1.8%      existing (inferred)  284 / 284
+whatsapp 3,471 /  8 buyers /  0.2%     phone-less bills      66 / ₹17,16,361
+```

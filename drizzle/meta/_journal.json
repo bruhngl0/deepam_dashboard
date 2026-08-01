@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785327101269,
+      "tag": "0000_cold_silver_sable",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785327101270,
+      "tag": "0001_customer_attribution",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785327101271,
+      "tag": "0002_fix_prior_purchase_basis",
+      "breakpoints": false
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785327101272,
+      "tag": "0003_name_trust",
+      "breakpoints": false
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785327101273,
+      "tag": "0004_prior_purchase_window",
+      "breakpoints": false
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785327101274,
+      "tag": "0005_attribution_prefers_real_timestamps",
+      "breakpoints": false
+    }
+  ]
+}
