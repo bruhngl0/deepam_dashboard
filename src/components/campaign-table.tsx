@@ -18,7 +18,7 @@ export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
       </p>
 
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[36rem] text-sm">
+        <table className="w-full min-w-[42rem] text-sm">
           <thead>
             <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
               <th className="pb-2 text-left font-medium">Campaign</th>
@@ -26,6 +26,7 @@ export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
               <th className="pb-2 text-right font-medium">Bought</th>
               <th className="pb-2 text-right font-medium">Rate</th>
               <th className="pb-2 text-right font-medium">Revenue</th>
+              <th className="pb-2 text-right font-medium">Avg bill</th>
               <th className="pb-2 text-right font-medium">Per lead</th>
             </tr>
           </thead>
@@ -49,6 +50,9 @@ export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
                 </td>
                 <td className="tnum py-2.5 text-right font-medium text-ink">
                   {formatCurrency(r.revenue)}
+                </td>
+                <td className="tnum py-2.5 text-right text-ink-2">
+                  {formatCurrency(r.averageBill)}
                 </td>
                 <td className="tnum py-2.5 text-right text-ink-2">
                   {formatCurrency(r.revenuePerLead)}

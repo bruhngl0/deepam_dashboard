@@ -36,13 +36,13 @@ Every decision has an ID (`D-01`…). Reference them from code comments so a fut
 - [D. Stores and branches](#d-stores-and-branches) — D-26…D-28
 - [E. Campaigns and time](#e-campaigns-and-time) — D-29…D-33
 - [F. Customer lifecycle](#f-customer-lifecycle-new-vs-existing) — D-34…D-39
-- [G. Attribution](#g-attribution) — D-40…D-45, D-85
-- [H. Metrics and denominators](#h-metrics-and-denominators) — D-46…D-52
+- [G. Attribution](#g-attribution) — D-40…D-45, D-85, D-92
+- [H. Metrics and denominators](#h-metrics-and-denominators) — D-46…D-52, D-91
 - [I. Data quality](#i-data-quality-and-rejection) — D-53…D-57
-- [J. Import mechanics](#j-import-mechanics) — D-58…D-63, D-84
+- [J. Import mechanics](#j-import-mechanics) — D-58…D-63, D-84, D-89, D-93 (authentication)
 - [K. Schema principles](#k-schema-principles) — D-64…D-69
 - [L. Tech stack](#l-tech-stack) — D-70…D-76
-- [M. UI rules](#m-ui-rules) — D-77…D-83, D-86
+- [M. UI rules](#m-ui-rules) — D-77…D-83, D-86…D-88, D-90
 - [N. Constants](#n-tunable-constants)
 - [O. Deliberately not done](#o-deliberately-not-done)
 - [P. Assumptions that could be wrong](#p-assumptions-that-could-be-wrong)
@@ -353,6 +353,14 @@ The lesson generalises: **a bug in this function is invisible in the row counts 
 **What changed in kind, not just degree:** the master workbook carries no dates, so *every* touch is `touched_at_is_estimated` and **D-44 rule 1 can never fire**. Channel priority is no longer a tiebreak of last resort — it decides every overlap. 298 people are on more than one list (Meta∩WhatsApp 227, Meta∩Others 51, WhatsApp∩Others 25, Meta∩Google 1), so this ordering alone places 298 customers.
 **Confidence:** Reasoned · **Reversal:** Free — one migration, and rule 1 resumes on its own the day any export carries a real timestamp.
 
+### D-92 — D-45 enforced: the attribution window is now real, not documented *(2026-08-03)*
+**Rule:** Migration `0007` bounds `customer_attribution.sale_agg` to `[first_touch_at, first_touch_at + attribution_window_days)` for every lead-matched customer. `dashboard.ts`'s `buildScoped` and `customers.ts`'s `buildScopedCte` enforce the identical rule in their own live `sale_agg` CTEs, both reading the same window from `settings` via `WINDOW_DAYS_EXPR` rather than hardcoding it.
+**Why now:** D-45 was written and seeded in migration `0001` and read by nothing for the rest of the project. A sale nine months after a customer's first touch was being credited to that touch anyway — harmless while every bill sits inside one seven-day load, silently wrong the moment a second campaign period lands in the same database. Better to land the enforcement before that data exists than to restate history afterwards.
+**The existing-customer exemption, stated precisely:** existing customers have no `first_touch_at` at all (D-36 — that absence is *what makes them existing*), so "sales within N days of first touch" has no answer for them. They are matched via `ft.customer_id IS NULL` in `sale_agg`'s join and counted at full lifetime spend, never windowed to zero.
+**Why the setting is read live here and not duplicated like D-85's channel priority:** `attribution_window_days` has exactly one reader in each context (the view, the two live queries) — there is nothing to keep "in step" by copying the value into application code, so the query can just point at the `settings` row.
+**Verified before shipping:** zero bills in the live database predate their customer's first touch and zero conversions land more than 30 days after it, so this migration changed no figure then on screen — `verify-metrics.ts` passed unchanged, and a direct check confirmed the WHERE clause genuinely discriminates (tightening the window to one day in a scratch query excluded 358 of 847 bills, proving it is not a no-op).
+**Confidence:** Proven — mechanism validated against live data, current figures unchanged by construction · **Reversal:** Costly — a migration, though the window value itself stays Free to change via `settings`.
+
 ---
 
 ## H. Metrics and denominators
@@ -398,6 +406,14 @@ total_leads                                        = sum(leads by channel) - exi
 **Why:** Consistency — they were contacted, same as any other channel.
 **Confidence:** Provisional. They are 61% of the denominator at 0.2% conversion and pull the headline rate from **12.7% to 5.1%**. A "reach vs. lead" distinction is arguably more honest, since a broadcast to a purchased list isn't the same act as someone filling in a form.
 **Reversal:** Free · **Open question #5 in `SYSTEM_DESIGN.md` — your call.**
+
+### D-91 — Date range filters sales, not leads, and not everything reads it *(2026-08-03)*
+**Rule:** `?from=&to=` on the dashboard bounds `sales.billed_at` in `getKpis`, `getChannelBreakdown`, `getCampaignBreakdown`, `getStoreBreakdown`, `getStoreChannelMix`, `getDataQuality` and the customer table. Unset on either side means unbounded on that side; both unset (the default) changes nothing.
+**What is deliberately not windowed:** leads (`totalLeads`, `getListOverlap`, `getFollowupOutcomes`) — the master sheet carries no per-lead dates at all (D-84), so there is nothing on that side to bound. The Customer value panel (D-90) also does not read it: ranking a lifetime measure inside an arbitrarily short window would make tier membership shift in ways a two-input date picker cannot explain in one line, so it stays lifetime and says so on the panel itself.
+**The `existing` segment in `getKpis` had to move off `customer_attribution`:** that view's `total_sales` is a materialized lifetime figure and cannot be windowed by a runtime range without a live rebuild. Keeping it there once a range existed would have let `existingRevenue` silently drift out of step with the now-windowed `newRevenue`, breaking the "these three tiles sum to exactly this" reconciliation the Total sales tile promises on screen (D-50). It is now read live from `sales JOIN customers WHERE lifecycle = 'existing'`, bounded by the same range.
+**The store filter on the customer table is deliberately lifetime, not windowed:** "shopped at this branch" is a fact about the person, and narrowing which sales count toward their totals should not also make them vanish from a store filter because their one visit fell outside the selected window.
+**Verified:** the invariant (`new + existing + phone-less = gross`) holds under the full range, two disjoint half-windows, and a full/half-window partition test (`19–22 Jul` + `23–26 Jul` revenue sums exactly to the full-range gross) before this shipped.
+**Confidence:** Proven against the live database · **Reversal:** Free — a query-layer parameter, no migration.
 
 ---
 
@@ -471,6 +487,24 @@ total_leads                                        = sum(leads by channel) - exi
 - The workbook carries **no dates at all**. Every touch is stamped with the campaign start and flagged `touched_at_is_estimated`, so D-44 rule 1 can never fire and time-to-convert is meaningless. This is what forced D-85.
 - Follow-up outcomes (D-67) are empty: the workbook records no calls.
 **Confidence:** Proven — the load ran and reconciles · **Reversal:** Expensive. Back the tables up before `--commit`; restoring the walk-in evidence means re-importing the four original exports.
+
+### D-89 — The import UI's commit path is gated behind an env var, on top of auth *(2026-08-03, revised same day once D-93 landed)*
+**Rule:** `POST /api/import/master-sheet/commit` — the route that runs D-84's delete-and-reload — refuses with a 403 unless `ALLOW_MASTER_SHEET_IMPORT=true` is set in the deployment's environment. Default is unset (off). The `/import` page reads the same flag server-side and hides the confirm-and-commit control when it is off, but the *server* check is what actually matters: it runs before the request body is even read, so a client that somehow rendered the button anyway still cannot make the commit succeed.
+**Why this exists and the CLI script never needed it:** `scripts/import-master-sheet.ts --commit` is already gated by the barrier of shell access to a machine holding the database credentials. A browser route had no equivalent barrier of its own when this was written — this flag was the *only* thing standing between the public internet and a one-click deletion of the entire lead layer.
+**Why it stayed once D-93 added real authentication, rather than being retired as originally planned:** this was first written expecting to remove the flag "the moment auth lands." Once auth actually landed, keeping it looked like the better call, not the interim one — a second gate that must be deliberately and separately enabled means a valid session alone is never sufficient to trigger the single most destructive action in the app. `commit/route.ts` now checks both: `requireApiUser()` first, this flag second.
+**Why an env var and not a client-side confirmation dialog:** a "type REPLACE to confirm" step exists in the UI too (`ImportForm`), but it is a UX safeguard against a mis-click, not a security boundary — anyone with a valid session can still `curl` the route directly and skip it. Only a server-side check that runs before any request-specific logic is a real gate, which is why there are two of those and one of the other.
+**What extraction this required:** the parsing and commit transaction moved out of the CLI script into `lib/import/master-sheet.ts`, called identically by the script and by `preview`/`commit`'s route handlers. Two definitions of this transaction — one in a script, one in a route — would have been exactly the kind of divergence-over-time bug D-76 exists to prevent, in the one place here where that divergence is most expensive: a destructive write path.
+**Confidence:** Reasoned · **Reversal:** Free — an env var, and the extraction makes removing the gate a one-line change in one file.
+
+### D-93 — Authentication: Clerk, invite-only, proxy is optimistic and `requireUser`/`requireApiUser` are the real boundary *(2026-08-03)*
+**Rule:** Every page and every API route requires a signed-in Clerk session. `src/proxy.ts` (Next.js 16 renamed `middleware.ts` — the old filename is deprecated) redirects a signed-out browser to `/sign-in` before a request reaches a page; `requireUser()` (pages) and `requireApiUser()` (routes) check again, server-side, before any query or mutation runs. There is no `/sign-up` route and no self-registration path in the UI — access is granted by inviting someone from the Clerk dashboard, and the Clerk instance itself must be set to restricted sign-up (Clerk dashboard → Configure → Restrictions), documented in `.env.example`, so the API can't be used to self-register even without the missing route.
+**Why the proxy redirect is not treated as the boundary:** Next.js's own documentation states plainly that the proxy layer is an optimistic check, not a session-management or authorisation solution. Every page calls `requireUser()` before its first query; every API route calls `requireApiUser()` before touching the request body. If the proxy matcher is ever edited badly, the app fails closed, not open — confirmed directly: with no Clerk keys configured, every page and every route returns a 500, never a 200 with unguarded data.
+**Why Clerk:** native Vercel Marketplace integration (auto-provisioned env vars via `vercel integration add clerk`), a free tier of 50,000 monthly retained users with no credit card, and pre-built `<SignIn>`/`<UserButton>`/`<Show>` components that cut the custom auth UI to near zero.
+**Why `<Show when="signed-in">` and a Server Component header, not `<SignedIn>`:** Clerk Core 3 removed `<SignedIn>`/`<SignedOut>` in favour of `<Show>`, which is an async Server Component. `site-header.tsx` was restructured to a Server Component specifically so `<Show>` can resolve server-side — a signed-out visitor's first paint never briefly shows navigation they can't use, the way a client-side conditional would.
+**Why API routes get a second helper, not `requireUser()` reused:** `requireUser()` calls Next's `redirect()`, which is correct for a page but wrong for a `fetch()`-driven API route — a redirect just hands the caller a followed 200 for an HTML sign-in page instead of a status it can branch on. `requireApiUser()` returns a real `Response` with status 401 that the caller returns directly.
+**What this cost:** `/import`, `/api/import/master-sheet/{preview,commit}` and `/api/customers/export` — none of which existed when auth was first built — needed the same two-line addition applied to them individually once resumed, since they were built in the gap between when auth was stashed and when it was reapplied. `commitMasterSheet`'s `uploadedBy` now carries the real signed-in user's id instead of the placeholder string it held before auth existed.
+**A real gap the live test caught, not just the fail-closed one:** `NEXT_PUBLIC_CLERK_SIGN_IN_URL` was missing. Without it, Clerk's default is to redirect a signed-out visitor to its own hosted Account Portal (`*.accounts.dev`) instead of this app's own `/sign-in` page — invisible with no keys configured (everything 500s before routing matters), and invisible in a code review, since the custom `/sign-in` page existed and looked complete. Only caught by provisioning real keys and following the redirect. Now set in `.env.local`, `.env.example`, and all three Vercel environments.
+**Confidence:** Proven — provisioned via `vercel integration add clerk` on the free Hobby plan, restricted sign-up confirmed set in the Clerk dashboard, and the full loop verified end to end: signed-out redirects to this app's own `/sign-in`, and a real invited account signed in successfully and reached the dashboard. Every route was also re-confirmed to fail closed (500, never open) before keys existed. **Reversal:** Costly — swapping providers means redoing the sign-in page and every `requireUser`/`requireApiUser` call site, though the boundary pattern itself would carry over.
 
 ---
 
@@ -605,6 +639,34 @@ total_leads                                        = sum(leads by channel) - exi
 **Guarded by:** the `DASHBOARD SCOPE` section of `scripts/verify-metrics.ts`, which asserts the page's own numbers rather than the materialized view's — the two agree today only because all 284 existing customers happen to have no lead touch.
 **Confidence:** Proven against the live database · **Reversal:** Free — one constant.
 
+### D-87 — Branch × channel is one query, not two panels that never cross *(2026-08-03)*
+**Rule:** `getStoreChannelMix` in `lib/queries/dashboard.ts` groups revenue by `(store, primary_channel)` and is rendered by a single `StoreChannelMixPanel`/`StoreChannelBars` pair shared between the dashboard and the Insights finding it grew out of — one query, one component, two places it's read.
+**Why:** The store panel reports revenue per branch; the channel panel reports revenue per channel; neither says whether a branch's revenue is mostly repeat customers or mostly newly acquired ones. Measured: MG Road is 55% `existing` revenue, Jayanagar is 18% — nearly the reverse composition on branches with otherwise-comparable totals (₹1,22,85,433 vs ₹61,01,939). That is a real staffing and campaign-spend difference, invisible until the two dimensions are crossed.
+**Why it reads `customer_attribution` rather than the dashboard's own lead-scoped `SCOPED` CTE:** a branch's revenue includes its existing customers, who by definition (D-36) have no lead touch and would vanish from a lead-scoped join — the same failure the `existing` segment of `getKpis` hit once already (see that CTE's own comment). Only `channel` identity is read from the materialized view here; every summed figure comes straight off `sales`, so — unlike that `existing` case — this *is* safe to bound by the date range filter (D-91).
+**Confidence:** Proven against the live database · **Reversal:** Free.
+
+### D-88 — Average bill and revenue per buyer sit beside every conversion rate *(2026-08-03)*
+**Rule:** `ChannelRow`/`CampaignRow` carry `averageBill` (revenue ÷ bills) and `revenuePerBuyer` (revenue ÷ buyers) alongside `conversionRate`, rendered on every table and bar that shows a rate.
+**Why:** Measured: sorted by conversion rate, Google Ads leads at 46.15% — and its buyers are worth ₹14,972 each, roughly half an Others buyer at ₹32,706, despite Others converting only fractionally lower at 44.69%. A rate column read alone moves budget toward the channel that is actually worth less per sale. This is not a hypothetical the columns guard against; it is what the current data already shows.
+
+| Channel | Conv. rate | Avg bill | Per buyer |
+|---|---|---|---|
+| Google Ads | 46.15% | ₹12,833 | ₹14,972 |
+| Other | 44.69% | ₹26,038 | ₹32,706 |
+| Instagram | 7.80% | ₹22,030 | ₹25,702 |
+| WhatsApp | 1.29% | ₹20,325 | ₹25,185 |
+
+**Confidence:** Proven against the live database · **Reversal:** Free.
+
+### D-90 — Customer value tiers: named thirds by lifetime spend, not deciles, and never windowed *(2026-08-03)*
+**Rule:** `VALUE_TIER` (`lib/format.ts` for the label/order, `lib/queries/dashboard.ts` for the SQL) ranks converted customers by `customer_attribution.total_sales` and splits them into **Top 10%** (decile 1 of `NTILE(10)`), **Next 20%** (deciles 2–3), **Rest of buyers** (deciles 4–10), plus **No purchase yet** for everyone who hasn't converted. Exposed as a Home panel with channel mix per tier, and as a filterable, badge-labelled column on the customer table.
+**Why named thirds and not the raw deciles already on the Insights page:** the Insights chart exists to make a finding legible; this exists to be filtered and acted on. `?tier=top10` needs to be one value a person picks from a dropdown, not one of ten visually-similar percentile bands.
+**Why `NTILE` and not fixed rupee thresholds:** deciles guarantee round, explainable group sizes (65 / 130 / 455 today) regardless of how the revenue distribution shifts; a fixed ₹-threshold would need re-tuning every time the business grows and would silently misclassify everyone once it went stale.
+**Why non-buyers get a flat `none` rather than a bottom decile:** ranking 5,500 people who spent nothing against each other manufactures a distinction that isn't there. `none`'s channel mix falls back to *share of people* rather than *share of revenue* for the same reason — there is no revenue in that tier to split, and printing "0% · 0% · 0% · 0%" for every channel would read as broken rather than reporting the true fact that nobody in it has bought anything yet.
+**Why this ranking is never windowed by the date range filter (D-91), unlike almost everything else on the dashboard:** re-ranking a lifetime-loyalty measure inside an arbitrarily short window — a single day, say — would make tier membership shift in ways a two-input date picker cannot explain in one line. The panel says so on itself rather than leaving the asymmetry silent.
+**Measured today:** 65 people (top10) carry 43.0% of identified revenue; 130 more (next20) carry 29.0%; the remaining 455 buyers carry 28.0%. Within top10, channel mix is `existing` 48% · `other` 30% · `meta` 17% · `whatsapp` 5% — the answer to "which channels actually reach the people who matter," which the concentration finding alone could not give.
+**Confidence:** Proven against the live database · **Reversal:** Free — the tier boundaries are a `CASE` on a window function, not a schema.
+
 ---
 
 ## N. Tunable constants
@@ -613,8 +675,8 @@ Everything here is config, changeable without a migration.
 
 | Constant | Default | Set by | Effect if changed |
 |---|---|---|---|
-| `ATTRIBUTION_WINDOW_DAYS` | 30 | D-45 | Widens/narrows what counts as a conversion |
-| `CHANNEL_PRIORITY` | `walkin > meta > whatsapp > other` | D-44 | Reallocates credit between channels |
+| `ATTRIBUTION_WINDOW_DAYS` | 30 | D-45, enforced D-92 | Widens/narrows what counts as a conversion |
+| `CHANNEL_PRIORITY` | `google > meta > other > whatsapp` | D-85 (was D-44's `walkin > meta > whatsapp > other`; `walkin` no longer exists as a channel, D-84) | Reallocates credit between channels — currently decides *every* overlap, not just ties (D-85) |
 | `EXCLUDE_FOREIGN_FROM_METRICS` | `true` | D-21 | Adds foreign leads to the denominator |
 | `EXCLUDE_EXISTING_FROM_FUNNEL` | `true` | D-46 | **5.1% → 10.6% conversion rate** |
 | `WHATSAPP_COUNTS_AS_LEAD` | `true` | D-52 | **5.1% → 12.7% conversion rate** |

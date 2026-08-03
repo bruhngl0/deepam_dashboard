@@ -9,6 +9,11 @@
  * Empty values render "Not provided" rather than a blank cell: 535 customers
  * have no city and most have no date of birth, and a blank cell reads as a bug
  * where an explicit label reads as a fact. (D-80)
+ *
+ * A buyer's value tier — Top 10%, Next 20%, Rest of buyers — sits under their
+ * sales figure. It is a business-wide ranking, not scoped to this table's lead
+ * population, so it stays comparable with the Customer value panel on the
+ * dashboard.
  */
 
 'use client';
@@ -24,6 +29,7 @@ import {
   CHANNEL_LABEL,
   LIFECYCLE_BASIS_LABEL,
   REMARK_LABEL,
+  VALUE_TIER_LABEL,
 } from '@/lib/format';
 import type { CustomerRow } from '@/lib/queries/customers';
 
@@ -115,7 +121,18 @@ function Row({ row }: { row: CustomerRow }) {
           <LifecycleChip row={row} />
         </td>
         <td className="tnum px-4 py-3 text-right text-sm font-medium text-ink">
-          {row.billCount > 0 ? formatCurrency(row.totalSales) : '—'}
+          {row.billCount > 0 ? (
+            <>
+              {formatCurrency(row.totalSales)}
+              {row.valueTier !== 'none' && (
+                <span className="mt-0.5 block text-xs font-normal tabular-nums text-ink-muted">
+                  {VALUE_TIER_LABEL[row.valueTier]}
+                </span>
+              )}
+            </>
+          ) : (
+            '—'
+          )}
         </td>
         <td className="px-4 py-3 text-right">
           <button

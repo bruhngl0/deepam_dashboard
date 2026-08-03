@@ -15,11 +15,13 @@
 import {
   getRevenueConcentration,
   getChannelValue,
-  getStoreChannelMix,
   getRepeatPurchase,
   getContactCompleteness,
 } from '@/lib/queries/insights';
+import { getStoreChannelMix } from '@/lib/queries/dashboard';
+import { StoreChannelBars } from '@/components/store-channel-mix';
 import { formatCurrency, formatNumber, CHANNEL_LABEL } from '@/lib/format';
+import { requireUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +70,9 @@ function Bar({ value, scale }: { value: number; scale: number }) {
 }
 
 export default async function InsightsPage() {
+  // Before any query runs — the proxy redirect is not the boundary.
+  await requireUser();
+
   const [deciles, channels, stores, repeat, completeness] = await Promise.all([
     getRevenueConcentration(),
     getChannelValue(),
@@ -194,35 +199,12 @@ export default async function InsightsPage() {
             eyebrow="Branch mix"
             title="The two branches are running different businesses"
           >
-            <div className="grid gap-5 sm:grid-cols-2">
-              {stores.map((s) => (
-                <div key={s.store} className="flex flex-col gap-2.5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-sm font-medium text-ink">{s.store}</p>
-                    <p className="tnum text-xs text-ink-muted">{formatCurrency(s.total)}</p>
-                  </div>
-                  {s.channels.map((c) => (
-                    <div key={c.channel}>
-                      <div className="flex items-baseline justify-between gap-3 text-xs">
-                        <span className="text-ink-2">{label(c.channel)}</span>
-                        <span className="tnum text-ink-2">
-                          {c.share > 0 && c.share < 1 ? '<1' : c.share.toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="mt-1">
-                        <Bar value={c.share} scale={100} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+            <StoreChannelBars stores={stores} />
             <Note>
-              One branch runs on people who already knew you; the other runs on acquisition.
-              That is a real operational difference — different staffing, different campaign
-              spend — and it is invisible on the dashboard today, because the store panel
-              shows revenue totals, the channel panel shows channels, and nothing crosses
-              them. Shares are of each branch&rsquo;s own identified revenue.
+              One branch runs on people who already knew you; the other runs on acquisition —
+              a real operational difference in staffing and campaign spend. This finding now
+              has a permanent home: the Branch × channel panel on the dashboard, which reads
+              the same query as the bars above.
             </Note>
           </Finding>
         </div>
@@ -294,17 +276,20 @@ export default async function InsightsPage() {
   );
 }
 
-type Priority = 'Risk' | 'High' | 'Medium';
+type Priority = 'Risk' | 'Done';
 
 const PRIORITY_STYLE: Record<Priority, string> = {
   Risk: 'border-status-critical/30 bg-status-critical/10 text-status-critical',
-  High: 'border-transparent bg-accent-soft/60 text-accent',
-  Medium: 'border-line bg-inset text-ink-2',
+  Done: 'border-status-good/30 bg-status-good/10 text-status-good',
 };
 
 /**
- * Ordered by what I would do first, so the numbering carries real information —
- * it is a priority sequence, not decoration.
+ * Originally seven proposals, ordered by what I would do first. Six are now
+ * built — the list stays in its original order rather than moving finished
+ * items to the bottom, so the sequence itself still records the priority call
+ * that was made, not just its outcome. Authentication is unchanged and unbuilt:
+ * it was the one item that was a liability rather than a missed opportunity,
+ * and it still is.
  */
 const BUILD: { priority: Priority; effort: string; title: string; body: string }[] = [
   {
@@ -312,49 +297,49 @@ const BUILD: { priority: Priority; effort: string; title: string; body: string }
     effort: 'Days',
     title: 'Authentication',
     body:
-      'The dashboard is a public URL serving names, phone numbers and email addresses for every customer in the database, with no login. Currently scheduled as Phase 7. It is the only item on this list that is a liability rather than a missed opportunity, and it should come first.',
+      'Code-complete, not yet live. D-93: every page and API route now requires a signed-in Clerk session — proxy.ts redirects, requireUser()/requireApiUser() enforce it again server-side before any query runs, invite-only with no public sign-up. Confirmed to fail closed: with no Clerk keys configured, every route returns 500, never an open page. What is still missing is a provisioned Clerk account — vercel integration add clerk, then restricted sign-up mode — and a deploy. Until both happen, whatever is actually live in production is still the pre-auth version. This remains the item that should land first.',
   },
   {
-    priority: 'High',
+    priority: 'Done',
     effort: 'Hours',
     title: 'Branch × channel matrix',
     body:
-      'Surfaces the finding above directly. The join already works and the query is written — it needs a panel on the dashboard rather than living only on this page.',
+      'D-87. A live panel on the dashboard now, not just a finding here — the same query and the same bars, shared between both pages so they can never disagree.',
   },
   {
-    priority: 'High',
+    priority: 'Done',
     effort: 'Hours',
     title: 'Value columns on the channel and campaign tables',
     body:
-      'Average bill and revenue per buyer, beside the conversion rate. Both are derivable from columns already in customer_attribution, and together they stop the rate column being read on its own.',
+      'D-88. Average bill and revenue per buyer sit beside every conversion rate on the dashboard now. Google Ads converting best and being worth roughly half an Others buyer is visible without a trip to this page.',
   },
   {
-    priority: 'High',
+    priority: 'Done',
     effort: 'Days',
     title: 'A customer-value view',
     body:
-      'Tiers or deciles with channel mix per tier, so the concentration finding becomes something you can act on: which campaigns actually reach the top decile. This is the one I would argue hardest for — it reframes the product from counting leads to finding the people who matter.',
+      'D-90. Named tiers (Top 10% / Next 20% / Rest of buyers / No purchase yet) by lifetime spend, with channel mix per tier, live on the dashboard — and filterable on the customer table via ?tier=. The concentration finding is now something you can act on: within the top decile, existing customers, Others and Instagram are visible by name.',
   },
   {
-    priority: 'High',
+    priority: 'Done',
     effort: 'Days',
     title: 'Date range filter',
     body:
-      'billed_at exists on every sale and nothing filters on it. Right now "the period" is hardcoded reality because only one week is loaded. The first day a second period lands, every number on the dashboard silently becomes a blend of the two.',
+      'D-91. ?from=&to= on the dashboard now bounds every sales-derived figure, verified to partition exactly (two half-windows sum to the full-range gross to the rupee). Leads stay unwindowed — they still carry no date (D-84) — and the Customer value panel deliberately stays lifetime; both say so on the page rather than leaving the asymmetry silent.',
   },
   {
-    priority: 'Medium',
+    priority: 'Done',
     effort: 'Hours',
     title: 'Implement the 30-day attribution window (D-45)',
     body:
-      'Documented in DECISIONS, seeded as a setting in migration 0001, and read by no code. Harmless while every bill sits inside one week; wrong the moment a July lead buys in November. Far better to land it before that data exists than to restate history afterwards.',
+      'D-92. Enforced now in migration 0007 and mirrored in the live dashboard queries, reading the window from settings rather than a hardcoded value. Verified to change no figure currently on screen — a scratch check confirmed the rule genuinely discriminates by tightening the window to one day, which excluded 358 of 847 bills.',
   },
   {
-    priority: 'Medium',
+    priority: 'Done',
     effort: 'Days',
     title: 'Import UI and export',
     body:
-      'Loading a sheet is currently a CLI run on a developer laptop, which makes every refresh a request. Export matters for the opposite reason — without it people screenshot the customer table and the numbers leave the system entirely.',
+      'D-89. /import previews any workbook safely and commits behind an explicit env-var gate pending authentication. /api/customers/export streams a CSV of every filtered row, not just the visible page, sharing its filter logic with the table so the two can never quietly disagree.',
   },
 ];
 
@@ -379,7 +364,7 @@ function Roadmap() {
           What to build
         </p>
         <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-ink">
-          Seven things, in the order I would do them
+          Six built, one left — in the order they were proposed
         </h2>
 
         <ol className="mt-5 flex flex-col gap-5">

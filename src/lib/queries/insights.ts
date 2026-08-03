@@ -9,6 +9,11 @@
  * Read straight from `sales` and `customer_attribution` rather than through the
  * dashboard's scoped CTE: these questions are about the whole business — what
  * the money is concentrated in, who buys twice — not about lead attribution.
+ *
+ * `getStoreChannelMix` lives in `lib/queries/dashboard.ts`, not here: once the
+ * branch × channel matrix became a dashboard panel it needed one definition
+ * both routes could read, and duplicating a join across two files is how they
+ * drift.
  */
 
 import { db } from '@/db';
@@ -110,51 +115,6 @@ export async function getChannelValue(): Promise<ChannelValueRow[]> {
   });
 }
 
-export interface StoreMixRow {
-  store: string;
-  total: number;
-  channels: { channel: string; buyers: number; revenue: number; share: number }[];
-}
-
-/**
- * Channel mix per branch. The dashboard reports stores and channels separately
- * and never crosses them, which hides that the two branches run on different
- * kinds of customer entirely.
- *
- * Rendered as small multiples — one single-hue block per store — rather than
- * grouped bars, so no categorical palette is needed to tell the stores apart.
- */
-export async function getStoreChannelMix(): Promise<StoreMixRow[]> {
-  const rows = await query(`
-    SELECT st.name                                        AS store,
-           ca.primary_channel::text                       AS channel,
-           COUNT(DISTINCT s.customer_id)::int             AS buyers,
-           COALESCE(ROUND(SUM(s.bill_amount)), 0)::bigint AS revenue
-    FROM   sales s
-    JOIN   stores st ON st.id = s.store_id
-    JOIN   customer_attribution ca ON ca.customer_id = s.customer_id
-    GROUP  BY 1, 2 ORDER BY st.name, revenue DESC`);
-
-  const byStore = new Map<string, StoreMixRow>();
-  for (const r of rows) {
-    const store = String(r.store);
-    if (!byStore.has(store)) byStore.set(store, { store, total: 0, channels: [] });
-    const entry = byStore.get(store)!;
-    const revenue = Number(r.revenue ?? 0);
-    entry.total += revenue;
-    entry.channels.push({
-      channel: String(r.channel),
-      buyers: Number(r.buyers ?? 0),
-      revenue,
-      share: 0,
-    });
-  }
-
-  for (const entry of byStore.values()) {
-    for (const c of entry.channels) c.share = entry.total ? (100 * c.revenue) / entry.total : 0;
-  }
-  return [...byStore.values()].sort((a, b) => b.total - a.total);
-}
 
 export interface RepeatRow {
   bills: number;

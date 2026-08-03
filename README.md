@@ -8,7 +8,7 @@ Ingests the cleaned master lead workbook (Meta, WhatsApp, Google Ads, Others) an
 | Document | What's in it |
 |---|---|
 | [`SYSTEM_DESIGN.md`](./SYSTEM_DESIGN.md) | Architecture, schema, ingestion pipeline, metric definitions |
-| [`DECISIONS.md`](./DECISIONS.md) | Every rule decided (D-01…D-82), its evidence, confidence and reversal cost |
+| [`DECISIONS.md`](./DECISIONS.md) | Every rule decided (D-01…D-92), its evidence, confidence and reversal cost |
 
 Code comments reference decision IDs — `// D-20: junk placeholder filter` — so a rule can always be traced back to the reasoning and the data behind it.
 
@@ -35,6 +35,7 @@ npm run dev
 | `npm run db:seed` | Seed stores and campaigns (idempotent) |
 | `npm run db:studio` | Drizzle Studio |
 | `npx tsx scripts/db-status.ts` | Show tables, views, enums, seeded data and settings |
+| `npx tsx scripts/import-master-sheet.ts "<file.xlsx>" [--commit]` | Replace the lead layer from the master workbook (D-84) — preview by default. Same logic as the `/import` page (D-89). |
 | `npx tsx scripts/import-sales.ts "<file>" [--commit]` | Import a POS sales report (preview by default) |
 | `npx tsx scripts/rollback-batch.ts [batch-id]` | List import batches, or roll one back |
 | `npx tsx scripts/verify-source-data.ts` | **Regression check: parser vs. the real files** |
@@ -57,20 +58,29 @@ If those four reconcile, the hardest part of the pipeline is correct. It expects
 ```
 src/
   app/page.tsx            Dashboard (Server Component, reads straight from SQL)
-  components/             Stat tiles, channel chart, customer table, filters
+  app/insights/            Live findings + build roadmap (numbers queried, not typed)
+  app/import/              Master-sheet upload — preview, then a gated commit (D-89)
+  app/api/import/          preview/ (safe) and commit/ (ALLOW_MASTER_SHEET_IMPORT-gated) routes
+  app/api/customers/export/  CSV export, same filters as the customer table (D-76)
+  components/              Stat tiles, channel chart, branch×channel matrix, customer
+                           value tiers, customer table, filters, import form
   lib/phone.ts            Identity resolution — the join key for the whole system
   lib/excel.ts            Serial-date + header-mapping helpers (timezone-safe)
-  lib/format.ts           Indian digit grouping, IST rendering
-  lib/parsers/            sales.ts · leads.ts (Meta, WhatsApp, walk-in)
-  lib/import/             Two-phase preview/commit per source
-  lib/queries/            One definition of every metric (D-76)
+  lib/format.ts           Indian digit grouping, IST rendering, value-tier labels
+  lib/csv.ts              RFC 4180 CSV encoding for the export route
+  lib/parsers/            sales.ts · leads.ts (Meta, WhatsApp, walk-in — superseded, D-84)
+  lib/import/              master-sheet.ts (parse + commit, shared by the CLI and the API
+                           routes, D-89) · leads.ts · sales.ts (two-phase preview/commit)
+  lib/queries/             One definition of every metric (D-76): dashboard.ts (DateRange,
+                           value tiers, branch×channel), customers.ts, insights.ts
   db/                     Drizzle schema, clients, seed
 drizzle/
-  0000  tables, enums, indexes            0003  name trust order (D-24)
-  0001  attribution view + settings       0004  prior_purchase window fix
-  0002  prior_purchase basis fix          0005  real timestamps beat estimates
+  0000  tables, enums, indexes            0004  prior_purchase window fix
+  0001  attribution view + settings       0005  real timestamps beat estimates
+  0002  prior_purchase basis fix          0006  master-sheet channel priority (D-85)
+  0003  name trust order (D-24)           0007  attribution window enforced (D-92)
 scripts/
-  import-sales.ts · import-leads.ts · rollback-batch.ts
+  import-master-sheet.ts · import-sales.ts · import-leads.ts · rollback-batch.ts
   verify-source-data.ts · verify-db.ts · verify-metrics.ts · db-status.ts
 ```
 
@@ -83,10 +93,12 @@ scripts/
 | 2 · Sales importer | **done** — 847 bills, ₹2,01,03,733, 650 customers, 66 phone-less |
 | 3 · Lead importers (Meta ×5, WhatsApp, walk-in) | **superseded** by the master-sheet importer (D-84) |
 | 3b · Master-sheet importer | **done** — 5,866 leads, 6,167 touches, 4 channels |
-| 4 · Lifecycle, attribution, KPI queries | **done** — `verify-metrics.ts` passes |
-| 5 · Dashboard + customer table UI | **done** — KPI row, channel chart, data-quality panel, filters |
-| 6 · Import UI | next |
-| 7 · Auth, export, data-quality panel | |
+| 4 · Lifecycle, attribution, KPI queries | **done** — `verify-metrics.ts` passes; attribution window enforced (D-92) |
+| 5 · Dashboard + customer table UI | **done** — KPI row, channel chart, branch×channel matrix (D-87), value columns (D-88), customer value tiers (D-90), date range filter (D-91), data-quality panel, filters |
+| 5b · Insights route | **done** — live findings + build roadmap at `/insights` |
+| 6 · Import UI | **done** — `/import`: preview always works, commit gated by `ALLOW_MASTER_SHEET_IMPORT` until auth exists (D-89) |
+| 6b · CSV export | **done** — `/api/customers/export`, same filters as the customer table |
+| 7 · Auth | **not started** — the dashboard, Insights and Import pages are all reachable with no login. See D-89: this is why the import commit path is env-gated rather than trusting the UI. |
 
 Phases 0–4 are the system; 5–7 are surface. Phase 4 is done when `npx tsx scripts/verify-metrics.ts` passes — that script, not `SYSTEM_DESIGN.md` §2.3, is the maintained baseline.
 

@@ -12,6 +12,11 @@
  * wrong conclusion — the gap between them *is* the finding. That gap is widest
  * on `other`, which is store-sourced: most of its buyers were already customers
  * (D-86), so its headline rate says little about acquisition.
+ *
+ * Average bill and revenue per buyer sit beside the rate for the same reason:
+ * sorted by conversion rate, Google Ads leads the list, but its buyers are
+ * worth roughly half an Others buyer. Reading the rate column alone moves
+ * budget the wrong way — see the Insights page for the full comparison.
  */
 
 import { formatNumber, formatCurrency, CHANNEL_LABEL } from '@/lib/format';
@@ -88,6 +93,10 @@ export function ChannelPerformance({
             <p className="tnum mt-1.5 text-xs text-ink-muted">
               {formatNumber(row.buyers)} of {formatNumber(row.people)} leads ·{' '}
               {formatNumber(row.bills)} bills · {formatCurrency(row.revenue)}
+            </p>
+            <p className="tnum mt-0.5 text-xs text-ink-muted">
+              {formatCurrency(row.averageBill)} avg bill ·{' '}
+              {formatCurrency(row.revenuePerBuyer)} per buyer
             </p>
             {funnelDiffers && (
               <p className="tnum mt-0.5 text-xs text-ink-muted">

@@ -90,6 +90,23 @@ export const CHANNEL_LABEL: Record<string, string> = {
   other: 'Other',
 };
 
+export type ValueTierCode = 'top10' | 'next20' | 'rest70' | 'none';
+
+/**
+ * Shared with `lib/queries/dashboard.ts`, which computes the tier assignment.
+ * Lives here, not there, because dashboard.ts imports the server-only `@/db`
+ * client — a client component (the customer table) importing a value from
+ * dashboard.ts would pull that server dependency into the browser bundle.
+ */
+export const VALUE_TIER_LABEL: Record<ValueTierCode, string> = {
+  top10: 'Top 10%',
+  next20: 'Next 20%',
+  rest70: 'Rest of buyers',
+  none: 'No purchase yet',
+};
+
+export const VALUE_TIER_ORDER: ValueTierCode[] = ['top10', 'next20', 'rest70', 'none'];
+
 export const LIFECYCLE_BASIS_LABEL: Record<string, string> = {
   prior_purchase: 'Purchased before this campaign window — provable',
   self_declared: 'Told us so on the walk-in form',
