@@ -75,7 +75,7 @@ export function KpiRow({
       <HeroTile
         label="Total leads"
         value={formatNumber(totalLeads)}
-        caption="Distinct people on the two lists"
+        caption="Distinct people across the four lists"
       />
       <StatTile
         label="Leads converted"
@@ -136,7 +136,7 @@ export function SegmentRow({
       <StatTile
         label="Already customers"
         value={formatCurrencyCompact(existingRevenue)}
-        caption={`${formatNumber(existingBuyers)} buyers of ${formatNumber(existingPeople)} · said so on the form`}
+        caption={`${formatNumber(existingBuyers)} buyers of ${formatNumber(existingPeople)} · inferred, no lead record`}
       />
       <StatTile
         label="Share of all revenue"

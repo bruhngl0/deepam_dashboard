@@ -1,7 +1,7 @@
 # Deepam CRM
 
 Multi-channel lead → sale attribution CRM for Deepam (Ananta Silk Weaves Pvt Ltd).
-Ingests Meta lead forms, WhatsApp broadcast reports, in-store walk-in submissions and POS sales, resolves them all to a single customer identity by phone number, and reports what each channel actually produced.
+Ingests the cleaned master lead workbook (Meta, WhatsApp, Google Ads, Others) and POS sales, resolves them all to a single customer identity by phone number, and reports what each channel actually produced. The original per-channel export parsers are kept — see D-84 for what replaced them and what that cost.
 
 **Documentation**
 
@@ -81,19 +81,25 @@ scripts/
 | 0 · Foundation — scaffold, schema, migrations, seed | **done** |
 | 1 · Phone normalization + tests | **done** |
 | 2 · Sales importer | **done** — 847 bills, ₹2,01,03,733, 650 customers, 66 phone-less |
-| 3 · Lead importers (Meta ×5, WhatsApp, walk-in) | **done** — 5,866 leads, 6,412 touches, 793 submissions |
-| 4 · Lifecycle, attribution, KPI queries | **done** — reproduces §2.3 exactly |
+| 3 · Lead importers (Meta ×5, WhatsApp, walk-in) | **superseded** by the master-sheet importer (D-84) |
+| 3b · Master-sheet importer | **done** — 5,866 leads, 6,167 touches, 4 channels |
+| 4 · Lifecycle, attribution, KPI queries | **done** — `verify-metrics.ts` passes |
 | 5 · Dashboard + customer table UI | **done** — KPI row, channel chart, data-quality panel, filters |
 | 6 · Import UI | next |
 | 7 · Auth, export, data-quality panel | |
 
-Phases 0–4 are the system; 5–7 are surface. Phase 4 is done when it reproduces the figures in `SYSTEM_DESIGN.md` §2.3 exactly.
+Phases 0–4 are the system; 5–7 are surface. Phase 4 is done when `npx tsx scripts/verify-metrics.ts` passes — that script, not `SYSTEM_DESIGN.md` §2.3, is the maintained baseline.
 
-**Current database state** — all four sources loaded and reconciling:
+**Current database state** — the cleaned master workbook, all four channels reporting:
 
 ```
-Total Leads 5,723  ·  Converted 294  ·  CVR 5.1%  ·  Gross ₹2,01,03,733
-walk-in  598 / 257 buyers / 43.0%      existing (declared)  143 / 72
-meta   1,654 /  29 buyers /  1.8%      existing (inferred)  284 / 284
-whatsapp 3,471 /  8 buyers /  0.2%     phone-less bills      66 / ₹17,16,361
+Total Leads 5,866  ·  Converted 366  ·  CVR 6.24%  ·  Gross ₹2,01,03,733
+whatsapp 3,562 /  46 buyers /  1.29%    existing (inferred)  284 / 284
+meta     1,924 / 150 buyers /  7.80%    phone-less bills      66 / ₹17,16,361
+other      367 / 164 buyers / 44.69%
+google      13 /   6 buyers / 46.15%
 ```
+
+`other` is store-sourced and is mostly people who had already bought, which is why the
+blended rate reads 6.24% against 1.29–7.80% for the digital channels. Read the channel
+rows, not the headline, to judge acquisition (D-86).

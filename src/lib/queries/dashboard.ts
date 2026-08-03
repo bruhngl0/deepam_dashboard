@@ -1,36 +1,36 @@
 /**
- * Dashboard metric queries — Instagram and WhatsApp only.
+ * Dashboard metric queries — every channel in the master sheet.
  *
  * The single definition of every KPI (D-76). Server Components and any future
  * REST route both read from here, so "conversion rate" cannot come to mean two
  * slightly different things in two places.
  *
- * ── Scope (D-83) ────────────────────────────────────────────────────────────
- * This dashboard reports the two digital lead sources. Walk-in is out of scope:
- * it is not queried, not counted and not plotted.
+ * ── Scope (D-86, reversing D-83) ────────────────────────────────────────────
+ * All four master-sheet channels are reported: Meta, WhatsApp, Google Ads and
+ * Others. D-83 had narrowed this view to the two digital sources to keep
+ * store-sourced walk-ins out of the headline; the master sheet then dissolved
+ * the walk-in channel and redistributed those people (D-84), so the narrowing
+ * no longer excluded what it was written to exclude — it just hid Google Ads.
  *
- * Scoping is a *filter*, not a deletion. Nothing in `lead_touches` or
- * `walkin_submissions` is removed, for one reason worth stating: the walk-in
- * form is the only evidence that 16 of the 100 matched buyers were already
- * customers (`lifecycle_basis = 'self_declared'`). Delete it and
- * `recompute_customer_lifecycle()` silently reclassifies those people as new
- * acquisitions, inflating Instagram's converted count from 72 to 85 with no
- * remaining trace of the error. The rows stay; the view narrows.
+ * The cost of the reversal is stated plainly, because it moves the headline a
+ * long way: `other` is store-sourced and converts at 44.7%, against 7.8% for
+ * Meta and 1.3% for WhatsApp. It is largely people who had already bought, so
+ * blended conversion rises from 3.8% to 6.2% without any campaign performing
+ * better. Read the channel table, not the headline rate, to judge acquisition.
  *
  * ── Why not read `customer_attribution` ─────────────────────────────────────
- * That materialized view resolves first touch across *all* channels, so a
- * person reached on Instagram who later filled a walk-in form is credited to
- * walk-in (migration 0005 — a real timestamp outranks an estimated one).
- * Filtering its `primary_channel` to meta/whatsapp would therefore silently
- * drop 82 Instagram and 196 WhatsApp leads that walk-in had taken. With walk-in
- * out of scope those people are back in play, so first touch is recomputed here
- * over the two digital channels alone, using the same precedence rules.
+ * Two differences, both deliberate. That view relabels `primary_channel` to
+ * 'existing' for anyone whose lifecycle is existing, which would empty the
+ * channel rows of every lead who turned out to be a prior customer; and it
+ * carries the 284 buyers who match no lead record at all, who are not leads and
+ * do not belong in a lead denominator. First touch is therefore recomputed here
+ * over `lead_touches`, using the same precedence rules as migration 0006.
  *
  * ── The denominator (D-46) ──────────────────────────────────────────────────
- * `totalLeads` here counts every digital lead, including the 25 already flagged
- * as existing customers, so the headline agrees with the channel table beneath
- * it. The D-46 funnel figure — existing and foreign numbers excluded — is
- * reported alongside as `newLeads`/`newConverted`/`newRevenue`, never folded in.
+ * `totalLeads` counts every lead, including those already flagged as existing
+ * customers, so the headline agrees with the channel table beneath it. The D-46
+ * funnel figure — existing and foreign numbers excluded — is reported alongside
+ * as `newLeads`/`newConverted`/`newRevenue`, never folded in.
  */
 
 import { db } from '@/db';
@@ -43,20 +43,29 @@ async function query(text: string): Promise<Row[]> {
   return Array.isArray(result) ? (result as Row[]) : ((result as { rows: Row[] }).rows ?? []);
 }
 
-/** The only channels this dashboard reports on. */
-export const SCOPED_CHANNELS = ['meta', 'whatsapp'] as const;
+/** The channels this dashboard reports on. (D-86) */
+export const SCOPED_CHANNELS = ['google', 'meta', 'other', 'whatsapp'] as const;
 
 const IN_SCOPE = SCOPED_CHANNELS.map((c) => `'${c}'`).join(',');
 
 /**
- * First touch across the in-scope channels only, with each person's sales
- * attached. Precedence matches `customer_attribution` (migration 0005):
- * real timestamps beat estimated ones, then earliest, then channel priority.
+ * First touch across the in-scope channels, with each person's sales attached.
+ * Precedence matches `customer_attribution` (migration 0006): real timestamps
+ * beat estimated ones, then earliest, then channel priority, then campaign id
+ * so the order is total and never planner-dependent.
  *
- * Both digital sources are wholly estimated (neither export carries a per-lead
- * date), so in practice rule 1 never fires here and ties fall to channel
- * priority — Instagram outranks WhatsApp, per the `channel_priority` setting.
+ * The master sheet carries no dates at all, so every touch is estimated and
+ * rule 1 never fires — channel priority decides every overlap, not just ties.
+ * That ordering is `settings.channel_priority`; keep the two in step.
  */
+const PRIORITY = `CASE lt.channel
+              WHEN 'google'   THEN 1
+              WHEN 'meta'     THEN 2
+              WHEN 'other'    THEN 3
+              WHEN 'whatsapp' THEN 4
+              ELSE 5
+            END`;
+
 const SCOPED = `
   scoped_touch AS (
     SELECT DISTINCT ON (lt.customer_id)
@@ -66,7 +75,8 @@ const SCOPED = `
     ORDER  BY lt.customer_id,
               lt.touched_at_is_estimated ASC,
               lt.touched_at ASC,
-              CASE lt.channel WHEN 'meta' THEN 2 WHEN 'whatsapp' THEN 3 ELSE 4 END
+              ${PRIORITY},
+              lt.campaign_id
   ),
   sale_agg AS (
     SELECT customer_id,
@@ -104,6 +114,7 @@ export interface Kpis {
   newLeads: number;
   newConverted: number;
   newRevenue: number;
+  /** Business-wide, not scope-limited — existing customers have no lead touch. */
   existingPeople: number;
   existingBuyers: number;
   existingRevenue: number;
@@ -124,11 +135,23 @@ export async function getKpis(): Promise<Kpis> {
              COALESCE(SUM(bill_count), 0)::int                    AS bills,
              COUNT(*) FILTER (WHERE in_funnel)::int               AS new_leads,
              COUNT(*) FILTER (WHERE in_funnel AND converted)::int AS new_converted,
-             COALESCE(SUM(total_sales) FILTER (WHERE in_funnel AND converted), 0)::numeric AS new_revenue,
-             COUNT(*) FILTER (WHERE lifecycle = 'existing')::int  AS existing_people,
-             COUNT(*) FILTER (WHERE lifecycle = 'existing' AND converted)::int AS existing_buyers,
-             COALESCE(SUM(total_sales) FILTER (WHERE lifecycle = 'existing'), 0)::numeric AS existing_revenue
+             COALESCE(SUM(total_sales) FILTER (WHERE in_funnel AND converted), 0)::numeric AS new_revenue
       FROM   scoped
+    ),
+    -- Existing customers are counted business-wide, not within lead scope.
+    -- Sourcing them from the scoped CTE (as this once did) silently returned
+    -- zero: every existing customer is no_lead_match, which is what makes them
+    -- existing (D-36), so by definition none has a lead touch and none survives
+    -- the join. The tile read "0 buyers of 0" while the data-quality panel
+    -- simultaneously reported their 79,20,018.
+    -- No double count: in_funnel excludes lifecycle = 'existing', so the new and
+    -- existing segments are disjoint and sum with phone-less to gross (D-50).
+    existing AS (
+      SELECT COUNT(*)::int                                   AS existing_people,
+             COUNT(*) FILTER (WHERE converted)::int          AS existing_buyers,
+             COALESCE(SUM(total_sales), 0)::numeric          AS existing_revenue
+      FROM   customer_attribution
+      WHERE  lifecycle = 'existing'
     ),
     bills AS (
       SELECT COUNT(*)::int AS n,
@@ -137,8 +160,8 @@ export async function getKpis(): Promise<Kpis> {
              COALESCE(SUM(bill_amount) FILTER (WHERE customer_id IS NULL), 0)::numeric AS phoneless_rev
       FROM   sales
     )
-    SELECT a.*, b.n, b.gross, b.phoneless_n, b.phoneless_rev
-    FROM   agg a, bills b`);
+    SELECT a.*, e.*, b.n, b.gross, b.phoneless_n, b.phoneless_rev
+    FROM   agg a, existing e, bills b`);
 
   const leads = Number(row.leads ?? 0);
   const converted = Number(row.converted ?? 0);
@@ -241,7 +264,10 @@ export async function getCampaignBreakdown(): Promise<CampaignRow[]> {
     const buyers = Number(r.buyers ?? 0);
     const revenue = Number(r.revenue ?? 0);
     return {
-      name: String(r.name).replace('Varamahalakshmi — ', ''),
+      // Campaign names are prefixed by their source: "Master Sheet — Meta",
+      // "Varamahalakshmi — WhatsApp Broadcast". The prefix is constant within a
+      // load, so it carries no information in a table already grouped by it.
+      name: String(r.name).replace(/^(Master Sheet|Varamahalakshmi) — /, ''),
       channel: String(r.channel),
       people,
       buyers,
@@ -253,33 +279,42 @@ export async function getCampaignBreakdown(): Promise<CampaignRow[]> {
 }
 
 export interface Reach {
-  instagramPhones: number;
-  whatsappPhones: number;
-  inBoth: number;
+  /** Distinct phone keys per channel, before first touch picks a winner. */
+  perChannel: { channel: string; phones: number }[];
+  onMoreThanOneList: number;
   unionPhones: number;
   matchedInSales: number;
 }
 
 /**
- * Raw phone-key reach, before first touch picks a winner. `inBoth` is why the
- * two channel rows cannot simply be added: 198 people are on both lists.
+ * Raw phone-key reach, before first touch picks a winner. `onMoreThanOneList`
+ * is why the channel rows above cannot simply be added — those people are
+ * counted once each there, under whichever channel priority awarded them.
  */
 export async function getReach(): Promise<Reach> {
+  const perChannel = await query(`
+    SELECT channel::text AS channel, COUNT(DISTINCT customer_id)::int AS phones
+    FROM   lead_touches
+    WHERE  channel IN (${IN_SCOPE})
+    GROUP  BY 1 ORDER BY phones DESC`);
+
   const [row] = await query(`
-    WITH m AS (SELECT DISTINCT customer_id FROM lead_touches WHERE channel = 'meta'),
-         w AS (SELECT DISTINCT customer_id FROM lead_touches WHERE channel = 'whatsapp'),
-         u AS (SELECT customer_id FROM m UNION SELECT customer_id FROM w)
-    SELECT (SELECT COUNT(*)::int FROM m) AS insta,
-           (SELECT COUNT(*)::int FROM w) AS wa,
-           (SELECT COUNT(*)::int FROM m JOIN w USING (customer_id)) AS both,
-           (SELECT COUNT(*)::int FROM u) AS union_n,
+    WITH u AS (
+      SELECT customer_id, COUNT(DISTINCT channel)::int AS n
+      FROM   lead_touches WHERE channel IN (${IN_SCOPE})
+      GROUP  BY customer_id
+    )
+    SELECT (SELECT COUNT(*)::int FROM u)                AS union_n,
+           (SELECT COUNT(*)::int FROM u WHERE n > 1)    AS multi,
            (SELECT COUNT(*)::int FROM u
              WHERE EXISTS (SELECT 1 FROM sales s WHERE s.customer_id = u.customer_id)) AS matched`);
 
   return {
-    instagramPhones: Number(row.insta ?? 0),
-    whatsappPhones: Number(row.wa ?? 0),
-    inBoth: Number(row.both ?? 0),
+    perChannel: perChannel.map((r) => ({
+      channel: String(r.channel),
+      phones: Number(r.phones ?? 0),
+    })),
+    onMoreThanOneList: Number(row.multi ?? 0),
     unionPhones: Number(row.union_n ?? 0),
     matchedInSales: Number(row.matched ?? 0),
   };
@@ -297,8 +332,8 @@ export interface StoreRow {
 }
 
 /**
- * Billed revenue per branch. The walk-in submission count that used to sit here
- * is gone with the rest of that channel; the in-scope columns replace it.
+ * Billed revenue per branch, and the share traceable to a master-sheet lead.
+ * The walk-in submission count that used to sit here went with that channel.
  */
 export async function getStoreBreakdown(): Promise<StoreRow[]> {
   const rows = await query(`
@@ -389,7 +424,12 @@ export interface FollowupRow {
   n: number;
 }
 
-/** Tele-calling outcomes — Instagram sheets only; WhatsApp carries no follow-up. */
+/**
+ * Tele-calling outcomes. Empty since the master-sheet load (D-84): the workbook
+ * carries no call outcomes, and the follow-up rows that did exist belonged to
+ * the per-channel exports it replaced. Returns [] until a dated export restores
+ * them — the caller renders nothing rather than a row of zeroes.
+ */
 export async function getFollowupOutcomes(): Promise<FollowupRow[]> {
   const rows = await query(`
     SELECT lf.final_remark::text AS remark, COUNT(*)::int AS n

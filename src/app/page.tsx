@@ -1,12 +1,13 @@
 /**
- * Dashboard — Instagram and WhatsApp.
+ * Dashboard — all four master-sheet channels.
  *
  * A Server Component reading straight from SQL — no client data-fetching layer.
  * Filter state lives in the URL, so every view is shareable.
  *
- * Walk-in is out of scope here (D-83). It is filtered out, not deleted — see
- * the note at the top of `lib/queries/dashboard.ts` for why that distinction
- * matters to the numbers on this page.
+ * Scope covers Meta, WhatsApp, Google Ads and Others (D-86). `Others` is
+ * store-sourced and converts far above the digital channels, which lifts the
+ * blended rate — see the note at the top of `lib/queries/dashboard.ts` before
+ * quoting the headline figure as an acquisition result.
  */
 
 import { Suspense } from 'react';
@@ -72,7 +73,7 @@ export default async function DashboardPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Deepam CRM</h1>
           <p className="mt-1 text-sm text-ink-2">
-            Lead-to-sale attribution for Instagram and WhatsApp. Walk-in excluded.
+            Lead-to-sale attribution across Instagram, WhatsApp, Google Ads and other sources.
           </p>
         </div>
         <ThemeToggle />
@@ -105,7 +106,7 @@ export default async function DashboardPage({
           <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
             <h2 className="text-lg font-semibold tracking-tight text-ink">By store</h2>
             <p className="mt-1 text-sm text-ink-2">
-              All billed revenue, and the share traceable to these two channels.
+              All billed revenue, and the share traceable to a lead.
             </p>
             <table className="mt-4 w-full text-sm">
               <thead>
@@ -149,8 +150,8 @@ export default async function DashboardPage({
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-ink">Customers</h2>
             <p className="mt-1 text-sm text-ink-2">
-              Every person on the Instagram or WhatsApp list — {formatNumber(customers.total)} in
-              this view.
+              Every person on a master-sheet lead list — {formatNumber(customers.total)} in this
+              view.
             </p>
           </div>
           <Suspense fallback={<div className="h-10" />}>

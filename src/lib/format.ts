@@ -85,7 +85,7 @@ export const CHANNEL_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',
   walkin: 'Walk-in',
   existing: 'Existing',
-  google: 'Google',
+  google: 'Google Ads',
   referral: 'Referral',
   other: 'Other',
 };

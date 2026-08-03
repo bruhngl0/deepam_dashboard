@@ -1,5 +1,5 @@
 /**
- * Channel performance — Instagram vs WhatsApp.
+ * Channel performance across the four master-sheet channels.
  *
  * The job is "compare magnitude, low → high", so: horizontal bars in a single
  * sequential hue, ordered by value, every bar direct-labeled. One measure across
@@ -9,7 +9,9 @@
  * Each row carries two rates: all matched buyers, and the D-46 funnel rate with
  * existing customers and foreign numbers removed. The bar plots the first and
  * the sub-line states the second, because quoting either alone invites the
- * wrong conclusion — the gap between them *is* the finding.
+ * wrong conclusion — the gap between them *is* the finding. That gap is widest
+ * on `other`, which is store-sourced: most of its buyers were already customers
+ * (D-86), so its headline rate says little about acquisition.
  */
 
 import { formatNumber, formatCurrency, CHANNEL_LABEL } from '@/lib/format';
@@ -24,6 +26,16 @@ export function ChannelPerformance({
 }) {
   const ordered = [...rows].sort((a, b) => b.conversionRate - a.conversionRate);
 
+  // The D-46 funnel line only earns its space when it disagrees with the line
+  // above it. Since the master-sheet load (D-84) no lead is flagged existing —
+  // the 284 existing customers have no lead touch, and the walk-in form that
+  // supplied `self_declared` is gone — so the filter currently removes nobody
+  // and every pair is identical. Printing the same figures twice would imply a
+  // distinction is being drawn where none is.
+  const funnelDiffers = rows.some(
+    (r) => r.funnelPeople !== r.people || r.funnelBuyers !== r.buyers,
+  );
+
   return (
     <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
       <h2 className="text-lg font-semibold tracking-tight text-ink">
@@ -33,6 +45,14 @@ export function ChannelPerformance({
         Share of each channel&rsquo;s leads that went on to buy. Exclusive first touch,
         so the rows sum to the totals above. Bars are scaled 0&ndash;100%.
       </p>
+      {!funnelDiffers && (
+        <p className="mt-2 text-xs text-ink-muted">
+          Every lead here counts as a new customer, so the new-customer-only rate is
+          identical to the rate shown and is omitted. Nothing is being filtered: the
+          master sheet carries no prior-customer evidence, so people who had already
+          bought are indistinguishable from genuine acquisitions.
+        </p>
+      )}
 
       <div className="mt-5 space-y-4">
         {ordered.map((row) => (
@@ -67,12 +87,14 @@ export function ChannelPerformance({
               {formatNumber(row.buyers)} of {formatNumber(row.people)} leads ·{' '}
               {formatNumber(row.bills)} bills · {formatCurrency(row.revenue)}
             </p>
-            <p className="tnum mt-0.5 text-xs text-ink-muted">
-              New customers only: {formatNumber(row.funnelBuyers)} of{' '}
-              {formatNumber(row.funnelPeople)} ·{' '}
-              {row.funnelConversionRate.toFixed(2)}% ·{' '}
-              {formatCurrency(row.funnelRevenue)}
-            </p>
+            {funnelDiffers && (
+              <p className="tnum mt-0.5 text-xs text-ink-muted">
+                New customers only: {formatNumber(row.funnelBuyers)} of{' '}
+                {formatNumber(row.funnelPeople)} ·{' '}
+                {row.funnelConversionRate.toFixed(2)}% ·{' '}
+                {formatCurrency(row.funnelRevenue)}
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -83,27 +105,25 @@ export function ChannelPerformance({
         </p>
         <table className="mt-3 w-full text-sm">
           <tbody>
-            <tr className="align-baseline">
-              <td className="py-1.5 pr-4 text-ink">Instagram numbers</td>
-              <td className="tnum py-1.5 text-right text-ink-2">
-                {formatNumber(reach.instagramPhones)}
-              </td>
-            </tr>
-            <tr className="align-baseline">
-              <td className="py-1.5 pr-4 text-ink">WhatsApp numbers</td>
-              <td className="tnum py-1.5 text-right text-ink-2">
-                {formatNumber(reach.whatsappPhones)}
-              </td>
-            </tr>
+            {reach.perChannel.map((r) => (
+              <tr key={r.channel} className="align-baseline">
+                <td className="py-1.5 pr-4 text-ink">
+                  {CHANNEL_LABEL[r.channel] ?? r.channel} numbers
+                </td>
+                <td className="tnum py-1.5 text-right text-ink-2">
+                  {formatNumber(r.phones)}
+                </td>
+              </tr>
+            ))}
             <tr className="align-baseline">
               <td className="py-1.5 pr-4 text-ink">
-                On both lists
+                On more than one list
                 <span className="ml-2 text-xs text-ink-muted">
-                  why the two cannot be added
+                  why the rows cannot be added
                 </span>
               </td>
               <td className="tnum py-1.5 text-right text-ink-2">
-                {formatNumber(reach.inBoth)}
+                {formatNumber(reach.onMoreThanOneList)}
               </td>
             </tr>
             <tr className="align-baseline border-t border-grid">

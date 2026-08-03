@@ -1,10 +1,10 @@
 /**
- * Customer table — Instagram and WhatsApp leads.
+ * Customer table — every master-sheet lead.
  *
- * Server-paginated. Every row shows *both* of its channel touches where it has
- * them, not just the attributed one — a row reading only "Instagram" would hide
- * that the same person was also on the WhatsApp broadcast. 198 people are on
- * both lists. (D-79)
+ * Server-paginated. Every row shows *all* of its channel touches, not just the
+ * attributed one — a row reading only "Instagram" would hide that the same
+ * person was also on the WhatsApp broadcast. 298 people appear on more than one
+ * list, 227 of them on Instagram and WhatsApp both. (D-79)
  *
  * Empty values render "Not provided" rather than a blank cell: 535 customers
  * have no city and most have no date of birth, and a blank cell reads as a bug

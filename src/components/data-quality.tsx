@@ -37,8 +37,8 @@ export function DataQualityPanel({ quality }: { quality: DataQuality }) {
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
         <Item
           value={formatCurrency(quality.unmatchedBuyerRevenue)}
-          label={`${formatNumber(quality.unmatchedBuyers)} buyers match neither list`}
-          note="They bought, but their number appears on no Instagram or WhatsApp sheet. Most came through the store directly. This is the ceiling on what these two channels can ever be shown to explain."
+          label={`${formatNumber(quality.unmatchedBuyers)} buyers match no lead list`}
+          note="They bought, but their number appears on no sheet in the master workbook. Most came through the store directly. This is the ceiling on what lead attribution can ever be shown to explain."
         />
         <Item
           value={formatCurrency(quality.phonelessRevenue)}
@@ -48,7 +48,7 @@ export function DataQualityPanel({ quality }: { quality: DataQuality }) {
         <Item
           value={`${formatNumber(quality.estimatedTouches)} of ${formatNumber(quality.scopedTouches)}`}
           label="lead touches with an estimated date"
-          note="Neither export carries a per-lead timestamp, so the campaign start date stands in. Time-to-convert is unreliable until Meta exports include created_time — and it is why first touch falls back to channel priority when the two lists overlap."
+          note="The master workbook carries no dates at all, so the campaign start date stands in for every touch. Time-to-convert is unreliable until a dated export arrives — and it is why channel priority, not timing, decides every overlap between the lists."
         />
         <Item
           value={formatNumber(quality.rejectedUnresolved)}

@@ -2,15 +2,23 @@
  * The Phase 4 acceptance test.
  *
  * Computes the dashboard metrics straight from the database and checks them
- * against SYSTEM_DESIGN.md §2.3 / DECISIONS.md §Q. If these reconcile, the
- * ingestion + attribution layers are correct end to end.
+ * against DECISIONS.md §Q. If these reconcile, the ingestion + attribution
+ * layers are correct end to end.
  *
  *   npx tsx scripts/verify-metrics.ts
+ *
+ * Baselined against the cleaned master workbook (D-84). Every figure below was
+ * re-derived after that load replaced the per-channel exports; the pre-master
+ * numbers are kept in DECISIONS.md §Q, not here. The four channels are Meta,
+ * WhatsApp, Google Ads and Others — `walkin` no longer exists as a channel and
+ * `self_declared` is no longer a reachable lifecycle basis, because the walk-in
+ * form was the only thing that ever set it.
  */
 
 import '../src/db/load-env';
 import { db } from '../src/db';
 import { sql } from 'drizzle-orm';
+import { getKpis, getChannelBreakdown } from '../src/lib/queries/dashboard';
 
 type Row = Record<string, unknown>;
 
@@ -56,13 +64,14 @@ async function main() {
     SELECT COUNT(*)::int AS n FROM (
       SELECT customer_id FROM lead_touches
       GROUP BY customer_id HAVING COUNT(DISTINCT channel) > 1) x`);
-  check('multi-channel people', Number(multi.n), 301);
+  check('multi-channel people', Number(multi.n), 298);
 
   console.log('\nCHANNEL OVERLAP (D-40)');
   for (const [a, b, expected] of [
-    ['meta', 'whatsapp', 198],
-    ['meta', 'walkin', 80],
-    ['whatsapp', 'walkin', 35],
+    ['meta', 'whatsapp', 227],
+    ['meta', 'other', 51],
+    ['whatsapp', 'other', 25],
+    ['meta', 'google', 1],
   ] as const) {
     const [r] = await q(`
       SELECT COUNT(*)::int AS n FROM (
@@ -80,14 +89,22 @@ async function main() {
       `  ${String(r.lifecycle).padEnd(10)} ${String(r.basis).padEnd(16)} ${String(r.n).padStart(6)}`,
     );
   }
-  const [decl] = await q(
-    `SELECT COUNT(*)::int AS n FROM customers WHERE lifecycle_basis = 'self_declared'`,
+  const [matched] = await q(
+    `SELECT COUNT(*)::int AS n FROM customers WHERE lifecycle_basis = 'lead_matched'`,
   );
-  check('existing — declared', Number(decl.n), 143);
+  check('new — lead matched', Number(matched.n), 5866);
   const [inf] = await q(
     `SELECT COUNT(*)::int AS n FROM customers WHERE lifecycle_basis = 'no_lead_match'`,
   );
   check('existing — inferred', Number(inf.n), 284);
+  // The master sheet dropped the walk-in form, which was the only source of a
+  // self-declared "I'm already a customer". 143 people who told us so are now
+  // classified as new acquisitions. Asserted at zero so the day an export
+  // restores that evidence, this test fails loudly instead of drifting. (D-84)
+  const [decl] = await q(
+    `SELECT COUNT(*)::int AS n FROM customers WHERE lifecycle_basis = 'self_declared'`,
+  );
+  check('existing — declared (lost with walk-in)', Number(decl.n), 0);
 
   console.log('\nATTRIBUTION (exclusive, existing-first)');
   const rows = await q(`
@@ -112,9 +129,10 @@ async function main() {
   }
 
   for (const [channel, people, buyers] of [
-    ['meta', 1654, 29],
-    ['whatsapp', 3471, 8],
-    ['walkin', 598, 257],
+    ['meta', 1924, 150],
+    ['whatsapp', 3562, 46],
+    ['other', 367, 164],
+    ['google', 13, 6],
   ] as const) {
     const [r] = await q(`
       SELECT COUNT(*)::int AS people, COUNT(*) FILTER (WHERE converted)::int AS buyers
@@ -146,18 +164,18 @@ async function main() {
            e.rev AS ex_rev, g.total AS gross, g.phoneless
     FROM funnel f, existing e, gross g`);
 
-  check('Total Leads', Number(kpi.leads), 5723);
-  check('Leads Converted', Number(kpi.converted), 294);
+  check('Total Leads', Number(kpi.leads), 5866);
+  check('Leads Converted', Number(kpi.converted), 366);
   check('Total Sales (gross)', Number(kpi.gross), 20103733);
   check(
     'Conversion Rate',
     pct(Number(kpi.converted), Number(kpi.leads)) + '%',
-    '5.1%',
+    '6.2%',
   );
-  check('New-customer revenue', Number(kpi.new_rev), 7748019);
-  check('Existing customers', Number(kpi.ex_people), 427);
-  check('Existing buyers', Number(kpi.ex_buyers), 356);
-  check('Existing revenue', Number(kpi.ex_rev), 10639353);
+  check('New-customer revenue', Number(kpi.new_rev), 10467354);
+  check('Existing customers', Number(kpi.ex_people), 284);
+  check('Existing buyers', Number(kpi.ex_buyers), 284);
+  check('Existing revenue', Number(kpi.ex_rev), 7920018);
   check('Phone-less revenue', Number(kpi.phoneless), 1716361);
 
   console.log('\nINVARIANTS (D-50)');
@@ -172,6 +190,47 @@ async function main() {
     'channel revenue = gross - phoneless',
     Number(chan.n),
     Number(kpi.gross) - Number(kpi.phoneless),
+  );
+
+  // The matview is not what the page reads. `dashboard.ts` recomputes first
+  // touch over `lead_touches` so that leads later found to be existing keep
+  // their channel instead of collapsing into 'existing'. The two agree today
+  // only because all 284 existing customers have no lead touch at all — assert
+  // the page's own numbers so a scope change cannot pass on the matview alone.
+  console.log('\nDASHBOARD SCOPE (D-86)');
+  const kpis = await getKpis();
+  check('scoped total leads', kpis.totalLeads, 5866);
+  check('scoped leads converted', kpis.leadsConverted, 366);
+  check('scoped conversion rate', kpis.conversionRate.toFixed(2) + '%', '6.24%');
+  check('scoped attributed revenue', Math.round(kpis.attributedRevenue), 10467354);
+  // The segment tiles. `existing` is business-wide on purpose: sourcing it from
+  // the lead scope returned 0, because an existing customer is defined by
+  // having no lead record. Asserted here so the tile cannot silently empty.
+  check('segment new revenue', Math.round(kpis.newRevenue), 10467354);
+  check('segment existing people', kpis.existingPeople, 284);
+  check('segment existing buyers', kpis.existingBuyers, 284);
+  check('segment existing revenue', Math.round(kpis.existingRevenue), 7920018);
+  check(
+    'new + existing + phone-less = gross',
+    Math.round(kpis.newRevenue + kpis.existingRevenue + kpis.phonelessRevenue),
+    Math.round(kpis.grossSales),
+  );
+
+  const breakdown = await getChannelBreakdown();
+  for (const [channel, people, buyers] of [
+    ['whatsapp', 3562, 46],
+    ['meta', 1924, 150],
+    ['other', 367, 164],
+    ['google', 13, 6],
+  ] as const) {
+    const row = breakdown.find((r) => r.channel === channel);
+    check(`scoped ${channel}`, `${row?.people ?? 0}/${row?.buyers ?? 0}`, `${people}/${buyers}`);
+  }
+  check('scoped channels reported', breakdown.length, 4);
+  check(
+    'channel rows sum to total leads',
+    breakdown.reduce((n, r) => n + r.people, 0),
+    kpis.totalLeads,
   );
 
   console.log('\nNAME TRUST (D-24)');

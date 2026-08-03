@@ -36,13 +36,13 @@ Every decision has an ID (`D-01`…). Reference them from code comments so a fut
 - [D. Stores and branches](#d-stores-and-branches) — D-26…D-28
 - [E. Campaigns and time](#e-campaigns-and-time) — D-29…D-33
 - [F. Customer lifecycle](#f-customer-lifecycle-new-vs-existing) — D-34…D-39
-- [G. Attribution](#g-attribution) — D-40…D-45
+- [G. Attribution](#g-attribution) — D-40…D-45, D-85
 - [H. Metrics and denominators](#h-metrics-and-denominators) — D-46…D-52
 - [I. Data quality](#i-data-quality-and-rejection) — D-53…D-57
-- [J. Import mechanics](#j-import-mechanics) — D-58…D-63
+- [J. Import mechanics](#j-import-mechanics) — D-58…D-63, D-84
 - [K. Schema principles](#k-schema-principles) — D-64…D-69
 - [L. Tech stack](#l-tech-stack) — D-70…D-76
-- [M. UI rules](#m-ui-rules) — D-77…D-82
+- [M. UI rules](#m-ui-rules) — D-77…D-83, D-86
 - [N. Constants](#n-tunable-constants)
 - [O. Deliberately not done](#o-deliberately-not-done)
 - [P. Assumptions that could be wrong](#p-assumptions-that-could-be-wrong)
@@ -304,6 +304,7 @@ The lesson generalises: **a bug in this function is invisible in the row counts 
 ### D-40 — Store every touch; derive credit at query time
 **Rule:** `lead_touches` is append-only truth. `customer_attribution` is one interpretation and is fully recomputable.
 **Why:** Measured: 301 customers appear in more than one channel (Meta∩WhatsApp 198, Meta∩walk-in 80, WhatsApp∩walk-in 35, all three 6). Any single-source-of-truth column would be a lossy opinion baked into the schema.
+**Figures re-baselined by D-84** — now 298 across four channels (Meta∩WhatsApp 227, Meta∩Others 51, WhatsApp∩Others 25, Meta∩Google 1). The rule is unchanged and this is the second time it has paid for itself: the whole lead layer was rebuilt without touching a customer or a sale.
 **Confidence:** Proven · **Reversal:** Free
 **This is what makes every other rule in this section changeable.**
 
@@ -344,6 +345,13 @@ The lesson generalises: **a bug in this function is invisible in the row counts 
 **Confidence:** Reasoned — I have no data on your consideration cycle, and a saree purchase may well run longer.
 **Reversal:** Free
 **Honest caveat:** with one week of data and estimated timestamps, nearly all touches land on the campaign start date, so this barely binds today. It matters from month two, so it's built in now rather than retrofitted.
+
+### D-85 — Channel priority re-ranked for the master-sheet channel set *(2026-08-03)*
+**Rule:** First-touch precedence is **Google Ads > Meta > Others > WhatsApp**, stated in migration `0006` and mirrored in `settings.channel_priority`. The ordering ends with `campaign_id` so the sort is total.
+**Why the order:** `google` is a tiny, hand-verified paid list — the most specific claim to origin. `meta` is paid acquisition with per-lead identity. `other` is store-sourced with no campaign of origin recorded. `whatsapp` is a broadcast to a purchased list, the weakest claim of the four.
+**Why it was forced:** D-84 dissolved the walk-in channel, so the old `CASE` still ranked `walkin` first and left `google` and `other` sharing the `ELSE` bucket. A person present in both Google Ads and Others therefore had their channel decided by whatever order the planner happened to return — a non-deterministic result inside a materialized view.
+**What changed in kind, not just degree:** the master workbook carries no dates, so *every* touch is `touched_at_is_estimated` and **D-44 rule 1 can never fire**. Channel priority is no longer a tiebreak of last resort — it decides every overlap. 298 people are on more than one list (Meta∩WhatsApp 227, Meta∩Others 51, WhatsApp∩Others 25, Meta∩Google 1), so this ordering alone places 298 customers.
+**Confidence:** Reasoned · **Reversal:** Free — one migration, and rule 1 resumes on its own the day any export carries a real timestamp.
 
 ---
 
@@ -455,6 +463,15 @@ total_leads                                        = sum(leads by channel) - exi
 **Confidence:** Reasoned · **Reversal:** Cheap
 **Caveat:** rollback can't restore enrichment overwritten by D-24. `raw` (D-14) is the backstop.
 
+### D-84 — The cleaned master workbook supersedes the per-channel exports *(2026-08-03)*
+**Rule:** `scripts/import-master-sheet.ts` replaces the entire lead layer from one workbook — one sheet per channel: **Meta, WhatsApp, Google Ads, Others**. It deletes every lead touch, follow-up, walk-in submission, campaign and lead import batch, then reloads. `customers` and `sales` are never touched (§O): a customer row is the identity key `sales` points at. Orphaned customers simply stop appearing in the funnel.
+**Why:** The workbook is the reviewed source — phone numbers already cleaned by hand, one file instead of four exports with four schemas. The walk-in channel does not survive it: whoever prepared the file dissolved it and redistributed its 741 people across the other four channels.
+**What it costs — stated because it is a real loss, not a cosmetic change:**
+- `walkin_submissions.how_did_you_hear` was the **only** evidence for the `self_declared` lifecycle basis. Dropping it makes **143 customers fall through to `lead_matched`** — people who told us to our face they were already customers are now counted as new acquisitions. Every conversion figure using the D-46 denominator is inflated accordingly. `verify-metrics.ts` asserts `self_declared = 0` so the day an export restores that evidence, the test fails loudly instead of drifting.
+- The workbook carries **no dates at all**. Every touch is stamped with the campaign start and flagged `touched_at_is_estimated`, so D-44 rule 1 can never fire and time-to-convert is meaningless. This is what forced D-85.
+- Follow-up outcomes (D-67) are empty: the workbook records no calls.
+**Confidence:** Proven — the load ran and reconciles · **Reversal:** Expensive. Back the tables up before `--commit`; restoring the walk-in evidence means re-importing the four original exports.
+
 ---
 
 ## K. Schema principles
@@ -564,6 +581,29 @@ total_leads                                        = sum(leads by channel) - exi
 **Rule:** Store × channel × lifecycle × has-sales × date × search all combine, and the active set stays visible.
 **Why:** A filter that silently clears another is how people end up quoting a number for the wrong segment in a meeting.
 **Confidence:** Reasoned · **Reversal:** Cheap
+
+### D-83 — Dashboard scoped to Instagram and WhatsApp — ⚠️ *superseded by D-86*
+**Rule (as it stood):** The dashboard reported only `meta` and `whatsapp`. Walk-in was **filtered out, not deleted**.
+**Why it was filtered rather than deleted:** the walk-in form was the only evidence that 16 of the 100 matched buyers were already customers. Deleting it would have let `recompute_customer_lifecycle()` silently reclassify them as new acquisitions, inflating Instagram's converted count from 72 to 85 with no remaining trace of the error. The rows stayed; the view narrowed.
+**Why it did not filter `customer_attribution.primary_channel`:** that view resolves first touch across *all* channels, so someone reached on Instagram who later filled a walk-in form was credited to walk-in (migration `0005`). Narrowing it would have silently dropped 82 Instagram and 196 WhatsApp leads. First touch was instead recomputed over the in-scope channels — a structure D-86 keeps.
+**Superseded because** D-84 dissolved the walk-in channel entirely. The filter no longer excluded the thing it was written to exclude; it only hid Google Ads.
+
+### D-86 — The dashboard reports all four master-sheet channels *(2026-08-03, reverses D-83)*
+**Rule:** `SCOPED_CHANNELS = ['google', 'meta', 'other', 'whatsapp']` in `lib/queries/dashboard.ts` — the single definition of scope (D-76), consumed by the customer table too.
+**Why:** D-83's exclusion target no longer exists. Keeping a two-channel scope after D-84 would have hidden Google Ads — a real paid channel — for no stated reason, which is the failure mode D-83 was itself written to prevent.
+**What it costs, and why it is written down rather than smoothed over:** `other` is store-sourced and converts at **44.7%**, against 7.8% for Meta and 1.3% for WhatsApp, because it is largely people who had already bought. Including it lifts blended conversion from **3.8% to 6.2% without any campaign performing better**. The channel table, not the headline rate, is what should be read to judge acquisition; the D-46 funnel figures sit on every channel row for exactly this reason.
+
+| Channel | Leads | Bought | Rate | Revenue |
+|---|---|---|---|---|
+| WhatsApp | 3,562 | 46 | 1.29% | ₹11,58,530 |
+| Instagram | 1,924 | 150 | 7.80% | ₹38,55,236 |
+| Others | 367 | 164 | 44.69% | ₹53,63,759 |
+| Google Ads | 13 | 6 | 46.15% | ₹89,829 |
+| **Total** | **5,866** | **366** | **6.24%** | **₹1,04,67,354** |
+
+**Why it still does not read `customer_attribution`:** two deliberate differences remain. That view relabels `primary_channel` to `existing` for anyone whose lifecycle is existing (D-43), which would empty the channel rows of every lead later found to be a prior customer; and it carries the 284 buyers matching no lead record, who are not leads and do not belong in a lead denominator.
+**Guarded by:** the `DASHBOARD SCOPE` section of `scripts/verify-metrics.ts`, which asserts the page's own numbers rather than the materialized view's — the two agree today only because all 284 existing customers happen to have no lead touch.
+**Confidence:** Proven against the live database · **Reversal:** Free — one constant.
 
 ---
 
@@ -786,3 +826,28 @@ Two implementation bugs were also found and fixed, neither visible in row counts
 - **Estimated timestamps outranked real ones** in first-touch ordering, moving 59 customers and 43 conversions from walk-in to Meta and cutting walk-in conversion from 43.0% to 15.3%. Fixed in `0005` — see D-44.
 
 Every headline KPI in §2.3 reconciles exactly against the live database. Run `npx tsx scripts/verify-metrics.ts` to confirm.
+
+### Re-baselined by the master-sheet reload, 2026-08-03
+
+**Everything above this heading describes the four per-channel exports, which no longer load the database.** D-84 replaced them with the cleaned master workbook. The figures are kept as written because they are the evidence the earlier decisions were made on — but do not quote them as current. `scripts/verify-metrics.ts` is the live baseline and is the only figure set that is maintained.
+
+Sales are untouched, so the hardest reconciliation still holds exactly:
+
+```
+847 bills   ·   ₹2,01,03,733 gross   ·   650 unique sale phones   ·   66 phone-less bills
+```
+
+What moved, and why:
+
+| Figure | Per-channel exports | Master sheet | Why |
+|---|---|---|---|
+| union of all leads | 5,866 | **5,866** | unchanged by coincidence, not by construction — the membership differs |
+| multi-channel people | 301 | **298** | walk-in dissolved; Others introduced |
+| Meta ∩ WhatsApp | 198 | **227** | the workbook's own dedupe compared raw strings, so more overlap survives normalization |
+| channels present | meta, whatsapp, walkin | **google, meta, other, whatsapp** | D-84 |
+| `self_declared` existing | 143 | **0** | walk-in form gone — the only source of that basis (D-84) |
+| `no_lead_match` existing | 284 | **284** | unchanged; derived from `sales`, which was not touched |
+| touches with a real date | walk-in only | **none** | the workbook carries no dates, so D-44 rule 1 never fires (D-85) |
+| follow-up outcomes | populated | **empty** | the workbook records no calls |
+
+Attribution after the reload, and the dashboard scope that reports it (D-86), are tabulated under D-86. The one figure worth repeating here: blended conversion reads **6.24%**, up from 3.8% on the two digital channels alone, entirely because `other` is store-sourced and converts at 44.7%. No campaign improved.

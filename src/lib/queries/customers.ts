@@ -1,16 +1,16 @@
 /**
- * Customer table query — Instagram and WhatsApp only.
+ * Customer table query — every channel in the master sheet.
  *
  * Server-side paginated and filtered — the browser never receives more than a
  * page. (D-78) Every filter composes; none silently clears another. (D-82)
  *
- * Each row carries all of its *in-scope* channel touches, not just the
- * attributed one — that is the payoff of keeping `lead_touches` append-only.
- * (D-40, D-79)
+ * Each row carries all of its channel touches, not just the attributed one —
+ * that is the payoff of keeping `lead_touches` append-only. (D-40, D-79)
  *
- * Scope (D-83): only people with at least one Instagram or WhatsApp touch are
- * listed, and the walk-in-derived columns are gone with the channel. First
- * touch is recomputed over the two in-scope channels rather than read from
+ * Scope (D-86): only people with at least one lead touch are listed, so the 284
+ * buyers who match no lead record do not appear here — they are counted in the
+ * existing-customer tiles instead. The walk-in-derived columns went with that
+ * channel. First touch is recomputed rather than read from
  * `customer_attribution`, for the reason set out in `dashboard.ts`.
  */
 
@@ -89,7 +89,14 @@ const SCOPED_CTE = sql.raw(`
     ORDER  BY lt.customer_id,
               lt.touched_at_is_estimated ASC,
               lt.touched_at ASC,
-              CASE lt.channel WHEN 'meta' THEN 2 WHEN 'whatsapp' THEN 3 ELSE 4 END
+              CASE lt.channel
+                WHEN 'google'   THEN 1
+                WHEN 'meta'     THEN 2
+                WHEN 'other'    THEN 3
+                WHEN 'whatsapp' THEN 4
+                ELSE 5
+              END,
+              lt.campaign_id
   ),
   sale_agg AS (
     SELECT customer_id, COUNT(*) AS bill_count, SUM(bill_amount) AS total_sales,
