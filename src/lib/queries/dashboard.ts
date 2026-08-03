@@ -281,45 +281,71 @@ export async function getCampaignBreakdown(): Promise<CampaignRow[]> {
   });
 }
 
-export interface Reach {
-  /** Distinct phone keys per channel, before first touch picks a winner. */
-  perChannel: { channel: string; phones: number }[];
-  onMoreThanOneList: number;
-  unionPhones: number;
-  matchedInSales: number;
+export interface ChannelCombination {
+  /** Channel codes, sorted — the exact set of lists this person is on. */
+  channels: string[];
+  people: number;
+  buyers: number;
+}
+
+export interface ListOverlap {
+  combinations: ChannelCombination[];
+  onOneList: number;
+  onTwoLists: number;
+  onThreeOrMore: number;
+  totalPeople: number;
+  totalBuyers: number;
 }
 
 /**
- * Raw phone-key reach, before first touch picks a winner. `onMoreThanOneList`
- * is why the channel rows above cannot simply be added — those people are
- * counted once each there, under whichever channel priority awarded them.
+ * Which lists each person is actually on, as exact combinations rather than
+ * per-channel totals.
+ *
+ * This replaced a raw per-channel reach table. That table gave four numbers
+ * summing to 6,167 against 5,866 distinct people and left the reader to work
+ * out where the extra 301 went. Grouping by the *set* of lists a person appears
+ * on answers it directly: the rows are disjoint, they sum to the distinct
+ * total, and the overlap is named instead of implied.
+ *
+ * Sets come back sorted by channel code, so the label reads in a stable order
+ * ("Instagram + WhatsApp", never "WhatsApp + Instagram").
  */
-export async function getReach(): Promise<Reach> {
-  const perChannel = await query(`
-    SELECT channel::text AS channel, COUNT(DISTINCT customer_id)::int AS phones
-    FROM   lead_touches
-    WHERE  channel IN (${IN_SCOPE})
-    GROUP  BY 1 ORDER BY phones DESC`);
-
-  const [row] = await query(`
-    WITH u AS (
-      SELECT customer_id, COUNT(DISTINCT channel)::int AS n
-      FROM   lead_touches WHERE channel IN (${IN_SCOPE})
+export async function getListOverlap(): Promise<ListOverlap> {
+  const rows = await query(`
+    WITH sets AS (
+      SELECT customer_id,
+             ARRAY_AGG(DISTINCT channel::text ORDER BY channel::text) AS channels
+      FROM   lead_touches
+      WHERE  channel IN (${IN_SCOPE})
       GROUP  BY customer_id
     )
-    SELECT (SELECT COUNT(*)::int FROM u)                AS union_n,
-           (SELECT COUNT(*)::int FROM u WHERE n > 1)    AS multi,
-           (SELECT COUNT(*)::int FROM u
-             WHERE EXISTS (SELECT 1 FROM sales s WHERE s.customer_id = u.customer_id)) AS matched`);
+    SELECT channels,
+           COUNT(*)::int AS people,
+           COUNT(*) FILTER (
+             WHERE EXISTS (SELECT 1 FROM sales s WHERE s.customer_id = sets.customer_id)
+           )::int AS buyers
+    FROM   sets
+    GROUP  BY channels
+    ORDER  BY people DESC, channels`);
+
+  const combinations = rows.map((r) => ({
+    channels: (r.channels as string[]) ?? [],
+    people: Number(r.people ?? 0),
+    buyers: Number(r.buyers ?? 0),
+  }));
+
+  // Derived here rather than in a second query so the summary line and the
+  // table can never disagree — they are the same rows counted two ways.
+  const sumWhere = (fn: (c: ChannelCombination) => boolean) =>
+    combinations.filter(fn).reduce((n, c) => n + c.people, 0);
 
   return {
-    perChannel: perChannel.map((r) => ({
-      channel: String(r.channel),
-      phones: Number(r.phones ?? 0),
-    })),
-    onMoreThanOneList: Number(row.multi ?? 0),
-    unionPhones: Number(row.union_n ?? 0),
-    matchedInSales: Number(row.matched ?? 0),
+    combinations,
+    onOneList: sumWhere((c) => c.channels.length === 1),
+    onTwoLists: sumWhere((c) => c.channels.length === 2),
+    onThreeOrMore: sumWhere((c) => c.channels.length >= 3),
+    totalPeople: combinations.reduce((n, c) => n + c.people, 0),
+    totalBuyers: combinations.reduce((n, c) => n + c.buyers, 0),
   };
 }
 

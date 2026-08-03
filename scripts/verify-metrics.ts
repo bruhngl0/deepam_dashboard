@@ -18,7 +18,11 @@
 import '../src/db/load-env';
 import { db } from '../src/db';
 import { sql } from 'drizzle-orm';
-import { getKpis, getChannelBreakdown } from '../src/lib/queries/dashboard';
+import {
+  getKpis,
+  getChannelBreakdown,
+  getListOverlap,
+} from '../src/lib/queries/dashboard';
 
 type Row = Record<string, unknown>;
 
@@ -240,6 +244,27 @@ async function main() {
     breakdown.reduce((n, r) => n + r.people, 0),
     kpis.totalLeads,
   );
+
+  // Unlike per-channel reach, these rows are disjoint sets and must reconcile
+  // to the distinct totals — that is the whole reason the table replaced it.
+  console.log('\nLIST OVERLAP (D-40)');
+  const overlap = await getListOverlap();
+  for (const c of overlap.combinations) {
+    console.log(
+      `  ${c.channels.join(' + ').padEnd(28)}${String(c.people).padStart(6)} people` +
+        `${String(c.buyers).padStart(6)} bought`,
+    );
+  }
+  check('on exactly one list', overlap.onOneList, 5568);
+  check('on two lists', overlap.onTwoLists, 295);
+  check('on all three', overlap.onThreeOrMore, 3);
+  check(
+    'cardinalities sum to distinct people',
+    overlap.onOneList + overlap.onTwoLists + overlap.onThreeOrMore,
+    overlap.totalPeople,
+  );
+  check('combination people sum to leads', overlap.totalPeople, kpis.totalLeads);
+  check('combination buyers sum to converted', overlap.totalBuyers, kpis.leadsConverted);
 
   console.log('\nNAME TRUST (D-24)');
   for (const r of await q(`

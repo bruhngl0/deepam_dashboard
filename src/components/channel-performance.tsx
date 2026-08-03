@@ -15,14 +15,16 @@
  */
 
 import { formatNumber, formatCurrency, CHANNEL_LABEL } from '@/lib/format';
-import type { ChannelRow, Reach } from '@/lib/queries/dashboard';
+import type { ChannelRow, ListOverlap } from '@/lib/queries/dashboard';
+
+const channelLabel = (code: string) => CHANNEL_LABEL[code] ?? code;
 
 export function ChannelPerformance({
   rows,
-  reach,
+  overlap,
 }: {
   rows: ChannelRow[];
-  reach: Reach;
+  overlap: ListOverlap;
 }) {
   const ordered = [...rows].sort((a, b) => b.conversionRate - a.conversionRate);
 
@@ -101,39 +103,54 @@ export function ChannelPerformance({
 
       <div className="mt-6 border-t border-grid pt-4">
         <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-          Raw reach, before first touch picks a winner
+          The actual distribution
         </p>
-        <table className="mt-3 w-full text-sm">
-          <tbody>
-            {reach.perChannel.map((r) => (
-              <tr key={r.channel} className="align-baseline">
-                <td className="py-1.5 pr-4 text-ink">
-                  {CHANNEL_LABEL[r.channel] ?? r.channel} numbers
+        <p className="mt-1.5 text-sm text-ink-2">
+          {formatNumber(overlap.onOneList)} people are on exactly one list,{' '}
+          {formatNumber(overlap.onTwoLists)} on two, {formatNumber(overlap.onThreeOrMore)} on
+          all three.
+        </p>
+
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[22rem] text-sm">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
+                <th className="pb-2 text-left font-medium">On these lists</th>
+                <th className="pb-2 text-right font-medium">People</th>
+                <th className="pb-2 text-right font-medium">Bought</th>
+              </tr>
+            </thead>
+            <tbody>
+              {overlap.combinations.map((c) => (
+                <tr key={c.channels.join('+')} className="border-t border-grid align-baseline">
+                  <td className="py-2 pr-4 text-ink">
+                    {c.channels.map(channelLabel).join(' + ')}
+                    {c.channels.length === 1 && (
+                      <span className="text-ink-muted"> only</span>
+                    )}
+                  </td>
+                  <td className="tnum py-2 text-right text-ink-2">
+                    {formatNumber(c.people)}
+                  </td>
+                  <td className="tnum py-2 text-right text-ink-2">
+                    {formatNumber(c.buyers)}
+                  </td>
+                </tr>
+              ))}
+              {/* The rows are disjoint sets, so unlike per-channel reach they
+                  genuinely add up — the total is worth stating for that reason. */}
+              <tr className="border-t border-line align-baseline">
+                <td className="py-2 pr-4 font-medium text-ink">Distinct people reached</td>
+                <td className="tnum py-2 text-right font-medium text-ink">
+                  {formatNumber(overlap.totalPeople)}
                 </td>
-                <td className="tnum py-1.5 text-right text-ink-2">
-                  {formatNumber(r.phones)}
+                <td className="tnum py-2 text-right font-medium text-ink">
+                  {formatNumber(overlap.totalBuyers)}
                 </td>
               </tr>
-            ))}
-            <tr className="align-baseline">
-              <td className="py-1.5 pr-4 text-ink">
-                On more than one list
-                <span className="ml-2 text-xs text-ink-muted">
-                  why the rows cannot be added
-                </span>
-              </td>
-              <td className="tnum py-1.5 text-right text-ink-2">
-                {formatNumber(reach.onMoreThanOneList)}
-              </td>
-            </tr>
-            <tr className="align-baseline border-t border-grid">
-              <td className="py-1.5 pr-4 font-medium text-ink">Distinct people reached</td>
-              <td className="tnum py-1.5 text-right font-medium text-ink">
-                {formatNumber(reach.unionPhones)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );

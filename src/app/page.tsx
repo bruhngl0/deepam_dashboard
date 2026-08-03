@@ -15,7 +15,7 @@ import {
   getKpis,
   getChannelBreakdown,
   getCampaignBreakdown,
-  getReach,
+  getListOverlap,
   getStoreBreakdown,
   getDataQuality,
 } from '@/lib/queries/dashboard';
@@ -55,12 +55,12 @@ export default async function DashboardPage({
     pageSize: Number(one(params.pageSize) ?? 25),
   };
 
-  const [kpis, channels, campaigns, reach, stores, quality, customers, options] =
+  const [kpis, channels, campaigns, overlap, stores, quality, customers, options] =
     await Promise.all([
       getKpis(),
       getChannelBreakdown(),
       getCampaignBreakdown(),
-      getReach(),
+      getListOverlap(),
       getStoreBreakdown(),
       getDataQuality(),
       getCustomers(filters),
@@ -103,7 +103,7 @@ export default async function DashboardPage({
       </div>
 
       <div className="mt-6 grid gap-3 lg:grid-cols-2">
-        <ChannelPerformance rows={channels} reach={reach} />
+        <ChannelPerformance rows={channels} overlap={overlap} />
         <div className="space-y-3">
           <CampaignTable rows={campaigns} />
           <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
