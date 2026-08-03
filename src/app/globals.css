@@ -87,6 +87,9 @@
   --color-accent-soft: var(--accent-soft);
   --color-dark-card: var(--surface-dark-card);
   --color-on-dark: var(--ink-on-dark);
+  /* Status is reserved for state, never for a data series. */
+  --color-status-good: var(--status-good);
+  --color-status-critical: var(--status-critical);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
