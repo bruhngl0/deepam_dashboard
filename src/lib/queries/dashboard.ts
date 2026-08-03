@@ -118,6 +118,7 @@ export interface Kpis {
   existingPeople: number;
   existingBuyers: number;
   existingRevenue: number;
+  existingBills: number;
   /** Whole-business context — not limited to the in-scope channels. */
   grossSales: number;
   totalBills: number;
@@ -149,7 +150,8 @@ export async function getKpis(): Promise<Kpis> {
     existing AS (
       SELECT COUNT(*)::int                                   AS existing_people,
              COUNT(*) FILTER (WHERE converted)::int          AS existing_buyers,
-             COALESCE(SUM(total_sales), 0)::numeric          AS existing_revenue
+             COALESCE(SUM(total_sales), 0)::numeric          AS existing_revenue,
+             COALESCE(SUM(bill_count), 0)::int               AS existing_bills
       FROM   customer_attribution
       WHERE  lifecycle = 'existing'
     ),
@@ -178,6 +180,7 @@ export async function getKpis(): Promise<Kpis> {
     existingPeople: Number(row.existing_people ?? 0),
     existingBuyers: Number(row.existing_buyers ?? 0),
     existingRevenue: Number(row.existing_revenue ?? 0),
+    existingBills: Number(row.existing_bills ?? 0),
     grossSales: Number(row.gross ?? 0),
     totalBills: Number(row.n ?? 0),
     phonelessBills: Number(row.phoneless_n ?? 0),

@@ -210,10 +210,18 @@ async function main() {
   check('segment existing people', kpis.existingPeople, 284);
   check('segment existing buyers', kpis.existingBuyers, 284);
   check('segment existing revenue', Math.round(kpis.existingRevenue), 7920018);
+  // The "Total sales" tile tells the reader the three tiles beside it sum to
+  // it. Both halves of that claim are asserted here so the copy cannot outlive
+  // the arithmetic.
   check(
     'new + existing + phone-less = gross',
     Math.round(kpis.newRevenue + kpis.existingRevenue + kpis.phonelessRevenue),
     Math.round(kpis.grossSales),
+  );
+  check(
+    'their bills sum to total bills',
+    kpis.attributedBills + kpis.existingBills + kpis.phonelessBills,
+    kpis.totalBills,
   );
 
   const breakdown = await getChannelBreakdown();

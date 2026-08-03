@@ -20,7 +20,7 @@ import {
   getDataQuality,
 } from '@/lib/queries/dashboard';
 import { getCustomers, getFilterOptions } from '@/lib/queries/customers';
-import { KpiRow, SegmentRow } from '@/components/stat-tiles';
+import { KpiRow, RevenueRow } from '@/components/stat-tiles';
 import { ChannelPerformance } from '@/components/channel-performance';
 import { CampaignTable } from '@/components/campaign-table';
 import { DataQualityPanel } from '@/components/data-quality';
@@ -85,17 +85,20 @@ export default async function DashboardPage({
           leadsConverted={kpis.leadsConverted}
           conversionRate={kpis.conversionRate}
           attributedRevenue={kpis.attributedRevenue}
-          attributedBills={kpis.attributedBills}
         />
-        <SegmentRow
+        <RevenueRow
           newLeads={kpis.newLeads}
           newConverted={kpis.newConverted}
           newRevenue={kpis.newRevenue}
           existingPeople={kpis.existingPeople}
           existingBuyers={kpis.existingBuyers}
           existingRevenue={kpis.existingRevenue}
+          existingBills={kpis.existingBills}
+          phonelessBills={kpis.phonelessBills}
+          phonelessRevenue={kpis.phonelessRevenue}
           grossSales={kpis.grossSales}
           totalBills={kpis.totalBills}
+          attributedBills={kpis.attributedBills}
         />
       </div>
 

@@ -5,6 +5,13 @@
  * chart. Exactly one hero figure per view — Total Leads, in the dark lead card.
  * Values use the app sans and proportional figures; tabular figures are for
  * columns, where digits must align.
+ *
+ * Tiles in the revenue row state their definition below a hairline; the leads
+ * row carries none. That row is four counts of one thing, read together and
+ * mostly self-evident from the label. The revenue row is a partition of the
+ * same rupees three ways, where "new" and "already" differ only by whether the
+ * buyer turned up on a lead sheet — a distinction nobody recovers from the
+ * label alone, and the one that gets misquoted in meetings.
  */
 
 import { formatNumber, formatCurrency, formatCurrencyCompact } from '@/lib/format';
@@ -19,7 +26,7 @@ export function HeroTile({
   caption: string;
 }) {
   return (
-    <div className="rounded-2xl bg-dark-card px-6 py-5 text-on-dark shadow-sm">
+    <div className="flex flex-col rounded-2xl bg-dark-card px-6 py-5 text-on-dark shadow-sm">
       <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-white/55">
         {label}
       </p>
@@ -29,19 +36,22 @@ export function HeroTile({
   );
 }
 
+/** `definition` is optional — the leads row carries none. */
 export function StatTile({
   label,
   value,
   caption,
+  definition,
   emphasis,
 }: {
   label: string;
   value: string;
   caption: string;
+  definition?: string;
   emphasis?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface px-6 py-5 shadow-sm">
+    <div className="flex flex-col rounded-2xl border border-line bg-surface px-6 py-5 shadow-sm">
       <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
         {label}
       </p>
@@ -53,6 +63,11 @@ export function StatTile({
         {value}
       </p>
       <p className="mt-2 text-sm text-ink-2">{caption}</p>
+      {definition && (
+        <p className="mt-3 border-t border-grid pt-3 text-xs leading-relaxed text-ink-muted">
+          {definition}
+        </p>
+      )}
     </div>
   );
 }
@@ -62,13 +77,11 @@ export function KpiRow({
   leadsConverted,
   conversionRate,
   attributedRevenue,
-  attributedBills,
 }: {
   totalLeads: number;
   leadsConverted: number;
   conversionRate: number;
   attributedRevenue: number;
-  attributedBills: number;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -80,7 +93,7 @@ export function KpiRow({
       <StatTile
         label="Leads converted"
         value={formatNumber(leadsConverted)}
-        caption={`Matched a bill · ${formatNumber(attributedBills)} bills`}
+        caption="Matched a bill"
       />
       <StatTile
         label="Attributed sales"
@@ -97,21 +110,34 @@ export function KpiRow({
 }
 
 /**
- * The headline above counts every in-scope lead. This row splits it, because
- * the two segments answer different questions: `newRevenue` is what the
- * campaigns *acquired*, `existingRevenue` is spend from people who were already
- * customers and would likely have bought regardless. Folding them together
- * would overstate the campaigns; hiding the second would understate the money.
+ * Where the money sits — a reconciliation, not a set of related figures.
+ *
+ * The first three tiles partition every rupee the business billed, and the
+ * fourth is their total. They are disjoint by construction: `newRevenue` uses
+ * the D-46 funnel, which excludes anyone flagged existing; `existingRevenue`
+ * counts exactly those people business-wide; phone-less bills carry no customer
+ * at all. So new + already + phone-less = total sales, exactly (D-50), and the
+ * last tile says so out loud — a reader can check the row adds up without
+ * leaving the page, which is the fastest way to earn trust in the rest of it.
+ *
+ * Splitting new from already-existing is the point: folding them together
+ * overstates what the campaigns acquired, and hiding the second understates the
+ * money. Phone-less is the third because it is the honest ceiling — revenue no
+ * attribution rule can ever reach.
  */
-export function SegmentRow({
+export function RevenueRow({
   newLeads,
   newConverted,
   newRevenue,
   existingPeople,
   existingBuyers,
   existingRevenue,
+  existingBills,
+  phonelessBills,
+  phonelessRevenue,
   grossSales,
   totalBills,
+  attributedBills,
 }: {
   newLeads: number;
   newConverted: number;
@@ -119,29 +145,41 @@ export function SegmentRow({
   existingPeople: number;
   existingBuyers: number;
   existingRevenue: number;
+  existingBills: number;
+  phonelessBills: number;
+  phonelessRevenue: number;
   grossSales: number;
   totalBills: number;
+  attributedBills: number;
 }) {
-  const attributed = newRevenue + existingRevenue;
-  const share = grossSales ? (100 * attributed) / grossSales : 0;
+  const traceable = grossSales ? (100 * (newRevenue + existingRevenue)) / grossSales : 0;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatTile
         label="New customers"
         value={formatCurrencyCompact(newRevenue)}
-        caption={`${formatNumber(newConverted)} buyers of ${formatNumber(newLeads)} leads · foreign numbers excluded`}
+        caption={`${formatNumber(newConverted)} buyers of ${formatNumber(newLeads)} leads · ${formatNumber(attributedBills)} bills`}
+        definition="Bought and are also on the leadsheet."
         emphasis
       />
       <StatTile
         label="Already customers"
         value={formatCurrencyCompact(existingRevenue)}
-        caption={`${formatNumber(existingBuyers)} buyers of ${formatNumber(existingPeople)} · inferred, no lead record`}
+        caption={`${formatNumber(existingBuyers)} buyers of ${formatNumber(existingPeople)} · ${formatNumber(existingBills)} bills`}
+        definition="Bought, but not on leadsheet."
       />
       <StatTile
-        label="Share of all revenue"
-        value={`${share.toFixed(1)}%`}
-        caption={`of ${formatCurrencyCompact(grossSales)} across ${formatNumber(totalBills)} bills, all channels`}
+        label="Phone-less bills"
+        value={formatCurrencyCompact(phonelessRevenue)}
+        caption={`${formatNumber(phonelessBills)} bills · no number captured`}
+        definition="No phone was taken at billing, so these can never match a lead even in principle. The ceiling on what attribution can explain."
+      />
+      <StatTile
+        label="Total sales"
+        value={formatCurrencyCompact(grossSales)}
+        caption={`${formatCurrency(grossSales)} · ${formatNumber(totalBills)} bills`}
+        definition={`Every bill in the period. The three tiles beside it sum to exactly this, and ${traceable.toFixed(1)}% of it traces to a known person.`}
       />
     </div>
   );
