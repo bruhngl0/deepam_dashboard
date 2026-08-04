@@ -11,7 +11,7 @@ import type { CampaignRow } from '@/lib/queries/dashboard';
 
 export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+    <section className="card rounded-2xl border border-line bg-surface p-6">
       <h2 className="text-lg font-semibold tracking-tight text-ink">By campaign</h2>
       <p className="mt-1 text-sm text-ink-2">
         Each campaign&rsquo;s share of the exclusive first-touch split.

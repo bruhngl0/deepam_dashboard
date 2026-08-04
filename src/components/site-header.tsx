@@ -22,9 +22,12 @@ export function SiteHeader() {
       <div className="mx-auto flex w-full max-w-[92rem] items-center gap-6 px-4 py-3 sm:px-6 lg:px-8">
         <Link
           href="/"
-          className="text-base font-semibold tracking-tight text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+          className="group flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
         >
-          Deepam CRM
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-strong text-[13px] font-semibold text-white shadow-sm transition-transform group-hover:scale-105">
+            D
+          </span>
+          <span className="text-base font-semibold tracking-tight text-ink">Deepam CRM</span>
         </Link>
 
         {/* Tabs are useless signed out — every destination redirects back. */}

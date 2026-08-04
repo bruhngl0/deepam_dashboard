@@ -46,7 +46,7 @@ export function StoreChannelBars({ stores }: { stores: StoreChannelMix[] }) {
               </div>
               <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-accent-soft/50">
                 <div
-                  className="h-full rounded-full bg-accent"
+                  className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-[width] duration-700 ease-out"
                   style={{ width: `${Math.max(0.8, Math.min(100, c.share))}%` }}
                 />
               </div>
@@ -60,7 +60,7 @@ export function StoreChannelBars({ stores }: { stores: StoreChannelMix[] }) {
 
 export function StoreChannelMixPanel({ stores }: { stores: StoreChannelMix[] }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+    <section className="card rounded-2xl border border-line bg-surface p-6">
       <h2 className="text-lg font-semibold tracking-tight text-ink">Branch × channel</h2>
       <p className="mt-1 text-sm text-ink-2">
         Each branch&rsquo;s identified revenue, split by where the customer came from.

@@ -23,11 +23,33 @@
 
   --accent: #2a78d6; /* sequential hue, light */
   --accent-soft: #cde2fb;
+  --accent-strong: #1a5cb0;
   --surface-dark-card: #1a1a19;
   --ink-on-dark: #fcfcfb;
 
   --status-good: #006300;
   --status-critical: #d03b3b;
+
+  /* Elevation — a soft, layered shadow rather than a single flat drop, so
+     cards read as resting on the page instead of outlined on top of it. */
+  --shadow-card: 0 1px 1px rgba(11, 11, 11, 0.02), 0 6px 20px -8px rgba(11, 11, 11, 0.10);
+  --shadow-card-hover: 0 2px 4px rgba(11, 11, 11, 0.03), 0 12px 28px -10px rgba(11, 11, 11, 0.14);
+  --shadow-hero: 0 1px 1px rgba(11, 11, 11, 0.04), 0 16px 32px -12px rgba(11, 11, 11, 0.28);
+  --card-top-highlight: rgba(255, 255, 255, 0.6);
+
+  /* A restrained spotlight, not a decoration — anchors the hero tile and the
+     page plane without introducing a second hue (both draw from --accent). */
+  --page-glow: radial-gradient(
+    64rem 32rem at 12% -10%,
+    color-mix(in oklab, var(--accent) 6%, transparent),
+    transparent 60%
+  );
+  --hero-gradient: radial-gradient(
+      120% 160% at 100% 0%,
+      color-mix(in oklab, var(--accent) 30%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(180deg, color-mix(in oklab, white 4%, var(--surface-dark-card)), var(--surface-dark-card));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,10 +68,32 @@
 
     --accent: #3987e5;
     --accent-soft: #184f95;
+    --accent-strong: #6bacf0;
     --surface-dark-card: #262624;
 
     --status-good: #0ca30c;
     --status-critical: #e66767;
+
+    /* Dark surfaces don't read a drop shadow — the light source that would
+       cast one doesn't exist there. Elevation instead comes from a faint
+       lightening (a hairline top highlight + a barely-lighter shadow tone)
+       plus a slightly stronger border, which is what --shadow-card already
+       supplies via --border above. */
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 6px 20px -8px rgba(0, 0, 0, 0.5);
+    --shadow-card-hover: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 14px 32px -10px rgba(0, 0, 0, 0.6);
+    --shadow-hero: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 20px 40px -14px rgba(0, 0, 0, 0.7);
+    --card-top-highlight: rgba(255, 255, 255, 0.06);
+    --page-glow: radial-gradient(
+      64rem 32rem at 12% -10%,
+      color-mix(in oklab, var(--accent) 10%, transparent),
+      transparent 60%
+    );
+    --hero-gradient: radial-gradient(
+        120% 160% at 100% 0%,
+        color-mix(in oklab, var(--accent) 22%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(180deg, color-mix(in oklab, white 3%, var(--surface-dark-card)), var(--surface-dark-card));
   }
 }
 
@@ -68,7 +112,24 @@
 
   --accent: #3987e5;
   --accent-soft: #184f95;
+  --accent-strong: #6bacf0;
   --surface-dark-card: #262624;
+
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 6px 20px -8px rgba(0, 0, 0, 0.5);
+  --shadow-card-hover: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 14px 32px -10px rgba(0, 0, 0, 0.6);
+  --shadow-hero: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 20px 40px -14px rgba(0, 0, 0, 0.7);
+  --card-top-highlight: rgba(255, 255, 255, 0.06);
+  --page-glow: radial-gradient(
+    64rem 32rem at 12% -10%,
+    color-mix(in oklab, var(--accent) 10%, transparent),
+    transparent 60%
+  );
+  --hero-gradient: radial-gradient(
+      120% 160% at 100% 0%,
+      color-mix(in oklab, var(--accent) 22%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(180deg, color-mix(in oklab, white 3%, var(--surface-dark-card)), var(--surface-dark-card));
 
   --status-good: #0ca30c;
   --status-critical: #e66767;
@@ -85,6 +146,7 @@
   --color-grid: var(--gridline);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-strong: var(--accent-strong);
   --color-dark-card: var(--surface-dark-card);
   --color-on-dark: var(--ink-on-dark);
   /* Status is reserved for state, never for a data series. */
@@ -99,13 +161,66 @@ html {
 }
 
 body {
-  background: var(--surface-page);
+  background: var(--page-glow), var(--surface-page);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* The one repeated card shell in the app — border + elevation + a hairline
+   top highlight that reads as a light catching the card's upper edge. Applied
+   via class rather than inlined per-component so every panel's elevation
+   moves together if the token above ever changes. */
+.card {
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--card-top-highlight);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+.card-interactive:hover {
+  box-shadow: var(--shadow-card-hover), inset 0 1px 0 var(--card-top-highlight);
+}
+
+.hero-card {
+  background: var(--hero-gradient);
+  box-shadow: var(--shadow-hero), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* Columns of numbers align vertically; large standalone values must not —
    tabular figures make a hero number look loose at display sizes. */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* A small flourish on the theme-toggle icon swap — the icon remounts (it's a
+   different SVG, not a shared path morph), so the animation is keyed on that
+   remount rather than a CSS transition, which can't span two elements. */
+@keyframes icon-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-45deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+.icon-pop {
+  animation: icon-pop 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-pop {
+    animation: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

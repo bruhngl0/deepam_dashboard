@@ -170,7 +170,7 @@ export default async function DashboardPage({
         <ChannelPerformance rows={channels} overlap={overlap} />
         <div className="space-y-3">
           <CampaignTable rows={campaigns} />
-          <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+          <section className="card rounded-2xl border border-line bg-surface p-6">
             <h2 className="text-lg font-semibold tracking-tight text-ink">By store</h2>
             <p className="mt-1 text-sm text-ink-2">
               All billed revenue, and the share traceable to a lead.
@@ -217,7 +217,7 @@ export default async function DashboardPage({
         <CustomerValuePanel data={valueTiers} />
       </div>
 
-      <section className="mt-6 rounded-2xl border border-line bg-surface shadow-sm">
+      <section className="card mt-6 rounded-2xl border border-line bg-surface">
         <div className="flex flex-col gap-4 p-6 pb-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-ink">Customers</h2>
@@ -226,14 +226,33 @@ export default async function DashboardPage({
               view.
             </p>
           </div>
-          <Suspense fallback={<div className="h-10" />}>
+          <Suspense
+            fallback={
+              <div className="flex flex-wrap gap-2" aria-hidden="true">
+                {[64, 32, 32, 32, 32, 40, 28, 28].map((w, i) => (
+                  <div
+                    key={i}
+                    className="h-9 animate-pulse rounded-xl bg-inset"
+                    style={{ width: `${w * 4}px` }}
+                  />
+                ))}
+              </div>
+            }
+          >
             <FilterBar stores={options.stores} channels={options.channels} dateBounds={dateBounds} />
           </Suspense>
         </div>
 
         <CustomerTable rows={customers.rows} />
 
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-between gap-3 border-t border-grid px-4 py-3">
+              <div className="h-4 w-32 animate-pulse rounded bg-inset" />
+              <div className="h-8 w-40 animate-pulse rounded-lg bg-inset" />
+            </div>
+          }
+        >
           <Pagination
             page={customers.page}
             pageCount={customers.pageCount}

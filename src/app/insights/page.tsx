@@ -27,8 +27,12 @@ export const dynamic = 'force-dynamic';
 
 const label = (code: string) => CHANNEL_LABEL[code] ?? code;
 
-/** Card wrapper. The eyebrow states the measure; the h2 states the finding. */
-function Finding({
+/**
+ * Card wrapper. The eyebrow states the measure; the h2 states the finding.
+ * Exported (with `Note` and `Bar` below) so `/analysis` reuses the exact same
+ * visual idiom instead of a second copy that can drift from this one.
+ */
+export function Finding({
   eyebrow,
   title,
   children,
@@ -38,7 +42,7 @@ function Finding({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+    <section className="card rounded-2xl border border-line bg-surface p-6">
       <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
         {eyebrow}
       </p>
@@ -51,7 +55,7 @@ function Finding({
 }
 
 /** Interpretation sits below its evidence, in secondary ink. */
-function Note({ children }: { children: React.ReactNode }) {
+export function Note({ children }: { children: React.ReactNode }) {
   return <p className="max-w-[68ch] text-sm leading-relaxed text-ink-2">{children}</p>;
 }
 
@@ -60,11 +64,14 @@ function Note({ children }: { children: React.ReactNode }) {
  * quantity is genuinely a share of a whole, the row maximum when the bars are
  * only being compared with each other.
  */
-function Bar({ value, scale }: { value: number; scale: number }) {
+export function Bar({ value, scale }: { value: number; scale: number }) {
   const pct = scale > 0 ? Math.max(0.8, Math.min(100, (100 * value) / scale)) : 0;
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-accent-soft/50">
-      <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+      <div
+        className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-[width] duration-700 ease-out"
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
@@ -276,73 +283,6 @@ export default async function InsightsPage() {
   );
 }
 
-type Priority = 'Risk' | 'Done';
-
-const PRIORITY_STYLE: Record<Priority, string> = {
-  Risk: 'border-status-critical/30 bg-status-critical/10 text-status-critical',
-  Done: 'border-status-good/30 bg-status-good/10 text-status-good',
-};
-
-/**
- * Originally seven proposals, ordered by what I would do first. Six are now
- * built — the list stays in its original order rather than moving finished
- * items to the bottom, so the sequence itself still records the priority call
- * that was made, not just its outcome. Authentication is unchanged and unbuilt:
- * it was the one item that was a liability rather than a missed opportunity,
- * and it still is.
- */
-const BUILD: { priority: Priority; effort: string; title: string; body: string }[] = [
-  {
-    priority: 'Risk',
-    effort: 'Days',
-    title: 'Authentication',
-    body:
-      'Code-complete, not yet live. D-93: every page and API route now requires a signed-in Clerk session — proxy.ts redirects, requireUser()/requireApiUser() enforce it again server-side before any query runs, invite-only with no public sign-up. Confirmed to fail closed: with no Clerk keys configured, every route returns 500, never an open page. What is still missing is a provisioned Clerk account — vercel integration add clerk, then restricted sign-up mode — and a deploy. Until both happen, whatever is actually live in production is still the pre-auth version. This remains the item that should land first.',
-  },
-  {
-    priority: 'Done',
-    effort: 'Hours',
-    title: 'Branch × channel matrix',
-    body:
-      'D-87. A live panel on the dashboard now, not just a finding here — the same query and the same bars, shared between both pages so they can never disagree.',
-  },
-  {
-    priority: 'Done',
-    effort: 'Hours',
-    title: 'Value columns on the channel and campaign tables',
-    body:
-      'D-88. Average bill and revenue per buyer sit beside every conversion rate on the dashboard now. Google Ads converting best and being worth roughly half an Others buyer is visible without a trip to this page.',
-  },
-  {
-    priority: 'Done',
-    effort: 'Days',
-    title: 'A customer-value view',
-    body:
-      'D-90. Named tiers (Top 10% / Next 20% / Rest of buyers / No purchase yet) by lifetime spend, with channel mix per tier, live on the dashboard — and filterable on the customer table via ?tier=. The concentration finding is now something you can act on: within the top decile, existing customers, Others and Instagram are visible by name.',
-  },
-  {
-    priority: 'Done',
-    effort: 'Days',
-    title: 'Date range filter',
-    body:
-      'D-91. ?from=&to= on the dashboard now bounds every sales-derived figure, verified to partition exactly (two half-windows sum to the full-range gross to the rupee). Leads stay unwindowed — they still carry no date (D-84) — and the Customer value panel deliberately stays lifetime; both say so on the page rather than leaving the asymmetry silent.',
-  },
-  {
-    priority: 'Done',
-    effort: 'Hours',
-    title: 'Implement the 30-day attribution window (D-45)',
-    body:
-      'D-92. Enforced now in migration 0007 and mirrored in the live dashboard queries, reading the window from settings rather than a hardcoded value. Verified to change no figure currently on screen — a scratch check confirmed the rule genuinely discriminates by tightening the window to one day, which excluded 358 of 847 bills.',
-  },
-  {
-    priority: 'Done',
-    effort: 'Days',
-    title: 'Import UI and export',
-    body:
-      'D-89. /import previews any workbook safely and commits behind an explicit env-var gate pending authentication. /api/customers/export streams a CSV of every filtered row, not just the visible page, sharing its filter logic with the table so the two can never quietly disagree.',
-  },
-];
-
 const PUSHBACK: { title: string; body: string }[] = [
   {
     title: 'More conversion-rate charts',
@@ -358,55 +298,22 @@ const PUSHBACK: { title: string; body: string }[] = [
 
 function Roadmap() {
   return (
-    <div className="mt-3 grid gap-3 lg:grid-cols-2">
-      <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
-        <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-          What to build
-        </p>
-        <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-ink">
-          Six built, one left — in the order they were proposed
-        </h2>
+    <section className="card mt-3 rounded-2xl border border-line bg-surface p-6">
+      <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+        What I would push back on
+      </p>
+      <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-ink">
+        Two things worth not building
+      </h2>
 
-        <ol className="mt-5 flex flex-col gap-5">
-          {BUILD.map((item, i) => (
-            <li key={item.title} className="flex gap-4">
-              <span className="tnum mt-0.5 shrink-0 text-sm font-semibold text-ink-muted">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <div className="flex flex-col gap-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${PRIORITY_STYLE[item.priority]}`}
-                  >
-                    {item.priority}
-                  </span>
-                  <span className="text-[11px] text-ink-muted">{item.effort}</span>
-                </div>
-                <p className="max-w-[68ch] text-sm leading-relaxed text-ink-2">{item.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="h-fit rounded-2xl border border-line bg-surface p-6 shadow-sm">
-        <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-          What I would push back on
-        </p>
-        <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-ink">
-          Two things worth not building
-        </h2>
-
-        <div className="mt-5 flex flex-col gap-5">
-          {PUSHBACK.map((item) => (
-            <div key={item.title} className="flex flex-col gap-1.5">
-              <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
-              <p className="max-w-[68ch] text-sm leading-relaxed text-ink-2">{item.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
+      <div className="mt-5 flex flex-col gap-5">
+        {PUSHBACK.map((item) => (
+          <div key={item.title} className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
+            <p className="max-w-[68ch] text-sm leading-relaxed text-ink-2">{item.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

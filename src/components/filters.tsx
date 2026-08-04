@@ -42,7 +42,7 @@ function useSetParam() {
 }
 
 const selectClass =
-  'rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink ' +
+  'rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink transition-shadow ' +
   'focus:outline-none focus:ring-2 focus:ring-accent/40';
 
 export function FilterBar({
@@ -208,7 +208,7 @@ export function FilterBar({
           p.delete('pageSize');
           return p.toString();
         })()}`}
-        className="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-medium text-ink-2 shadow-sm hover:bg-inset hover:text-ink"
+        className="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-medium text-ink-2 shadow-sm transition-colors hover:bg-inset hover:text-ink active:scale-95"
       >
         Export CSV
       </a>
@@ -228,7 +228,7 @@ export function FilterBar({
               to: null,
             })
           }
-          className="rounded-xl px-3 py-2 text-sm font-medium text-accent hover:underline"
+          className="rounded-xl px-3 py-2 text-sm font-medium text-accent transition-colors hover:underline active:scale-95"
         >
           Clear {active} filter{active > 1 ? 's' : ''}
         </button>
@@ -262,7 +262,7 @@ export function Pagination({
           type="button"
           disabled={page <= 1}
           onClick={() => setParam({ page: String(page - 1) })}
-          className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-2 disabled:opacity-40 enabled:hover:bg-inset"
+          className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-2 transition-colors disabled:opacity-40 enabled:hover:bg-inset enabled:active:scale-95"
         >
           Previous
         </button>
@@ -273,7 +273,7 @@ export function Pagination({
           type="button"
           disabled={page >= pageCount}
           onClick={() => setParam({ page: String(page + 1) })}
-          className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-2 disabled:opacity-40 enabled:hover:bg-inset"
+          className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-2 transition-colors disabled:opacity-40 enabled:hover:bg-inset enabled:active:scale-95"
         >
           Next
         </button>

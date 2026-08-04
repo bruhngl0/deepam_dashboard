@@ -30,7 +30,7 @@ export default async function ImportPage() {
         </p>
       </header>
 
-      <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+      <section className="card rounded-2xl border border-line bg-surface p-6">
         <ImportForm commitEnabled={commitEnabled} />
       </section>
     </main>

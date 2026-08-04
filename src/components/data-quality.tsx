@@ -28,7 +28,7 @@ function Item({
 
 export function DataQualityPanel({ quality }: { quality: DataQuality }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+    <section className="card rounded-2xl border border-line bg-surface p-6">
       <h2 className="text-lg font-semibold tracking-tight text-ink">Data quality</h2>
       <p className="mt-1 text-sm text-ink-2">
         Known gaps in this period. Each one moves a number above.

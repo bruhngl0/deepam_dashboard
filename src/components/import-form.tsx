@@ -95,9 +95,22 @@ export function ImportForm({ commitEnabled }: { commitEnabled: boolean }) {
       <div>
         <label
           htmlFor="workbook"
-          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium text-ink shadow-sm hover:bg-inset"
+          className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-line bg-inset/40 px-5 py-4 text-sm text-ink transition-colors hover:border-accent/50 hover:bg-accent-soft/20"
         >
-          Choose workbook (.xlsx)
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft/50 text-accent transition-colors group-hover:bg-accent-soft">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-[1.8]">
+              <path d="M12 16V4M12 4l-4 4M12 4l4 4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" />
+            </svg>
+          </span>
+          <span className="flex flex-col">
+            <span className="font-medium text-ink">
+              {fileName ?? 'Choose workbook (.xlsx)'}
+            </span>
+            <span className="text-xs text-ink-muted">
+              {fileName ? 'Click to choose a different file' : 'Master workbook with one sheet per channel'}
+            </span>
+          </span>
         </label>
         <input
           id="workbook"
@@ -106,7 +119,6 @@ export function ImportForm({ commitEnabled }: { commitEnabled: boolean }) {
           onChange={handleFileChange}
           className="sr-only"
         />
-        {fileName && <span className="ml-3 text-sm text-ink-2">{fileName}</span>}
       </div>
 
       {status === 'previewing' && <p className="text-sm text-ink-muted">Reading workbook…</p>}
@@ -118,7 +130,7 @@ export function ImportForm({ commitEnabled }: { commitEnabled: boolean }) {
       )}
 
       {preview && (status === 'previewed' || status === 'committing') && (
-        <div className="overflow-x-auto rounded-xl border border-line">
+        <div className="card overflow-x-auto rounded-xl border border-line">
           <table className="w-full min-w-[36rem] text-sm">
             <thead>
               <tr className="border-b border-grid bg-inset/60 text-[11px] uppercase tracking-[0.09em] text-ink-muted">
@@ -133,7 +145,7 @@ export function ImportForm({ commitEnabled }: { commitEnabled: boolean }) {
             </thead>
             <tbody>
               {preview.sheets.map((s) => (
-                <tr key={s.sheet} className="border-t border-grid">
+                <tr key={s.sheet} className="border-t border-grid transition-colors hover:bg-inset/50">
                   <td className="px-3 py-2 text-ink">
                     {s.sheet}
                     <span className="ml-2 text-xs text-ink-muted">
@@ -200,7 +212,7 @@ export function ImportForm({ commitEnabled }: { commitEnabled: boolean }) {
                 type="text"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
-                className="w-32 rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+                className="w-32 rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink transition-shadow focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
               {/* A fixed color, not the theme-reactive status token: the one truly
                   destructive control in the app should read the same in both
@@ -210,7 +222,7 @@ export function ImportForm({ commitEnabled }: { commitEnabled: boolean }) {
                 type="button"
                 disabled={!confirmed || status === 'committing'}
                 onClick={handleCommit}
-                className="rounded-xl bg-red-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-xl bg-red-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40 enabled:active:scale-95"
               >
                 {status === 'committing' ? 'Committing…' : 'Replace lead data'}
               </button>

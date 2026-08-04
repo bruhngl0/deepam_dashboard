@@ -22,7 +22,7 @@ export function CustomerValuePanel({ data }: { data: CustomerValueTiers }) {
   const top10 = data.tiers.find((t) => t.tier === 'top10');
 
   return (
-    <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+    <section className="card rounded-2xl border border-line bg-surface p-6">
       <h2 className="text-lg font-semibold tracking-tight text-ink">Customer value</h2>
       <p className="mt-1 text-sm text-ink-2">
         {formatNumber(top10?.people ?? 0)} customers carry {(top10?.shareOfRevenue ?? 0).toFixed(1)}
@@ -54,7 +54,7 @@ export function CustomerValuePanel({ data }: { data: CustomerValueTiers }) {
               aria-label={`${t.label}: ${t.shareOfRevenue.toFixed(1)} percent of identified revenue, ${t.people} people`}
             >
               <div
-                className="h-full rounded-full bg-accent"
+                className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-[width] duration-700 ease-out"
                 style={{ width: `${Math.max(0.6, Math.min(100, t.shareOfRevenue))}%` }}
               />
             </div>

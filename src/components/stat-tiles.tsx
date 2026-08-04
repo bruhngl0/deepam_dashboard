@@ -26,11 +26,11 @@ export function HeroTile({
   caption: string;
 }) {
   return (
-    <div className="flex flex-col rounded-2xl bg-dark-card px-6 py-5 text-on-dark shadow-sm">
+    <div className="hero-card flex flex-col rounded-2xl bg-dark-card px-6 py-5 text-on-dark">
       <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-white/55">
         {label}
       </p>
-      <p className="mt-2 text-5xl font-semibold leading-none tracking-tight">{value}</p>
+      <p className="tnum mt-2 text-5xl font-semibold leading-none tracking-tight">{value}</p>
       <p className="mt-2 text-sm text-white/60">{caption}</p>
     </div>
   );
@@ -51,12 +51,15 @@ export function StatTile({
   emphasis?: boolean;
 }) {
   return (
-    <div className="flex flex-col rounded-2xl border border-line bg-surface px-6 py-5 shadow-sm">
+    <div className="card relative flex flex-col overflow-hidden rounded-2xl border border-line bg-surface px-6 py-5">
+      {emphasis && (
+        <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent/0 via-accent to-accent/0" />
+      )}
       <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
         {label}
       </p>
       <p
-        className={`mt-2 text-3xl font-semibold leading-none tracking-tight ${
+        className={`tnum mt-2 text-3xl font-semibold leading-none tracking-tight ${
           emphasis ? 'text-accent' : 'text-ink'
         }`}
       >
@@ -96,7 +99,7 @@ export function KpiRow({
         caption="Matched a bill"
       />
       <StatTile
-        label="Attributed sales"
+        label="Sales from leads"
         value={formatCurrencyCompact(attributedRevenue)}
         caption={formatCurrency(attributedRevenue)}
       />

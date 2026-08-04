@@ -53,7 +53,7 @@ function Chip({
   return (
     <span
       title={title}
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${tones}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${tones}`}
     >
       {children}
     </span>
@@ -91,7 +91,7 @@ function Row({ row }: { row: CustomerRow }) {
 
   return (
     <>
-      <tr className="border-t border-grid hover:bg-inset/60">
+      <tr className="border-t border-grid transition-colors hover:bg-inset/60">
         <td className="px-4 py-3">
           <p className="font-medium text-ink">{orNotProvided(row.fullName)}</p>
           <p className="text-xs text-ink-muted">{row.email ?? 'No email'}</p>
@@ -139,7 +139,7 @@ function Row({ row }: { row: CustomerRow }) {
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-inset"
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-2 transition-colors hover:bg-inset hover:text-ink active:scale-95"
           >
             {open ? 'Hide' : 'View'}
           </button>
@@ -148,7 +148,7 @@ function Row({ row }: { row: CustomerRow }) {
 
       {open && (
         <tr className="border-t border-grid bg-inset/40">
-          <td colSpan={7} className="px-4 py-4">
+          <td colSpan={7} className="animate-[fade-in_180ms_ease] px-4 py-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <DetailField label="Area" value={orNotProvided(row.area)} />
               <DetailField label="City" value={orNotProvided(row.city)} />

@@ -44,7 +44,7 @@ export function ChannelPerformance({
   );
 
   return (
-    <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+    <section className="card rounded-2xl border border-line bg-surface p-6">
       <h2 className="text-lg font-semibold tracking-tight text-ink">
         Conversion by channel
       </h2>
@@ -85,7 +85,7 @@ export function ChannelPerformance({
               aria-label={`${row.conversionRate.toFixed(2)} percent of ${row.people} leads converted`}
             >
               <div
-                className="h-full rounded-full bg-accent"
+                className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-[width] duration-700 ease-out"
                 style={{ width: `${Math.max(0.6, Math.min(100, row.conversionRate))}%` }}
               />
             </div>
