@@ -12,13 +12,64 @@
 
 import { db } from '@/db';
 import { sql } from 'drizzle-orm';
-import { VALUE_TIER } from './dashboard';
 
 type Row = Record<string, unknown>;
 
 async function query(text: string): Promise<Row[]> {
   const result = (await db.execute(sql.raw(text))) as unknown;
   return Array.isArray(result) ? (result as Row[]) : ((result as { rows: Row[] }).rows ?? []);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Every query in this module builds raw SQL text (see `query` above), so a
+ * batch id headed into a WHERE clause has to be provably not SQL before it's
+ * spliced in. It ultimately comes from a URL search param — validating the
+ * shape is what makes that safe rather than trusting the caller.
+ */
+function batchClause(column: string, batchId?: string | null): string {
+  if (!batchId) return '';
+  if (!UUID_RE.test(batchId)) throw new Error(`Invalid batch id: ${batchId}`);
+  return `AND ${column} = '${batchId}'`;
+}
+
+export interface SalesReport {
+  id: string;
+  fileName: string;
+  bills: number;
+  revenue: number;
+  from: string;
+  to: string;
+}
+
+/**
+ * One row per committed sales import batch — what the report dropdown on the
+ * Analysis page lists. Sales are never replaced or merged across imports
+ * (D-04), so each batch is a distinct billing period a user uploaded once.
+ */
+export async function getSalesReports(): Promise<SalesReport[]> {
+  const rows = await query(`
+    SELECT ib.id::text                              AS id,
+           ib.file_name                              AS file_name,
+           COUNT(s.id)::int                          AS bills,
+           COALESCE(SUM(s.bill_amount), 0)::numeric  AS revenue,
+           MIN(s.billed_at AT TIME ZONE 'Asia/Kolkata')::date AS from_date,
+           MAX(s.billed_at AT TIME ZONE 'Asia/Kolkata')::date AS to_date
+    FROM   import_batches ib
+    JOIN   sales s ON s.batch_id = ib.id
+    WHERE  ib.source_kind = 'sale' AND ib.status = 'committed'
+    GROUP  BY ib.id, ib.file_name
+    ORDER  BY MIN(s.billed_at) DESC`);
+
+  return rows.map((r) => ({
+    id: String(r.id),
+    fileName: String(r.file_name),
+    bills: Number(r.bills ?? 0),
+    revenue: Number(r.revenue ?? 0),
+    from: String(r.from_date),
+    to: String(r.to_date),
+  }));
 }
 
 export interface CustomerSegment {
@@ -65,21 +116,36 @@ const SEGMENT_ORDER: CustomerSegment['segment'][] = [
  * purchase is within the same week, so a recency score would just repeat the
  * calendar back rather than say anything about churn risk.
  */
-export async function getCustomerSegments(): Promise<{
+export async function getCustomerSegments(batchId?: string | null): Promise<{
   segments: CustomerSegment[];
   totalPeople: number;
   totalRevenue: number;
 }> {
+  // Computed straight from `sales` rather than the `customer_attribution` MV
+  // (whose totals are always lifetime) so the value band — top 30% by spend —
+  // is ranked within whichever report is selected, not globally, when one is.
   const rows = await query(`
-    WITH ${VALUE_TIER},
+    WITH scoped AS (
+      SELECT customer_id, bill_amount
+      FROM   sales
+      WHERE  customer_id IS NOT NULL ${batchClause('batch_id', batchId)}
+    ),
+    agg AS (
+      SELECT customer_id,
+             COUNT(*)::int    AS bill_count,
+             SUM(bill_amount) AS total_sales
+      FROM   scoped GROUP BY customer_id
+    ),
+    ranked AS (
+      SELECT customer_id, bill_count, total_sales,
+             NTILE(10) OVER (ORDER BY total_sales DESC, customer_id) AS decile
+      FROM   agg
+    ),
     segments AS (
-      SELECT ca.customer_id,
-             CASE WHEN ca.bill_count >= 2 THEN 'repeat' ELSE 'one_time' END AS frequency_band,
-             CASE WHEN vt.tier IN ('top10', 'next20') THEN 'high' ELSE 'low' END AS value_band,
-             ca.total_sales
-      FROM   customer_attribution ca
-      JOIN   value_tier vt ON vt.customer_id = ca.customer_id
-      WHERE  ca.converted
+      SELECT CASE WHEN bill_count >= 2 THEN 'repeat' ELSE 'one_time' END AS frequency_band,
+             CASE WHEN decile <= 3 THEN 'high' ELSE 'low' END           AS value_band,
+             total_sales
+      FROM   ranked
     )
     SELECT frequency_band, value_band,
            COUNT(*)::int                          AS people,
@@ -135,7 +201,7 @@ export interface OrderValueDistribution {
  * other panel. A mean gets pulled hard by a handful of large saree
  * purchases; the gap between mean and median on a row is the skew itself.
  */
-export async function getOrderValueDistribution(): Promise<OrderValueDistribution> {
+export async function getOrderValueDistribution(batchId?: string | null): Promise<OrderValueDistribution> {
   const byStore = await query(`
     SELECT st.name AS key,
            COUNT(*)::int                                                        AS bills,
@@ -143,6 +209,7 @@ export async function getOrderValueDistribution(): Promise<OrderValueDistributio
            ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY s.bill_amount))::bigint AS median_bill,
            ROUND(PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY s.bill_amount))::bigint AS p90_bill
     FROM   sales s JOIN stores st ON st.id = s.store_id
+    WHERE  TRUE ${batchClause('s.batch_id', batchId)}
     GROUP  BY st.name ORDER BY median_bill DESC`);
 
   const byChannel = await query(`
@@ -153,6 +220,7 @@ export async function getOrderValueDistribution(): Promise<OrderValueDistributio
            ROUND(PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY s.bill_amount))::bigint AS p90_bill
     FROM   sales s
     LEFT   JOIN customer_attribution ca ON ca.customer_id = s.customer_id
+    WHERE  TRUE ${batchClause('s.batch_id', batchId)}
     GROUP  BY 1 ORDER BY median_bill DESC NULLS LAST`);
 
   const map = (rows: Row[]): OrderValueRow[] =>
@@ -190,12 +258,16 @@ const BAND_LABEL = ['Morning · before 12pm', 'Afternoon · 12–5pm', 'Evening 
  * is when checkout happens, which lags "when people decided to buy" by
  * whatever the in-store dwell time is.
  */
-export async function getSalesRhythm(): Promise<{ byDay: DayRow[]; byTimeBand: TimeBandRow[] }> {
+export async function getSalesRhythm(
+  batchId?: string | null,
+): Promise<{ byDay: DayRow[]; byTimeBand: TimeBandRow[] }> {
+  const clause = batchClause('batch_id', batchId);
+
   const dayRows = await query(`
     SELECT EXTRACT(ISODOW FROM billed_at AT TIME ZONE 'Asia/Kolkata')::int AS dow,
            COUNT(*)::int                          AS bills,
            COALESCE(SUM(bill_amount), 0)::numeric AS revenue
-    FROM   sales GROUP BY 1 ORDER BY 1`);
+    FROM   sales WHERE TRUE ${clause} GROUP BY 1 ORDER BY 1`);
 
   const bandRows = await query(`
     SELECT (CASE
@@ -206,7 +278,7 @@ export async function getSalesRhythm(): Promise<{ byDay: DayRow[]; byTimeBand: T
             END)::int                              AS band,
            COUNT(*)::int                          AS bills,
            COALESCE(SUM(bill_amount), 0)::numeric AS revenue
-    FROM   sales GROUP BY 1 ORDER BY 1`);
+    FROM   sales WHERE TRUE ${clause} GROUP BY 1 ORDER BY 1`);
 
   const byDay = dayRows.map((r) => ({
     dow: Number(r.dow),
@@ -239,7 +311,7 @@ export interface SalesmanRow {
  * Capped at 12 rows: 40 distinct codes exist, and a ranked list past the
  * first dozen stops being something anyone reads.
  */
-export async function getSalesmanPerformance(): Promise<SalesmanRow[]> {
+export async function getSalesmanPerformance(batchId?: string | null): Promise<SalesmanRow[]> {
   const rows = await query(`
     SELECT COALESCE(NULLIF(TRIM(s.salesman_code), ''), 'Unassigned') AS code,
            st.name                                    AS store,
@@ -247,6 +319,7 @@ export async function getSalesmanPerformance(): Promise<SalesmanRow[]> {
            COALESCE(SUM(s.bill_amount), 0)::numeric    AS revenue,
            ROUND(AVG(s.bill_amount))::bigint           AS avg_bill
     FROM   sales s JOIN stores st ON st.id = s.store_id
+    WHERE  TRUE ${batchClause('s.batch_id', batchId)}
     GROUP  BY 1, 2 ORDER BY revenue DESC LIMIT 12`);
 
   return rows.map((r) => ({

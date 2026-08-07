@@ -111,7 +111,7 @@ export function ChannelPerformance({
       </div>
 
       <div className="mt-6 border-t border-grid pt-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+        <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
           The actual distribution
         </p>
         <p className="mt-1.5 text-sm text-ink-2">
@@ -123,10 +123,10 @@ export function ChannelPerformance({
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[22rem] text-sm">
             <thead>
-              <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-                <th className="pb-2 text-left font-medium">On these lists</th>
-                <th className="pb-2 text-right font-medium">People</th>
-                <th className="pb-2 text-right font-medium">Bought</th>
+              <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+                <th className="pb-2 text-left font-bold">On these lists</th>
+                <th className="pb-2 text-right font-bold">People</th>
+                <th className="pb-2 text-right font-bold">Bought</th>
               </tr>
             </thead>
             <tbody>

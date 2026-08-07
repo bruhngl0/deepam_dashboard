@@ -43,7 +43,7 @@ export function Finding({
 }) {
   return (
     <section className="card rounded-2xl border border-line bg-surface p-6">
-      <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+      <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
         {eyebrow}
       </p>
       <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-ink text-balance">
@@ -166,11 +166,11 @@ export default async function InsightsPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[30rem] text-sm">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-                    <th className="pb-2 text-left font-medium">Channel</th>
-                    <th className="pb-2 text-right font-medium">Conv. rate</th>
-                    <th className="pb-2 text-right font-medium">Avg bill</th>
-                    <th className="pb-2 text-right font-medium">Per buyer</th>
+                  <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+                    <th className="pb-2 text-left font-bold">Channel</th>
+                    <th className="pb-2 text-right font-bold">Conv. rate</th>
+                    <th className="pb-2 text-right font-bold">Avg bill</th>
+                    <th className="pb-2 text-right font-bold">Per buyer</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -299,7 +299,7 @@ const PUSHBACK: { title: string; body: string }[] = [
 function Roadmap() {
   return (
     <section className="card mt-3 rounded-2xl border border-line bg-surface p-6">
-      <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+      <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
         What I would push back on
       </p>
       <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-ink">

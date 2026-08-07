@@ -20,14 +20,14 @@ export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[42rem] text-sm">
           <thead>
-            <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-              <th className="pb-2 text-left font-medium">Campaign</th>
-              <th className="pb-2 text-right font-medium">Leads</th>
-              <th className="pb-2 text-right font-medium">Bought</th>
-              <th className="pb-2 text-right font-medium">Rate</th>
-              <th className="pb-2 text-right font-medium">Revenue</th>
-              <th className="pb-2 text-right font-medium">Avg bill</th>
-              <th className="pb-2 text-right font-medium">Per lead</th>
+            <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+              <th className="pb-2 text-left font-bold">Campaign</th>
+              <th className="pb-2 text-right font-bold">Leads</th>
+              <th className="pb-2 text-right font-bold">Bought</th>
+              <th className="pb-2 text-right font-bold">Rate</th>
+              <th className="pb-2 text-right font-bold">Revenue</th>
+              <th className="pb-2 text-right font-bold">Avg bill</th>
+              <th className="pb-2 text-right font-bold">Per lead</th>
             </tr>
           </thead>
           <tbody>

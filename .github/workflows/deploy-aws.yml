@@ -1,0 +1,52 @@
+# Builds the Docker image and pushes it to ECR on every push to main.
+#
+# Deliberately stops there — it does not call `aws apprunner start-deployment`.
+# See DEPLOY_AWS.md: nothing goes live on the strength of "a merge happened,"
+# the same two-phase caution this app applies to its own data imports (D-58).
+# Promote a specific image tag with:
+#   aws apprunner start-deployment --service-arn <arn>
+#
+# Requires two repo variables/secrets (Settings -> Secrets and variables ->
+# Actions), not hardcoded here:
+#   AWS_ROLE_ARN   - an IAM role this workflow assumes via OIDC (no long-lived
+#                    AWS keys stored in GitHub). Needs ecr:GetAuthorizationToken,
+#                    ecr:BatchCheckLayerAvailability, ecr:PutImage, ecr:InitiateLayerUpload,
+#                    ecr:UploadLayerPart, ecr:CompleteLayerUpload on the deepam-crm repo.
+#   AWS_REGION     - e.g. ap-south-1
+
+name: Build and push to ECR
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write # required for OIDC -> AssumeRoleWithWebIdentity
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPOSITORY: deepam-crm
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" -t "$REGISTRY/$REPOSITORY:latest" .
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker push "$REGISTRY/$REPOSITORY:latest"

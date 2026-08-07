@@ -177,11 +177,11 @@ export default async function DashboardPage({
             </p>
             <table className="mt-4 w-full text-sm">
               <thead>
-                <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-                  <th className="pb-2 text-left font-medium">Store</th>
-                  <th className="pb-2 text-right font-medium">Bills</th>
-                  <th className="pb-2 text-right font-medium">Revenue</th>
-                  <th className="pb-2 text-right font-medium">Attributed</th>
+                <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+                  <th className="pb-2 text-left font-bold">Store</th>
+                  <th className="pb-2 text-right font-bold">Bills</th>
+                  <th className="pb-2 text-right font-bold">Revenue</th>
+                  <th className="pb-2 text-right font-bold">Attributed</th>
                 </tr>
               </thead>
               <tbody>

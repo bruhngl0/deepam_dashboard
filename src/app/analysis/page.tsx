@@ -1,12 +1,14 @@
 /**
  * Analysis — cuts on the data the dashboard and Insights don't show yet.
  *
- * Everything here is a same-period cut of the 8 days currently loaded, never a
- * projection. A trend line or a recency-based churn score would be fitted to
- * one week and would misstate its own confidence — see the note on
- * `lib/queries/analysis.ts`. Real forecasting needs accumulated weekly
- * batches, which the import pipeline doesn't keep yet (leads are replaced,
- * not appended, on every load — D-84).
+ * A "Sales report" dropdown scopes every figure to one committed sales import
+ * batch, or leaves it unscoped across every batch loaded (sales are appended,
+ * never replaced — D-04, unlike leads, which are wholesale-replaced on every
+ * load — D-84). Everything here is still a same-period cut, never a
+ * projection: a trend line or a recency-based churn score needs several
+ * comparable weekly batches to fit without misstating its own confidence —
+ * see the note on `lib/queries/analysis.ts` and the "Not here yet" section
+ * below for what's still missing before that's honest.
  */
 
 import {
@@ -14,24 +16,42 @@ import {
   getOrderValueDistribution,
   getSalesRhythm,
   getSalesmanPerformance,
+  getSalesReports,
 } from '@/lib/queries/analysis';
 import { Finding, Note, Bar } from '@/app/insights/page';
-import { formatCurrency, formatNumber, CHANNEL_LABEL } from '@/lib/format';
+import { ReportSelect } from '@/components/report-select';
+import { formatCurrency, formatDate, formatNumber, CHANNEL_LABEL } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 const scopeLabel = (key: string) => (key === 'unmatched' ? 'No phone captured' : (CHANNEL_LABEL[key] ?? key));
 
-export default async function AnalysisPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function AnalysisPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   // Before any query runs — the proxy redirect is not the boundary.
   await requireUser();
 
+  const params = await searchParams;
+  const requestedBatch = Array.isArray(params.batch) ? params.batch[0] : params.batch;
+
+  const reports = await getSalesReports();
+  // Only a batch id the DB actually has is trusted — a stale bookmark or a
+  // hand-edited URL falls back to "all reports" rather than erroring or
+  // silently matching nothing (same rule the dashboard uses for `tier`, D-91).
+  const selectedReport = reports.find((r) => r.id === requestedBatch);
+  const batchId = selectedReport?.id;
+
   const [segments, orderValue, rhythm, salesmen] = await Promise.all([
-    getCustomerSegments(),
-    getOrderValueDistribution(),
-    getSalesRhythm(),
-    getSalesmanPerformance(),
+    getCustomerSegments(batchId),
+    getOrderValueDistribution(batchId),
+    getSalesRhythm(batchId),
+    getSalesmanPerformance(batchId),
   ]);
 
   const coreRepeat = segments.segments.find((s) => s.segment === 'repeat_high');
@@ -49,16 +69,32 @@ export default async function AnalysisPage() {
   const totalSalesmanRevenue = salesmen.reduce((n, s) => n + s.revenue, 0);
   const maxSalesmanRevenue = Math.max(...salesmen.map((s) => s.revenue), 1);
 
+  const earliestLoaded = reports.reduce<string | null>(
+    (min, r) => (min === null || r.from < min ? r.from : min),
+    null,
+  );
+  const latestLoaded = reports.reduce<string | null>(
+    (max, r) => (max === null || r.to > max ? r.to : max),
+    null,
+  );
+
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Analysis</h1>
-        <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
-          Segmentation, basket size, timing and staff performance — cuts the dashboard and
-          Insights don&rsquo;t surface. Every figure below is scoped to the 8 days currently
-          loaded, not a forecast; see the note at the bottom for what a real projection needs
-          first.
-        </p>
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Analysis</h1>
+          <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
+            Segmentation, basket size, timing and staff performance — cuts the dashboard and
+            Insights don&rsquo;t surface. Every figure below is a same-period cut, never a
+            forecast; see the note at the bottom for what a real projection needs first.
+          </p>
+          <p className="tnum mt-2 text-xs text-ink-muted">
+            {selectedReport
+              ? `Showing only the ${formatDate(selectedReport.from)} – ${formatDate(selectedReport.to)} report — ${formatNumber(selectedReport.bills)} bills, ${formatCurrency(selectedReport.revenue)}.`
+              : `Showing every sales report loaded — ${formatNumber(reports.length)} report${reports.length === 1 ? '' : 's'}${earliestLoaded && latestLoaded ? `, ${formatDate(earliestLoaded)} – ${formatDate(latestLoaded)}` : ''}.`}
+          </p>
+        </div>
+        <ReportSelect reports={reports} />
       </header>
 
       <div className="grid gap-3 lg:grid-cols-2">
@@ -90,12 +126,13 @@ export default async function AnalysisPage() {
             ))}
           </div>
           <Note>
-            Frequency (repeat vs. one-time) crossed with the same top-30%-by-spend cut the
-            dashboard&rsquo;s value tiers use, so this never disagrees with that panel.
-            Recency is deliberately left out — every purchase here happened within the same
-            8-day window, so a days-since-last-purchase score would just restate the calendar
-            rather than signal churn risk. It becomes meaningful once multiple weeks of sales
-            are loaded.
+            Frequency (repeat vs. one-time) crossed with a top-30%-by-spend cut.
+            {selectedReport
+              ? ' Ranked within this report only — a customer’s tier here can differ from the dashboard’s lifetime value panel, since that ranks across every bill they’ve ever placed.'
+              : ' Ranked across every bill loaded, the same population the dashboard’s value tiers use, so this never disagrees with that panel.'}
+            {' '}Recency is deliberately left out — a days-since-last-purchase score needs
+            multiple, separated weeks of sales to mean anything, and only became possible once
+            a second report was loaded.
           </Note>
         </Finding>
 
@@ -104,18 +141,18 @@ export default async function AnalysisPage() {
           title={`The average hides the shape: ${topStoreGap ? topStoreGap.key : 'one store'}'s mean bill runs ${formatCurrency((topStoreGap?.meanBill ?? 0) - (topStoreGap?.medianBill ?? 0))} above its median`}
         >
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+            <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
               By store
             </p>
             <div className="mt-2 overflow-x-auto">
               <table className="w-full min-w-[28rem] text-sm">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-                    <th className="pb-1.5 text-left font-medium">Store</th>
-                    <th className="pb-1.5 text-right font-medium">Bills</th>
-                    <th className="pb-1.5 text-right font-medium">Mean</th>
-                    <th className="pb-1.5 text-right font-medium">Median</th>
-                    <th className="pb-1.5 text-right font-medium">P90</th>
+                  <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+                    <th className="pb-1.5 text-left font-bold">Store</th>
+                    <th className="pb-1.5 text-right font-bold">Bills</th>
+                    <th className="pb-1.5 text-right font-bold">Mean</th>
+                    <th className="pb-1.5 text-right font-bold">Median</th>
+                    <th className="pb-1.5 text-right font-bold">P90</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -142,18 +179,18 @@ export default async function AnalysisPage() {
           </div>
 
           <div className="border-t border-grid pt-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+            <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
               By channel
             </p>
             <div className="mt-2 overflow-x-auto">
               <table className="w-full min-w-[28rem] text-sm">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-                    <th className="pb-1.5 text-left font-medium">Channel</th>
-                    <th className="pb-1.5 text-right font-medium">Bills</th>
-                    <th className="pb-1.5 text-right font-medium">Mean</th>
-                    <th className="pb-1.5 text-right font-medium">Median</th>
-                    <th className="pb-1.5 text-right font-medium">P90</th>
+                  <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+                    <th className="pb-1.5 text-left font-bold">Channel</th>
+                    <th className="pb-1.5 text-right font-bold">Bills</th>
+                    <th className="pb-1.5 text-right font-bold">Mean</th>
+                    <th className="pb-1.5 text-right font-bold">Median</th>
+                    <th className="pb-1.5 text-right font-bold">P90</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -210,7 +247,7 @@ export default async function AnalysisPage() {
           </div>
 
           <div className="border-t border-grid pt-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+            <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
               By time of day
             </p>
             <div className="mt-2 flex flex-col gap-2">
@@ -244,12 +281,12 @@ export default async function AnalysisPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[30rem] text-sm">
               <thead>
-                <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-                  <th className="pb-2 text-left font-medium">Code</th>
-                  <th className="pb-2 text-left font-medium">Store</th>
-                  <th className="pb-2 text-right font-medium">Bills</th>
-                  <th className="pb-2 text-right font-medium">Revenue</th>
-                  <th className="pb-2 text-right font-medium">Avg bill</th>
+                <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+                  <th className="pb-2 text-left font-bold">Code</th>
+                  <th className="pb-2 text-left font-bold">Store</th>
+                  <th className="pb-2 text-right font-bold">Bills</th>
+                  <th className="pb-2 text-right font-bold">Revenue</th>
+                  <th className="pb-2 text-right font-bold">Avg bill</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,7 +322,7 @@ export default async function AnalysisPage() {
       </div>
 
       <section className="card mt-3 rounded-2xl border border-line bg-surface p-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+        <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
           Not here yet
         </p>
         <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-ink">

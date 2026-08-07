@@ -78,7 +78,7 @@ function LifecycleChip({ row }: { row: CustomerRow }) {
 function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+      <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
         {label}
       </p>
       <p className="mt-1 text-sm text-ink">{value}</p>
@@ -243,13 +243,13 @@ export function CustomerTable({ rows }: { rows: CustomerRow[] }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[64rem] text-left">
         <thead>
-          <tr className="text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-            <th className="px-4 pb-3 font-medium">Customer</th>
-            <th className="px-4 pb-3 font-medium">Store</th>
-            <th className="px-4 pb-3 font-medium">Contact</th>
-            <th className="px-4 pb-3 font-medium">Channels</th>
-            <th className="px-4 pb-3 font-medium">Lifecycle</th>
-            <th className="px-4 pb-3 text-right font-medium">Sales</th>
+          <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+            <th className="px-4 pb-3 font-bold">Customer</th>
+            <th className="px-4 pb-3 font-bold">Store</th>
+            <th className="px-4 pb-3 font-bold">Contact</th>
+            <th className="px-4 pb-3 font-bold">Channels</th>
+            <th className="px-4 pb-3 font-bold">Lifecycle</th>
+            <th className="px-4 pb-3 text-right font-bold">Sales</th>
             <th className="px-4 pb-3" />
           </tr>
         </thead>

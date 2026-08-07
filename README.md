@@ -9,6 +9,7 @@ Ingests the cleaned master lead workbook (Meta, WhatsApp, Google Ads, Others) an
 |---|---|
 | [`SYSTEM_DESIGN.md`](./SYSTEM_DESIGN.md) | Architecture, schema, ingestion pipeline, metric definitions |
 | [`DECISIONS.md`](./DECISIONS.md) | Every rule decided (D-01…D-92), its evidence, confidence and reversal cost |
+| [`DEPLOY_AWS.md`](./DEPLOY_AWS.md) | Containerizing and deploying to AWS App Runner — build, env vars, health check, redeploys |
 
 Code comments reference decision IDs — `// D-20: junk placeholder filter` — so a rule can always be traced back to the reasoning and the data behind it.
 

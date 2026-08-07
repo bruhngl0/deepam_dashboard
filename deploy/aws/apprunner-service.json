@@ -1,0 +1,40 @@
+{
+  "ServiceName": "deepam-crm",
+  "SourceConfiguration": {
+    "AutoDeploymentsEnabled": false,
+    "AuthenticationConfiguration": {
+      "AccessRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/AppRunnerECRAccessRole"
+    },
+    "ImageRepository": {
+      "ImageIdentifier": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/deepam-crm:latest",
+      "ImageRepositoryType": "ECR",
+      "ImageConfiguration": {
+        "Port": "3000",
+        "RuntimeEnvironmentSecrets": {
+          "DATABASE_URL": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:deepam-crm/database-url",
+          "CLERK_SECRET_KEY": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:deepam-crm/clerk-secret-key"
+        },
+        "RuntimeEnvironmentVariables": {
+          "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "<pk_live_xxx>",
+          "NEXT_PUBLIC_CLERK_SIGN_IN_URL": "/sign-in",
+          "ALLOW_MASTER_SHEET_IMPORT": "false",
+          "HOSTNAME": "0.0.0.0",
+          "PORT": "3000"
+        }
+      }
+    }
+  },
+  "InstanceConfiguration": {
+    "Cpu": "1024",
+    "Memory": "2048",
+    "InstanceRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/AppRunnerDeepamCrmInstanceRole"
+  },
+  "HealthCheckConfiguration": {
+    "Protocol": "HTTP",
+    "Path": "/api/health",
+    "Interval": 10,
+    "Timeout": 5,
+    "HealthyThreshold": 1,
+    "UnhealthyThreshold": 3
+  }
+}

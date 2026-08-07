@@ -133,14 +133,14 @@ export function ImportForm({ commitEnabled }: { commitEnabled: boolean }) {
         <div className="card overflow-x-auto rounded-xl border border-line">
           <table className="w-full min-w-[36rem] text-sm">
             <thead>
-              <tr className="border-b border-grid bg-inset/60 text-[11px] uppercase tracking-[0.09em] text-ink-muted">
-                <th className="px-3 py-2 text-left font-medium">Sheet</th>
-                <th className="px-3 py-2 text-right font-medium">Rows</th>
-                <th className="px-3 py-2 text-right font-medium">Valid</th>
-                <th className="px-3 py-2 text-right font-medium">Distinct</th>
-                <th className="px-3 py-2 text-right font-medium">Dupes</th>
-                <th className="px-3 py-2 text-right font-medium">Rejected</th>
-                <th className="px-3 py-2 text-right font-medium">Flagged</th>
+              <tr className="border-b border-grid bg-inset/60 text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+                <th className="px-3 py-2 text-left font-bold">Sheet</th>
+                <th className="px-3 py-2 text-right font-bold">Rows</th>
+                <th className="px-3 py-2 text-right font-bold">Valid</th>
+                <th className="px-3 py-2 text-right font-bold">Distinct</th>
+                <th className="px-3 py-2 text-right font-bold">Dupes</th>
+                <th className="px-3 py-2 text-right font-bold">Rejected</th>
+                <th className="px-3 py-2 text-right font-bold">Flagged</th>
               </tr>
             </thead>
             <tbody>
