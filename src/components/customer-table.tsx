@@ -19,6 +19,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   formatCurrency,
   formatNumber,
@@ -93,7 +94,19 @@ function Row({ row }: { row: CustomerRow }) {
     <>
       <tr className="border-t border-grid transition-colors hover:bg-inset/60">
         <td className="px-4 py-3">
-          <p className="font-medium text-ink">{orNotProvided(row.fullName)}</p>
+          {/* Only a lead who has actually bought has a buyer profile to open —
+              `/crm/buyers/[id]` is scoped to `sales`, so linking a lead with no
+              bill would hand them a 404 for a page that is correctly absent. */}
+          {row.billCount > 0 ? (
+            <Link
+              href={`/crm/buyers/${row.id}`}
+              className="font-medium text-ink underline-offset-2 hover:text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {orNotProvided(row.fullName)}
+            </Link>
+          ) : (
+            <p className="font-medium text-ink">{orNotProvided(row.fullName)}</p>
+          )}
           <p className="text-xs text-ink-muted">{row.email ?? 'No email'}</p>
         </td>
         <td className="px-4 py-3">

@@ -69,8 +69,14 @@ interface Rejected {
   errorMsg: string;
 }
 
-/** Reads the first sheet only — each upload here is one channel, one file. */
-function parseFirstSheet(buffer: Buffer): {
+/**
+ * Reads the first sheet only — each upload here is one channel, one file.
+ * WhatsApp's delivered-numbers export is a headerless two-column list: the
+ * first column is a 91-prefixed mobile number and the second is a repeated
+ * delivery label. Recognize that measured format without relaxing the header
+ * requirement for the other channel imports.
+ */
+export function parseChannelLeadsWorkbook(buffer: Buffer, channel: BulkLeadChannel): {
   sheetName: string;
   rows: ParsedRow[];
   rejected: Rejected[];
@@ -82,12 +88,27 @@ function parseFirstSheet(buffer: Buffer): {
   if (!sheetName) throw new Error('Workbook has no sheets.');
 
   const raw = sheetToRows(workbook, sheetName);
-  const header = (raw[0] ?? []).map((h) => String(h ?? '').trim());
-  const cols = mapColumns(header, {
+  let header = (raw[0] ?? []).map((h) => String(h ?? '').trim());
+  let cols = mapColumns(header, {
     phone: ['phone_number', 'contact_number', 'mobile_number', 'whatsapp_number', 'phone', 'mobile'],
     name: ['full_name', 'customer_name', 'name'],
     email: ['email_address', 'email'],
   });
+  let dataRows = raw.slice(1);
+  let firstRowNumber = 2;
+
+  if (cols.phone < 0 && channel === 'whatsapp') {
+    const nonBlankRows = raw.filter((row) => row.some((v) => v !== null && v !== ''));
+    const sample = nonBlankRows.slice(0, 3);
+    const isPhoneList = sample.length > 0 && sample.every((row) => normalizePhone(row[0]).ok);
+
+    if (isPhoneList) {
+      header = (raw[0] ?? []).map((_, index) => (index === 0 ? 'Phone' : `Column ${index + 1}`));
+      cols = { phone: 0, name: -1, email: -1 };
+      dataRows = raw;
+      firstRowNumber = 1;
+    }
+  }
 
   if (cols.phone < 0) {
     throw new Error(
@@ -101,9 +122,9 @@ function parseFirstSheet(buffer: Buffer): {
   let rawRows = 0;
   let duplicates = 0;
 
-  raw.slice(1).forEach((row, i) => {
+  dataRows.forEach((row, i) => {
     if (!row.some((v) => v !== null && v !== '')) return;
-    const rowNumber = i + 2;
+    const rowNumber = i + firstRowNumber;
 
     const record: Record<string, unknown> = {};
     header.forEach((h, c) => {
@@ -168,7 +189,7 @@ export async function previewChannelLeads(
   channel: BulkLeadChannel,
 ): Promise<ChannelLeadsPreview> {
   const spec = CHANNEL_SPECS[channel];
-  const { sheetName, rows, rejected, rawRows, duplicates } = parseFirstSheet(buffer);
+  const { sheetName, rows, rejected, rawRows, duplicates } = parseChannelLeadsWorkbook(buffer, channel);
   const fileHash = createHash('sha256').update(buffer).update(channel).digest('hex');
 
   const phones = rows.map((r) => r.e164);

@@ -27,7 +27,14 @@ import { sql } from 'drizzle-orm';
 
 // ── Enums ────────────────────────────────────────────────────────────────────
 
-/** Acquisition channels. `existing` is a terminal bucket, not a campaign. (D-34) */
+/**
+ * Acquisition channels. `existing` is a terminal bucket, not a campaign. (D-34)
+ *
+ * `vendor` is not an acquisition channel — it's a placeholder so
+ * `import_batches.source_type` has a value that doesn't lie about vendor/stock
+ * imports the way reusing `existing`/`other` would (see `sales`'s own precedent
+ * of overloading this enum, which this avoids repeating a second time).
+ */
 export const channelEnum = pgEnum('channel', [
   'meta',
   'whatsapp',
@@ -36,6 +43,7 @@ export const channelEnum = pgEnum('channel', [
   'referral',
   'existing',
   'other',
+  'vendor',
 ]);
 
 /** How a customer entered the business. Derived, never hand-set. (D-39) */
@@ -58,7 +66,13 @@ export const importStatusEnum = pgEnum('import_status', [
   'rolled_back',
 ]);
 
-export const sourceKindEnum = pgEnum('source_kind', ['lead', 'sale']);
+export const sourceKindEnum = pgEnum('source_kind', [
+  'lead',
+  'sale',
+  'vendor_stock',
+  'sale_items',
+  'existing_customer',
+]);
 
 /** Normalized tele-calling outcome. Raw text is preserved alongside. (D-67) */
 export const remarkStatusEnum = pgEnum('remark_status', [
@@ -342,6 +356,190 @@ export const sales = pgTable(
   ],
 );
 
+// ── Loyalty / existing-customer seed ────────────────────────────────────────
+
+/**
+ * One row per customer from a bulk loyalty/CRM export (Capillary-style) used
+ * to seed the store's already-known customers before any lead or sales
+ * import runs. `customerId` is always resolved (this file's whole purpose is
+ * establishing customer identity, unlike `sale_line_items`'s nullable
+ * `saleId`), so it's a required FK, not an optional one.
+ *
+ * This table is the evidence `recompute_customer_lifecycle()` reads to keep
+ * these people classified `existing` across every future recompute (D-38) —
+ * a hand-set `lifecycle` column would be silently overwritten the moment the
+ * next lead or sales batch imports, since that function recomputes lifecycle
+ * from scratch on every run rather than trusting a stored flag. A row with
+ * `total_bill_count > 0` is treated as provable (`prior_purchase`, the same
+ * tier a real historical bill gets); a row with no bill evidence but present
+ * in the loyalty master is `self_declared` — the business's own registry
+ * still outranks silence, just not a bill.
+ */
+export const loyaltyCustomers = pgTable(
+  'loyalty_customers',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    customerId: bigint('customer_id', { mode: 'number' })
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    batchId: uuid('batch_id')
+      .notNull()
+      .references(() => importBatches.id),
+    externalUserId: text('external_user_id'), // the loyalty system's own id, for audit trail
+    loyaltyType: text('loyalty_type'), // open set (D-66): 'loyalty' | 'not_registered'
+    registeredStoreName: text('registered_store_name'), // raw — may be a real store, a kiosk, or an event channel
+    preferredStoreRaw: text('preferred_store_raw'), // raw code, never force-mapped onto `stores`
+    totalBillCount: integer('total_bill_count'),
+    totalBillAmount: numeric('total_bill_amount', { precision: 12, scale: 2 }),
+    firstBillDate: date('first_bill_date'),
+    lastBillDate: date('last_bill_date'),
+    raw: jsonb('raw').notNull(), // D-14
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('loyalty_customers_customer_idx').on(t.customerId),
+    index('loyalty_customers_bill_count_idx').on(t.totalBillCount),
+  ],
+);
+
+// ── Vendor module ────────────────────────────────────────────────────────────
+//
+// A second, independent domain: vendor stock and item-level sales. Deliberately
+// NOT wired into `customers`/`lead_touches` (D-64) — a vendor ledger is
+// inventory, not people. `sales` itself is untouched by any of this: it stays
+// the bill-level, phone-bearing table it always was, and `sale_line_items`
+// enriches it via a nullable FK rather than replacing it, because the barcode
+// sales export carries no phone number and phone is the only identity key in
+// this system (D-03, D-23).
+
+/** A supplier/party, from `Party Wise.xlsx`'s "Account" column. */
+export const vendors = pgTable('vendors', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull().unique(), // trimmed, e.g. 'ARTHA HI FASHION'
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
+ * One row per barcode per reporting period, from `Party Wise.xlsx` — a
+ * stock-pcs-and-value snapshot (opening → purchased → sold → closing) per
+ * item, per vendor. Re-uploading the same period is an upsert, not a
+ * duplicate: a barcode's figures can be corrected in a later export of the
+ * same window.
+ */
+export const vendorStockLedger = pgTable(
+  'vendor_stock_ledger',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    vendorId: integer('vendor_id')
+      .notNull()
+      .references(() => vendors.id),
+    batchId: uuid('batch_id')
+      .notNull()
+      .references(() => importBatches.id),
+    barcode: text('barcode').notNull(),
+    itemName: text('item_name'), // 'ART - POLYSTERS' | 'MYSORE SILK' — a group, not a SKU name
+    itemGroupName: text('item_group_name'), // blank in every row seen so far; kept for when it isn't
+    compSize: text('comp_size'),
+    freshOrDefective: text('fresh_or_defective'), // open set (D-66) — only 'Fresh' seen so far
+    periodFrom: date('period_from').notNull(),
+    periodTo: date('period_to').notNull(),
+    opQty: numeric('op_qty', { precision: 12, scale: 2 }),
+    opAmt: numeric('op_amt', { precision: 12, scale: 2 }),
+    purcQty: numeric('purc_qty', { precision: 12, scale: 2 }),
+    purcAmt: numeric('purc_amt', { precision: 12, scale: 2 }),
+    prQty: numeric('pr_qty', { precision: 12, scale: 2 }), // purchase returns
+    prAmt: numeric('pr_amt', { precision: 12, scale: 2 }),
+    netPurcQty: numeric('net_purc_qty', { precision: 12, scale: 2 }),
+    netPurcAmt: numeric('net_purc_amt', { precision: 12, scale: 2 }),
+    inQty: numeric('in_qty', { precision: 12, scale: 2 }), // inter-store transfer in
+    inAmt: numeric('in_amt', { precision: 12, scale: 2 }),
+    outQty: numeric('out_qty', { precision: 12, scale: 2 }),
+    outAmt: numeric('out_amt', { precision: 12, scale: 2 }),
+    inTransitQty: numeric('in_transit_qty', { precision: 12, scale: 2 }),
+    inTransitAmt: numeric('in_transit_amt', { precision: 12, scale: 2 }),
+    salesQty: numeric('sales_qty', { precision: 12, scale: 2 }),
+    salesAmt: numeric('sales_amt', { precision: 12, scale: 2 }),
+    srQty: numeric('sr_qty', { precision: 12, scale: 2 }), // sales returns
+    srAmt: numeric('sr_amt', { precision: 12, scale: 2 }),
+    netSalesQty: numeric('net_sales_qty', { precision: 12, scale: 2 }),
+    netSalesAmt: numeric('net_sales_amt', { precision: 12, scale: 2 }),
+    clQty: numeric('cl_qty', { precision: 12, scale: 2 }), // closing stock
+    clAmt: numeric('cl_amt', { precision: 12, scale: 2 }),
+    clMrp: numeric('cl_mrp', { precision: 12, scale: 2 }),
+    raw: jsonb('raw').notNull(), // D-14
+  },
+  (t) => [
+    uniqueIndex('vendor_stock_ledger_identity_idx').on(
+      t.barcode,
+      t.periodFrom,
+      t.periodTo,
+    ),
+    index('vendor_stock_ledger_vendor_idx').on(t.vendorId),
+    index('vendor_stock_ledger_barcode_idx').on(t.barcode),
+  ],
+);
+
+/**
+ * One row per barcode per bill, from the "Barcode Wise" item-level sales
+ * register. `saleId` links back to the existing bill-level `sales` row when
+ * one can be resolved (matched on voucher date + the numeric voucher suffix,
+ * proven against the live `sales` table before this table was built);
+ * otherwise it's NULL — a real line item with no bill match yet (e.g. an
+ * Online-channel order, or a date outside what's been imported into `sales`),
+ * kept and flagged rather than dropped (same treatment as D-51's phone-less
+ * bills).
+ */
+export const saleLineItems = pgTable(
+  'sale_line_items',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    saleId: bigint('sale_id', { mode: 'number' }).references(() => sales.id),
+    voucherDateRaw: date('voucher_date_raw').notNull(), // as printed in the sheet, dd/mm/yyyy parsed
+    voucherNoRaw: text('voucher_no_raw').notNull(), // bare suffix, e.g. '00670' — no BK01-/BK02- prefix
+    batchId: uuid('batch_id')
+      .notNull()
+      .references(() => importBatches.id),
+    barcode: text('barcode').notNull(), // join key to vendor_stock_ledger.barcode
+    accountNameRaw: text('account_name_raw'), // customer name as typed — display only, never identity (D-23)
+    itemName: text('item_name'),
+    hsnCode: text('hsn_code'),
+    designNo: text('design_no'),
+    colorName: text('color_name'),
+    size: text('size'),
+    qty: numeric('qty', { precision: 12, scale: 2 }), // signed — negative is a return/reversal line
+    purcValue: numeric('purc_value', { precision: 12, scale: 2 }), // cost basis at time of sale
+    salesRate: numeric('sales_rate', { precision: 12, scale: 2 }),
+    amount: numeric('amount', { precision: 12, scale: 2 }),
+    itemDiscAmt: numeric('item_disc_amt', { precision: 12, scale: 2 }),
+    itemAmt: numeric('item_amt', { precision: 12, scale: 2 }),
+    addLessAmt: numeric('add_less_amt', { precision: 12, scale: 2 }),
+    netAmt: numeric('net_amt', { precision: 12, scale: 2 }),
+    taxableAmt: numeric('taxable_amt', { precision: 12, scale: 2 }),
+    sgstAmt: numeric('sgst_amt', { precision: 12, scale: 2 }),
+    cgstAmt: numeric('cgst_amt', { precision: 12, scale: 2 }),
+    igstAmt: numeric('igst_amt', { precision: 12, scale: 2 }),
+    otherAddLessAmt: numeric('other_add_less_amt', { precision: 12, scale: 2 }),
+    amtWithTax: numeric('amt_with_tax', { precision: 12, scale: 2 }),
+    salesAmt: numeric('sales_amt', { precision: 12, scale: 2 }),
+    raw: jsonb('raw').notNull(), // D-14
+  },
+  (t) => [
+    uniqueIndex('sale_line_items_identity_idx').on(
+      t.voucherDateRaw,
+      t.voucherNoRaw,
+      t.barcode,
+    ),
+    index('sale_line_items_sale_idx')
+      .on(t.saleId)
+      .where(sql`sale_id IS NOT NULL`),
+    index('sale_line_items_barcode_idx').on(t.barcode),
+  ],
+);
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 /**
@@ -366,3 +564,6 @@ export type Customer = typeof customers.$inferSelect;
 export type LeadTouch = typeof leadTouches.$inferSelect;
 export type WalkinSubmission = typeof walkinSubmissions.$inferSelect;
 export type Sale = typeof sales.$inferSelect;
+export type Vendor = typeof vendors.$inferSelect;
+export type VendorStockLedgerRow = typeof vendorStockLedger.$inferSelect;
+export type SaleLineItem = typeof saleLineItems.$inferSelect;

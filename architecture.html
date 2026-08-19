@@ -1,0 +1,664 @@
+<title>Deepam CRM — System Architecture</title>
+<style>
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12171a;
+      --surface: #181f22;
+      --surface-2: #1f282b;
+      --ink: #e7ecea;
+      --ink-2: #a7b4b2;
+      --ink-3: #77857f;
+      --border: #2a3438;
+      --accent: #e0ac52;
+      --accent-ink: #e0ac52;
+      --accent-2: #57bdb6;
+      --good: #4faf75;
+      --warn: #e0ac52;
+      --bad: #e0665a;
+      --code-bg: #1b2326;
+      --shadow: rgba(0, 0, 0, 0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12171a;
+    --surface: #181f22;
+    --surface-2: #1f282b;
+    --ink: #e7ecea;
+    --ink-2: #a7b4b2;
+    --ink-3: #77857f;
+    --border: #2a3438;
+    --accent: #e0ac52;
+    --accent-ink: #e0ac52;
+    --accent-2: #57bdb6;
+    --good: #4faf75;
+    --warn: #e0ac52;
+    --bad: #e0665a;
+    --code-bg: #1b2326;
+    --shadow: rgba(0, 0, 0, 0.4);
+  }
+
+  :root {
+    --bg: #f2f4f3;
+    --surface: #ffffff;
+    --surface-2: #ebeeec;
+    --ink: #13181b;
+    --ink-2: #4c5a5e;
+    --ink-3: #7c8a8d;
+    --border: #d6dedc;
+    --accent: #a9782f;
+    --accent-ink: #7a5620;
+    --accent-2: #1f6f6b;
+    --good: #2e7d4f;
+    --warn: #a9782f;
+    --bad: #b23a2c;
+    --code-bg: #eaeeea;
+    --shadow: rgba(20, 30, 30, 0.08);
+
+    --font-display: ui-serif, Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 24px 96px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  .page {
+    max-width: 880px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────────── */
+  header.masthead {
+    padding: 64px 0 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(2rem, 4.4vw, 2.75rem);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .thread {
+    width: 84px;
+    height: 4px;
+    margin: 18px 0 20px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--accent) 0px, var(--accent) 10px,
+      var(--accent-2) 10px, var(--accent-2) 20px
+    );
+    border-radius: 2px;
+  }
+  .dek {
+    font-size: 1.09rem;
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin: 0 0 22px;
+    text-wrap: balance;
+  }
+  .meta-line {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+  .meta-line b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ───────────────────────────────────────────────────── */
+  section.chapter {
+    margin: 0 0 72px;
+  }
+  .chapter-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .chapter-num {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent-ink);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+    border-radius: 999px;
+    padding: 3px 10px;
+    flex: none;
+  }
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.5rem;
+    margin: 0;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+  .chapter p.lede {
+    max-width: 68ch;
+    color: var(--ink-2);
+    font-size: 1rem;
+    margin: 0 0 26px;
+  }
+  .chapter p.lede code, p code, li code, td code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    color: var(--ink);
+  }
+  strong { color: var(--ink); font-weight: 650; }
+
+  /* ── Diagram frame ──────────────────────────────────────────────── */
+  figure.diagram {
+    margin: 0 0 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 22px 16px;
+    box-shadow: 0 1px 2px var(--shadow);
+  }
+  figure.diagram svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    color: var(--ink);
+    overflow: visible;
+  }
+  figure.diagram figcaption {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 13.5px;
+    color: var(--ink-2);
+    line-height: 1.55;
+  }
+  svg .box-fill { fill: var(--surface-2); }
+  svg .box-stroke { stroke: var(--ink-2); }
+  svg .accent-fill { fill: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+  svg .accent-stroke { stroke: var(--accent-ink); }
+  svg .dim { fill: var(--ink-3); }
+  svg .label { fill: var(--ink); }
+  svg text { font-family: var(--font-body); }
+  svg .mono { font-family: var(--font-mono); }
+  svg .dashed { stroke-dasharray: 5 4; }
+
+  /* ── Reference tables ───────────────────────────────────────────── */
+  .ref-wrap { overflow-x: auto; margin: 28px 0; }
+  table.ref {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 480px;
+  }
+  table.ref caption {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 10px;
+  }
+  table.ref th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--ink-2);
+    font-size: 12.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.ref td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink);
+    vertical-align: top;
+  }
+  table.ref tr:last-child td { border-bottom: none; }
+  table.ref td.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 13px; }
+  .pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--ink-2);
+  }
+  .pill.secret { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); background: color-mix(in srgb, var(--bad) 8%, transparent); }
+  .pill.plain { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good) 8%, transparent); }
+
+  .stack-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px 20px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .stack-list li {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    border-left: 2px solid var(--border);
+    padding-left: 10px;
+  }
+  .stack-list b { display: block; color: var(--ink); font-size: 14px; margin-bottom: 1px; }
+
+  footer.colophon {
+    margin-top: 56px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--ink-3);
+    line-height: 1.7;
+  }
+  footer.colophon code { font-family: var(--font-mono); }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Architecture audit · read from source, not from a spec</p>
+    <h1>Deepam CRM — how it actually runs</h1>
+    <div class="thread" role="presentation"></div>
+    <p class="dek">Four leaky sheets and a POS export, resolved to one customer per phone number. This is the request path, the import pipeline, the data model, and the two places the app is deployed — traced from <code>src/proxy.ts</code>, <code>src/db/</code>, the API routes, and the Docker/CI config, not summarized from the design docs.</p>
+    <div class="meta-line">
+      <span><b>Stack</b> Next.js 16.2 · React 19.2 · Drizzle · Neon Postgres</span>
+      <span><b>Auth</b> Clerk, invite-only</span>
+      <span><b>Commit</b> e522f6f</span>
+      <span><b>Audited</b> 2026-08-08</span>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════════ 01 -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">01</span><h2>System overview</h2></div>
+    <p class="lede">One Next.js App Router codebase is deployed <strong>twice</strong> — Vercel (git-integrated, auto-deploy) and AWS App Runner (a Docker container built from the same repo) — and both copies talk to the same Neon Postgres database and the same Clerk instance. There's no queue, no worker, no cache tier: every request is handled inline by a Server Component or a Route Handler, and Postgres is the only stateful dependency besides Clerk's session store. The AWS path carries no AWS-specific application code — App Runner just runs the standalone server (<code>output: 'standalone'</code>) in a container; it was added because Amplify's documented Next.js support tops out below v16, not because the app needed AWS.</p>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 900 460" role="img" aria-label="Browser requests reach one of two identical Next.js deployments, on Vercel or AWS App Runner, both of which read and write the same Neon Postgres database and verify sessions against the same Clerk instance.">
+        <defs>
+          <marker id="a1" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+            <polygon points="0,0 8,4 0,8" fill="currentColor" />
+          </marker>
+        </defs>
+
+        <!-- Browser -->
+        <rect x="350" y="18" width="200" height="52" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="450" y="40" text-anchor="middle" class="label" font-size="14" font-weight="600">Browser</text>
+        <text x="450" y="58" text-anchor="middle" class="dim" font-size="11">signed-in staff · desktop</text>
+
+        <!-- host containers -->
+        <rect x="40" y="128" width="380" height="168" rx="10" fill="none" class="box-stroke dashed" stroke-width="1.2"/>
+        <text x="58" y="150" class="dim mono" font-size="11" letter-spacing="0.04em">VERCEL · AUTO-DEPLOY ON PUSH</text>
+
+        <rect x="480" y="128" width="380" height="168" rx="10" fill="none" class="box-stroke dashed" stroke-width="1.2"/>
+        <text x="498" y="150" class="dim mono" font-size="11" letter-spacing="0.04em">AWS APP RUNNER · MANUAL PROMOTE</text>
+
+        <rect x="70" y="172" width="320" height="98" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="230" y="200" text-anchor="middle" class="label" font-size="13.5" font-weight="600">Next.js 16 App Router</text>
+        <text x="230" y="222" text-anchor="middle" class="dim" font-size="11.5">Server Components (pages)</text>
+        <text x="230" y="240" text-anchor="middle" class="dim" font-size="11.5">Route Handlers (/api/*)</text>
+        <text x="230" y="258" text-anchor="middle" class="dim mono" font-size="10.5">git build</text>
+
+        <rect x="510" y="172" width="320" height="98" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="670" y="200" text-anchor="middle" class="label" font-size="13.5" font-weight="600">Next.js 16 App Router</text>
+        <text x="670" y="222" text-anchor="middle" class="dim" font-size="11.5">same image, containerized</text>
+        <text x="670" y="240" text-anchor="middle" class="dim" font-size="11.5">standalone server.js</text>
+        <text x="670" y="258" text-anchor="middle" class="dim mono" font-size="10.5">Dockerfile · ECR</text>
+
+        <!-- browser to hosts -->
+        <line x1="410" y1="70" x2="240" y2="170" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+        <text x="300" y="115" class="dim" font-size="11">HTTPS</text>
+        <line x1="490" y1="70" x2="660" y2="170" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+        <text x="590" y="115" class="dim" font-size="11">HTTPS</text>
+
+        <!-- bus -->
+        <line x1="230" y1="270" x2="230" y2="340" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+        <line x1="670" y1="270" x2="670" y2="340" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+        <line x1="200" y1="340" x2="700" y2="340" stroke="currentColor" stroke-width="1" class="dashed dim"/>
+        <text x="450" y="332" text-anchor="middle" class="dim" font-size="10.5">same Clerk instance · same Neon database</text>
+
+        <line x1="260" y1="340" x2="260" y2="378" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+        <line x1="620" y1="340" x2="620" y2="378" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+
+        <!-- services -->
+        <rect x="140" y="378" width="240" height="60" rx="8" class="accent-fill accent-stroke" stroke-width="1.3"/>
+        <text x="260" y="402" text-anchor="middle" class="label" font-size="13.5" font-weight="600">Clerk</text>
+        <text x="260" y="420" text-anchor="middle" class="dim" font-size="11">session &amp; auth · invite-only</text>
+
+        <rect x="460" y="378" width="300" height="60" rx="8" class="accent-fill accent-stroke" stroke-width="1.3"/>
+        <text x="610" y="402" text-anchor="middle" class="label" font-size="13.5" font-weight="600">Neon Postgres</text>
+        <text x="610" y="420" text-anchor="middle" class="dim" font-size="11">serverless · scale-to-zero</text>
+      </svg>
+      <figcaption>Two hosts running the same app image against one shared backend. Vercel ships on every push; the AWS image builds on every push too, but going live there is a separate, deliberate step (§05).</figcaption>
+    </figure>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════ 02 -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">02</span><h2>Request flow &amp; the auth boundary</h2></div>
+    <p class="lede">Every route is closed by default. <code>proxy.ts</code> — Next 16's rename of <code>middleware.ts</code> — runs Clerk on every request except <code>/sign-in</code> and <code>/api/health</code>, but the project treats that as an <strong>optimistic</strong> check, not the real gate: with no Clerk keys configured, every route returns 500 rather than serving a page. The check that actually matters runs a layer deeper, inside the handler itself — <code>requireUser()</code> for pages, <code>requireApiUser()</code> for API routes — so a badly-edited matcher still can't leak data.</p>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 880 500" role="img" aria-label="A browser request passes through proxy.ts, which forwards signed-in traffic to either a Server Component page or an API route handler; each independently re-checks the session with requireUser or requireApiUser before touching the database, failing to a sign-in redirect or a 401 respectively.">
+        <defs>
+          <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+            <polygon points="0,0 8,4 0,8" fill="currentColor" />
+          </marker>
+        </defs>
+
+        <rect x="330" y="14" width="220" height="48" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="440" y="43" text-anchor="middle" class="label" font-size="13.5" font-weight="600">Browser request</text>
+
+        <line x1="440" y1="62" x2="440" y2="98" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+
+        <rect x="270" y="98" width="340" height="66" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="440" y="124" text-anchor="middle" class="label mono" font-size="13" font-weight="600">proxy.ts — clerkMiddleware()</text>
+        <text x="440" y="144" text-anchor="middle" class="dim" font-size="11">optimistic check · Node runtime, not Edge</text>
+        <text x="440" y="157" text-anchor="middle" class="dim" font-size="10.5">public: /sign-in, /api/health</text>
+
+        <!-- redirect exit -->
+        <line x1="610" y1="118" x2="700" y2="118" stroke="currentColor" stroke-width="1.2" class="dim" marker-end="url(#a2)"/>
+        <text x="700" y="112" class="dim" font-size="10.5">signed out</text>
+        <rect x="700" y="98" width="150" height="44" rx="8" fill="none" class="box-stroke dashed" stroke-width="1.2"/>
+        <text x="775" y="124" text-anchor="middle" class="dim" font-size="11.5">→ /sign-in</text>
+
+        <!-- fork -->
+        <line x1="380" y1="164" x2="220" y2="222" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+        <line x1="500" y1="164" x2="660" y2="222" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+        <text x="230" y="196" class="dim" font-size="11">page request</text>
+        <text x="580" y="196" class="dim" font-size="11">fetch() / mutation</text>
+
+        <!-- page path -->
+        <rect x="60" y="222" width="320" height="56" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="220" y="246" text-anchor="middle" class="label mono" font-size="12.5" font-weight="600">app/**/page.tsx</text>
+        <text x="220" y="263" text-anchor="middle" class="dim" font-size="11">Server Component</text>
+
+        <line x1="220" y1="278" x2="220" y2="308" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+        <rect x="60" y="308" width="320" height="54" rx="8" class="accent-fill accent-stroke" stroke-width="1.3"/>
+        <text x="220" y="331" text-anchor="middle" class="label mono" font-size="12.5" font-weight="600">requireUser()</text>
+        <text x="220" y="349" text-anchor="middle" class="dim" font-size="10.5">await auth() → redirect('/sign-in') if none</text>
+
+        <line x1="220" y1="362" x2="220" y2="392" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+        <text x="234" y="380" class="dim" font-size="10.5">session ok</text>
+        <rect x="60" y="392" width="320" height="48" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="220" y="421" text-anchor="middle" class="label mono" font-size="12">lib/queries/*.ts → db</text>
+
+        <!-- api path -->
+        <rect x="500" y="222" width="320" height="56" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="660" y="246" text-anchor="middle" class="label mono" font-size="12.5" font-weight="600">app/api/**/route.ts</text>
+        <text x="660" y="263" text-anchor="middle" class="dim" font-size="11">Route Handler</text>
+
+        <line x1="660" y1="278" x2="660" y2="308" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+        <rect x="500" y="308" width="320" height="54" rx="8" class="accent-fill accent-stroke" stroke-width="1.3"/>
+        <text x="660" y="331" text-anchor="middle" class="label mono" font-size="12.5" font-weight="600">requireApiUser()</text>
+        <text x="660" y="349" text-anchor="middle" class="dim" font-size="10.5">returns 401 JSON if none — never a redirect</text>
+
+        <line x1="660" y1="362" x2="660" y2="392" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+        <text x="674" y="380" class="dim" font-size="10.5">session ok</text>
+        <rect x="500" y="392" width="320" height="48" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="660" y="421" text-anchor="middle" class="label mono" font-size="12">lib/queries or lib/import → db / txDb</text>
+
+        <!-- converge to db -->
+        <line x1="220" y1="440" x2="380" y2="472" stroke="currentColor" stroke-width="1.2" class="dim" marker-end="url(#a2)"/>
+        <line x1="660" y1="440" x2="500" y2="472" stroke="currentColor" stroke-width="1.2" class="dim" marker-end="url(#a2)"/>
+        <rect x="330" y="472" width="220" height="26" rx="13" class="box-fill box-stroke" stroke-width="1.1"/>
+        <text x="440" y="490" text-anchor="middle" class="dim mono" font-size="11">Neon Postgres</text>
+      </svg>
+      <figcaption>Two independent fail-closed checks, not one shared gate — a page that forgets <code>requireUser()</code> still can't reach the database through a route that has it. Reads use the HTTP driver (<code>db</code>); the import commit path borrows the pooled WebSocket driver (<code>txDb()</code>) because it's the one place that needs a real multi-statement transaction. Responses — rendered HTML for pages, JSON for routes — return the same path in reverse.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════ 03 -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">03</span><h2>Data ingestion — two-phase preview/commit</h2></div>
+    <p class="lede">Four source formats land as uploaded <code>.xlsx</code>/<code>.csv</code> files. Every one is parsed, normalized through a single phone module, and staged — <strong>never</strong> written to a canonical table on the strength of an unreviewed file. Commit is a single pooled transaction that upserts on natural keys (<code>phone_e164</code>, <code>voucher_no</code>, <code>submission_id</code>), so re-uploading the same sheet twice is a no-op rather than a duplicate.</p>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 980 520" role="img" aria-label="An uploaded file is parsed, normalized, and staged; bad rows are quarantined rather than dropped; the good rows produce a preview that a human must explicitly commit before the transaction writes canonical tables and refreshes the derived attribution view.">
+        <defs>
+          <marker id="a3" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+            <polygon points="0,0 8,4 0,8" fill="currentColor" />
+          </marker>
+        </defs>
+
+        <!-- row A -->
+        <g font-size="12.5">
+          <rect x="20" y="30" width="150" height="64" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+          <text x="95" y="58" text-anchor="middle" class="label" font-weight="600">Upload</text>
+          <text x="95" y="76" text-anchor="middle" class="dim" font-size="10.5">.xlsx / .csv</text>
+
+          <line x1="170" y1="62" x2="205" y2="62" stroke="currentColor" stroke-width="1.2" marker-end="url(#a3)"/>
+
+          <rect x="205" y="30" width="170" height="64" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+          <text x="290" y="52" text-anchor="middle" class="label" font-weight="600">Parse — SheetJS</text>
+          <text x="290" y="70" text-anchor="middle" class="dim" font-size="10.5">detect sheet + header</text>
+          <text x="290" y="84" text-anchor="middle" class="dim" font-size="10.5">signature → type</text>
+
+          <line x1="375" y1="62" x2="410" y2="62" stroke="currentColor" stroke-width="1.2" marker-end="url(#a3)"/>
+
+          <rect x="410" y="30" width="190" height="64" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+          <text x="505" y="52" text-anchor="middle" class="label" font-weight="600">Normalize</text>
+          <text x="505" y="70" text-anchor="middle" class="dim mono" font-size="10.5">lib/phone.ts → E.164</text>
+          <text x="505" y="84" text-anchor="middle" class="dim" font-size="10.5">junk / foreign flagged</text>
+
+          <line x1="600" y1="62" x2="635" y2="62" stroke="currentColor" stroke-width="1.2" marker-end="url(#a3)"/>
+
+          <rect x="635" y="30" width="160" height="64" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+          <text x="715" y="52" text-anchor="middle" class="label" font-weight="600">Stage rows</text>
+          <text x="715" y="70" text-anchor="middle" class="dim" font-size="10.5">classify ok /</text>
+          <text x="715" y="84" text-anchor="middle" class="dim" font-size="10.5">rejected / duplicate</text>
+        </g>
+
+        <!-- quarantine branch -->
+        <line x1="715" y1="94" x2="715" y2="130" stroke="currentColor" stroke-width="1.2" class="dim dashed" marker-end="url(#a3)"/>
+        <text x="800" y="116" class="dim" font-size="10.5">rejected / dup</text>
+        <rect x="635" y="130" width="230" height="52" rx="8" fill="none" class="box-stroke dashed" stroke-width="1.2"/>
+        <text x="750" y="152" text-anchor="middle" class="dim" font-size="11.5">import_rows_rejected</text>
+        <text x="750" y="168" text-anchor="middle" class="dim" font-size="10">quarantine · typed reason · raw JSONB kept</text>
+
+        <!-- down to preview -->
+        <line x1="290" y1="94" x2="290" y2="230" stroke="currentColor" stroke-width="1.2" class="dim"/>
+        <line x1="290" y1="230" x2="480" y2="230" stroke="currentColor" stroke-width="1.2" class="dim" marker-end="url(#a3)"/>
+
+        <rect x="290" y="252" width="400" height="72" rx="10" class="accent-fill accent-stroke" stroke-width="1.6"/>
+        <text x="490" y="280" text-anchor="middle" class="label mono" font-size="13.5" font-weight="700">PREVIEW</text>
+        <text x="490" y="298" text-anchor="middle" class="dim" font-size="11">POST /api/import/*/preview</text>
+        <text x="490" y="313" text-anchor="middle" class="dim" font-size="10.5">counts by class · sample rows · reject reasons</text>
+
+        <line x1="490" y1="324" x2="490" y2="360" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+        <text x="504" y="346" class="dim" font-size="10.5">operator reviews, clicks Commit</text>
+
+        <rect x="290" y="360" width="400" height="56" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="490" y="384" text-anchor="middle" class="label mono" font-size="12.5" font-weight="600">COMMIT — one pooled transaction</text>
+        <text x="490" y="401" text-anchor="middle" class="dim" font-size="10.5">upsert on phone_e164 / voucher_no / submission_id</text>
+
+        <line x1="490" y1="416" x2="490" y2="444" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+
+        <rect x="240" y="444" width="500" height="54" rx="8" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="490" y="466" text-anchor="middle" class="label" font-size="12.5" font-weight="600">Recompute lifecycle → REFRESH MATERIALIZED VIEW</text>
+        <text x="490" y="484" text-anchor="middle" class="dim mono" font-size="10.5">customer_attribution — in this order, always</text>
+      </svg>
+      <figcaption>The accent box is the only human checkpoint in the pipeline — nothing left of it is reversible-by-inspection, nothing right of it runs unreviewed. Rejects are quarantined, never dropped, with the full original row kept as JSONB so any parsing rule can be re-derived later without re-asking for the file.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════ 04 -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">04</span><h2>Data model</h2></div>
+    <p class="lede"><code>customers</code> is deliberately thin — a normalized phone number as the only identity key, everything else enrichable. Every source keeps its own table, so a fifth channel is a new table and a parser, not a migration on the busiest table in the system. <code>customer_attribution</code> is a materialized view rather than a column: first-touch channel and lifecycle both depend on rules (channel priority, attribution window) the team expects to keep tuning, and a view is refreshed where a column would need a backfill.</p>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 900 400" role="img" aria-label="Campaigns own import batches, which own lead touches; lead touches and walk-in submissions both reference customers; sales reference both customers and stores; a derived materialized view, customer attribution, reads from customers, lead touches, and sales without being a foreign key itself.">
+        <defs>
+          <marker id="a4" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+            <polygon points="0,0 8,4 0,8" fill="currentColor" />
+          </marker>
+        </defs>
+
+        <g font-size="12">
+          <rect x="30" y="30" width="140" height="46" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+          <text x="100" y="58" text-anchor="middle" class="label mono" font-weight="600" font-size="12">campaigns</text>
+
+          <rect x="220" y="30" width="160" height="46" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+          <text x="300" y="58" text-anchor="middle" class="label mono" font-weight="600" font-size="12">import_batches</text>
+
+          <rect x="430" y="30" width="150" height="46" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+          <text x="505" y="58" text-anchor="middle" class="label mono" font-weight="600" font-size="12">lead_touches</text>
+
+          <rect x="630" y="30" width="190" height="46" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+          <text x="725" y="58" text-anchor="middle" class="label mono" font-weight="600" font-size="12">walkin_submissions</text>
+
+          <rect x="370" y="176" width="160" height="54" rx="7" class="box-fill box-stroke" stroke-width="1.4"/>
+          <text x="450" y="200" text-anchor="middle" class="label mono" font-weight="700" font-size="13">customers</text>
+          <text x="450" y="216" text-anchor="middle" class="dim" font-size="9.5">identity: phone_e164</text>
+
+          <rect x="370" y="320" width="150" height="46" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+          <text x="445" y="348" text-anchor="middle" class="label mono" font-weight="600" font-size="12">stores</text>
+
+          <rect x="600" y="320" width="140" height="46" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+          <text x="670" y="348" text-anchor="middle" class="label mono" font-weight="600" font-size="12">sales</text>
+
+          <rect x="30" y="176" width="220" height="54" rx="7" fill="none" class="box-stroke dashed" stroke-width="1.2"/>
+          <text x="140" y="198" text-anchor="middle" class="dim mono" font-size="11.5">customer_attribution</text>
+          <text x="140" y="215" text-anchor="middle" class="dim" font-size="9.5">materialized view, derived</text>
+        </g>
+
+        <!-- FKs -->
+        <line x1="220" y1="53" x2="170" y2="53" stroke="currentColor" stroke-width="1.2" marker-end="url(#a4)"/>
+        <line x1="430" y1="53" x2="380" y2="53" stroke="currentColor" stroke-width="1.2" marker-end="url(#a4)"/>
+        <line x1="505" y1="76" x2="470" y2="176" stroke="currentColor" stroke-width="1.2" marker-end="url(#a4)"/>
+        <line x1="725" y1="76" x2="500" y2="176" stroke="currentColor" stroke-width="1.2" marker-end="url(#a4)"/>
+        <line x1="670" y1="320" x2="500" y2="222" stroke="currentColor" stroke-width="1.2" marker-end="url(#a4)"/>
+        <text x="600" y="270" class="dim" font-size="10">sales → customers</text>
+        <line x1="600" y1="343" x2="530" y2="330" stroke="currentColor" stroke-width="1.2" marker-end="url(#a4)"/>
+        <text x="545" y="357" class="dim" font-size="10">sales → stores</text>
+
+        <!-- derived reads -->
+        <line x1="370" y1="203" x2="250" y2="203" stroke="currentColor" stroke-width="1.1" class="dim dashed" marker-end="url(#a4)"/>
+        <line x1="505" y1="176" x2="200" y2="180" stroke="currentColor" stroke-width="1.1" class="dim dashed" marker-end="url(#a4)"/>
+        <line x1="600" y1="330" x2="250" y2="220" stroke="currentColor" stroke-width="1.1" class="dim dashed" marker-end="url(#a4)"/>
+        <text x="160" y="245" class="dim" font-size="9.5">reads customers + lead_touches + sales</text>
+        <text x="160" y="258" class="dim" font-size="9.5">refreshed after every commit</text>
+      </svg>
+      <figcaption>Solid arrows are real foreign keys; the dashed box is a read-only aggregate, not a table anything else references. Every ingesting table also carries a <code>raw JSONB</code> column (not drawn) holding the untouched source row, so a wrong parsing rule is a re-derivation, not a re-ask for the file.</figcaption>
+    </figure>
+
+    <div class="ref-wrap">
+      <table class="ref">
+        <caption>Canonical tables, at last measured volume</caption>
+        <thead><tr><th>Table</th><th>Rows</th><th>Grows via</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">customers</td><td class="num">~6,150</td><td>upsert on <code>phone_e164</code>, enrich-not-overwrite</td></tr>
+          <tr><td class="mono">lead_touches</td><td class="num">~5,866</td><td>append-only, one row per (customer, campaign, channel)</td></tr>
+          <tr><td class="mono">sales</td><td class="num">847</td><td>upsert on <code>voucher_no</code></td></tr>
+          <tr><td class="mono">walkin_submissions</td><td class="num">820</td><td>append-only, one row per <code>submission_id</code></td></tr>
+          <tr><td class="mono">import_rows_rejected</td><td class="num">varies</td><td>quarantine — never dropped, never auto-resolved</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════ 05 -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">05</span><h2>Deployment &amp; operations</h2></div>
+    <p class="lede">Vercel deploys automatically on every push. The AWS path is deliberately slower: GitHub Actions builds and pushes a Docker image to ECR via OIDC (no long-lived AWS keys stored in GitHub) on every push to <code>main</code> — and stops there. Going live on App Runner is a separate, manual <code>aws apprunner start-deployment</code>, the same preview-then-commit caution the app applies to its own imports. Migrations are never run by the container; they're a manual <code>npm run db:migrate</code> against the real database before first traffic.</p>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 900 260" role="img" aria-label="A push to main triggers two independent release paths: Vercel builds and deploys automatically, while GitHub Actions builds and pushes a Docker image to ECR but requires a separate manual command to actually promote it on App Runner.">
+        <defs>
+          <marker id="a5" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+            <polygon points="0,0 8,4 0,8" fill="currentColor" />
+          </marker>
+        </defs>
+
+        <rect x="20" y="16" width="150" height="46" rx="7" class="box-fill box-stroke" stroke-width="1.3"/>
+        <text x="95" y="44" text-anchor="middle" class="label mono" font-size="12.5" font-weight="600">git push main</text>
+
+        <!-- vercel lane -->
+        <line x1="170" y1="35" x2="230" y2="35" stroke="currentColor" stroke-width="1.2" marker-end="url(#a5)"/>
+        <rect x="230" y="12" width="220" height="54" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+        <text x="340" y="34" text-anchor="middle" class="label" font-size="12" font-weight="600">Vercel build + deploy</text>
+        <text x="340" y="50" text-anchor="middle" class="dim" font-size="10">git integration, no gate</text>
+        <line x1="450" y1="35" x2="510" y2="35" stroke="currentColor" stroke-width="1.2" marker-end="url(#a5)"/>
+        <rect x="510" y="12" width="180" height="54" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+        <text x="600" y="34" text-anchor="middle" class="label" font-size="12" font-weight="600">Live on Vercel</text>
+        <text x="600" y="50" text-anchor="middle" class="dim" font-size="10">preview + production</text>
+
+        <!-- aws lane -->
+        <line x1="95" y1="62" x2="95" y2="120" stroke="currentColor" stroke-width="1.2" class="dim"/>
+        <line x1="95" y1="120" x2="230" y2="120" stroke="currentColor" stroke-width="1.2" marker-end="url(#a5)"/>
+        <rect x="230" y="97" width="220" height="52" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+        <text x="340" y="118" text-anchor="middle" class="label" font-size="12" font-weight="600">GitHub Actions</text>
+        <text x="340" y="134" text-anchor="middle" class="dim mono" font-size="9.5">OIDC assume role → docker build</text>
+
+        <line x1="450" y1="123" x2="510" y2="123" stroke="currentColor" stroke-width="1.2" marker-end="url(#a5)"/>
+        <rect x="510" y="97" width="180" height="52" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+        <text x="600" y="118" text-anchor="middle" class="label" font-size="12" font-weight="600">ECR</text>
+        <text x="600" y="134" text-anchor="middle" class="dim" font-size="9.5">:sha and :latest tags</text>
+
+        <line x1="690" y1="123" x2="720" y2="123" stroke="currentColor" stroke-width="1.4" class="dashed" marker-end="url(#a5)"/>
+        <text x="695" y="112" class="dim" font-size="9.5">manual</text>
+
+        <rect x="720" y="90" width="160" height="66" rx="8" class="accent-fill accent-stroke" stroke-width="1.4"/>
+        <text x="800" y="112" text-anchor="middle" class="label mono" font-size="11" font-weight="700">start-deployment</text>
+        <text x="800" y="128" text-anchor="middle" class="dim" font-size="9.5">operator runs the</text>
+        <text x="800" y="142" text-anchor="middle" class="dim" font-size="9.5">AWS CLI command</text>
+
+        <line x1="800" y1="156" x2="800" y2="184" stroke="currentColor" stroke-width="1.2" marker-end="url(#a5)"/>
+        <rect x="670" y="184" width="210" height="52" rx="7" class="box-fill box-stroke" stroke-width="1.2"/>
+        <text x="775" y="205" text-anchor="middle" class="label" font-size="12" font-weight="600">Live on App Runner</text>
+        <text x="775" y="221" text-anchor="middle" class="dim" font-size="9.5">health check: GET /api/health</text>
+      </svg>
+      <figcaption>Two lanes from the same push. Vercel's lane has no gate; the AWS lane deliberately does — an image can sit built-and-pushed in ECR indefinitely without a single user seeing it, which is the point.</figcaption>
+    </figure>
+
+    <div class="ref-wrap">
+      <table class="ref">
+        <caption>Runtime configuration — where each value lives</caption>
+        <thead><tr><th>Variable</th><th>Where</th><th>Kind</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">DATABASE_URL</td><td>Secrets Manager (AWS) / Vercel env</td><td><span class="pill secret">secret</span></td></tr>
+          <tr><td class="mono">CLERK_SECRET_KEY</td><td>Secrets Manager (AWS) / Vercel env</td><td><span class="pill secret">secret</span></td></tr>
+          <tr><td class="mono">NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</td><td>plain runtime env, both hosts</td><td><span class="pill plain">plain</span></td></tr>
+          <tr><td class="mono">NEXT_PUBLIC_CLERK_SIGN_IN_URL</td><td>plain runtime env, both hosts</td><td><span class="pill plain">plain</span></td></tr>
+          <tr><td class="mono">ALLOW_MASTER_SHEET_IMPORT</td><td>plain runtime env, defaults unset</td><td><span class="pill plain">plain</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lede" style="margin-top:22px;">The single most destructive route in the app — <code>POST /api/import/master-sheet/commit</code>, which deletes and reloads the entire lead layer — sits behind two independent gates: a signed-in Clerk session, and this separate env flag that must be turned on deliberately. Either one alone is not enough to trigger it.</p>
+  </section>
+
+  <footer class="colophon">
+    Read directly from source for this audit: <code>SYSTEM_DESIGN.md</code>, <code>DECISIONS.md</code> (D-01–D-93), <code>src/proxy.ts</code>, <code>src/lib/auth.ts</code>, <code>src/db/index.ts</code>, <code>src/db/schema.ts</code>, <code>src/app/**</code>, <code>src/lib/import/**</code>, <code>Dockerfile</code>, <code>DEPLOY_AWS.md</code>, <code>.github/workflows/deploy-aws.yml</code>, <code>.env.example</code>. Reflects the repository as of commit <code>e522f6f</code>.
+  </footer>
+
+</div>

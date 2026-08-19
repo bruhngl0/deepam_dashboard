@@ -76,101 +76,126 @@ export function StatTile({
 }
 
 export function KpiRow({
-  totalLeads,
-  leadsConverted,
-  conversionRate,
-  attributedRevenue,
+  totalCustomers,
+  historicalCustomers,
+  reactivatedCustomers,
+  reactivatedSales,
+  newCustomers,
+  newCustomerBills,
+  grossSales,
+  totalBills,
 }: {
-  totalLeads: number;
-  leadsConverted: number;
-  conversionRate: number;
-  attributedRevenue: number;
+  totalCustomers: number;
+  historicalCustomers: number;
+  reactivatedCustomers: number;
+  reactivatedSales: number;
+  newCustomers: number;
+  newCustomerBills: number;
+  grossSales: number;
+  totalBills: number;
 }) {
+  const averageBill = totalBills ? grossSales / totalBills : 0;
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <HeroTile
-        label="Total leads"
-        value={formatNumber(totalLeads)}
-        caption="Distinct people across the four lists"
+        label="Total customers"
+        value={formatNumber(totalCustomers)}
+        caption="Loyalty customers plus new buyers"
       />
       <StatTile
-        label="Leads converted"
-        value={formatNumber(leadsConverted)}
-        caption="Matched a bill"
+        label="Historical customers"
+        value={formatNumber(historicalCustomers)}
+        caption="People on the loyalty customer sheet"
       />
       <StatTile
-        label="Sales from leads"
-        value={formatCurrencyCompact(attributedRevenue)}
-        caption={formatCurrency(attributedRevenue)}
+        label="Reactivated customers"
+        value={formatNumber(reactivatedCustomers)}
+        caption={`${formatCurrencyCompact(reactivatedSales)} in sales in the selected period`}
+        definition="Historical customers from the loyalty sheet who bought again in this period."
+        emphasis
       />
       <StatTile
-        label="Conversion rate"
-        value={`${conversionRate.toFixed(2)}%`}
-        caption="Converted ÷ total leads"
+        label="New customers"
+        value={formatNumber(newCustomers)}
+        caption={`${formatNumber(newCustomerBills)} bills from lead-only customers`}
+        definition="Bought after appearing on a lead sheet, but are not on the loyalty customer sheet."
+      />
+      <StatTile
+        label="Total sales"
+        value={formatCurrencyCompact(grossSales)}
+        caption={`${formatCurrency(grossSales)} · ${formatNumber(totalBills)} bills`}
+        definition="Every bill in the selected period, including bills that cannot be linked to a customer."
+      />
+      <StatTile
+        label="Average bill value"
+        value={formatCurrencyCompact(averageBill)}
+        caption={`${formatCurrency(averageBill)} per bill`}
+        definition="Total sales divided by every bill in the selected period."
       />
     </div>
   );
 }
 
 /**
- * Where the money sits — a reconciliation, not a set of related figures.
- *
- * The first three tiles partition every rupee the business billed, and the
- * fourth is their total. They are disjoint by construction: `newRevenue` uses
- * the D-46 funnel, which excludes anyone flagged existing; `existingRevenue`
- * counts exactly those people business-wide; phone-less bills carry no customer
- * at all. So new + already + phone-less = total sales, exactly (D-50), and the
- * last tile says so out loud — a reader can check the row adds up without
- * leaving the page, which is the fastest way to earn trust in the rest of it.
- *
- * Splitting new from already-existing is the point: folding them together
- * overstates what the campaigns acquired, and hiding the second understates the
- * money. Phone-less is the third because it is the honest ceiling — revenue no
- * attribution rule can ever reach.
+ * Sales context. The lead and loyalty tiles identify different matched
+ * populations; they are not a partition of all billed revenue. A person can be
+ * present in both sources, while a buyer absent from both remains visible only
+ * in the total-sales tile.
  */
 export function RevenueRow({
   newLeads,
   newConverted,
   newRevenue,
+  newBills,
   existingPeople,
   existingBuyers,
   existingRevenue,
   existingBills,
+  multiSourceBuyers,
+  multiSourceRevenue,
+  multiSourceBills,
   phonelessBills,
   phonelessRevenue,
   grossSales,
   totalBills,
-  attributedBills,
 }: {
   newLeads: number;
   newConverted: number;
   newRevenue: number;
+  newBills: number;
   existingPeople: number;
   existingBuyers: number;
   existingRevenue: number;
   existingBills: number;
+  multiSourceBuyers: number;
+  multiSourceRevenue: number;
+  multiSourceBills: number;
   phonelessBills: number;
   phonelessRevenue: number;
   grossSales: number;
   totalBills: number;
-  attributedBills: number;
 }) {
-  const traceable = grossSales ? (100 * (newRevenue + existingRevenue)) / grossSales : 0;
-
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <StatTile
         label="New customers"
         value={formatCurrencyCompact(newRevenue)}
-        caption={`${formatNumber(newConverted)} buyers of ${formatNumber(newLeads)} leads · ${formatNumber(attributedBills)} bills`}
-        definition="Bought and are also on the leadsheet."
+        caption={`${formatNumber(newConverted)} buyers of ${formatNumber(newLeads)} leads · ${formatNumber(newBills)} bills`}
+        definition="On a lead sheet but not on the loyalty customer list."
         emphasis
       />
       <StatTile
-        label="Already customers"
+        label="Loyalty customer list"
         value={formatCurrencyCompact(existingRevenue)}
         caption={`${formatNumber(existingBuyers)} buyers of ${formatNumber(existingPeople)} · ${formatNumber(existingBills)} bills`}
-        definition="Bought, but not on leadsheet."
+        definition="Matched to the loyalty/CRM customer list by normalized phone number."
+      />
+      <StatTile
+        label="Sales from multiple sources"
+        value={formatCurrencyCompact(multiSourceRevenue)}
+        caption={`${formatNumber(multiSourceBuyers)} buyers · ${formatNumber(multiSourceBills)} bills`}
+        definition="Matched to sales, the loyalty list, and at least one lead sheet by normalized phone number."
       />
       <StatTile
         label="Phone-less bills"
@@ -182,7 +207,7 @@ export function RevenueRow({
         label="Total sales"
         value={formatCurrencyCompact(grossSales)}
         caption={`${formatCurrency(grossSales)} · ${formatNumber(totalBills)} bills`}
-        definition={`Every bill in the period. The three tiles beside it sum to exactly this, and ${traceable.toFixed(1)}% of it traces to a known person.`}
+        definition="Every bill in the period. The loyalty and multi-source figures may overlap."
       />
     </div>
   );

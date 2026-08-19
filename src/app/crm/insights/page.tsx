@@ -18,8 +18,9 @@ import {
   getRepeatPurchase,
   getContactCompleteness,
 } from '@/lib/queries/insights';
-import { getStoreChannelMix } from '@/lib/queries/dashboard';
+import { getStoreChannelMix, parseDateParam, type DateRange } from '@/lib/queries/dashboard';
 import { StoreChannelBars } from '@/components/store-channel-mix';
+import { Finding, Note, Bar } from '@/components/finding-card';
 import { formatCurrency, formatNumber, CHANNEL_LABEL } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
 
@@ -27,64 +28,34 @@ export const dynamic = 'force-dynamic';
 
 const label = (code: string) => CHANNEL_LABEL[code] ?? code;
 
-/**
- * Card wrapper. The eyebrow states the measure; the h2 states the finding.
- * Exported (with `Note` and `Bar` below) so `/analysis` reuses the exact same
- * visual idiom instead of a second copy that can drift from this one.
- */
-export function Finding({
-  eyebrow,
-  title,
-  children,
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function one(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function InsightsPage({
+  searchParams,
 }: {
-  eyebrow: string;
-  title: string;
-  children: React.ReactNode;
+  searchParams: SearchParams;
 }) {
-  return (
-    <section className="card rounded-2xl border border-line bg-surface p-6">
-      <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
-        {eyebrow}
-      </p>
-      <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-ink text-balance">
-        {title}
-      </h2>
-      <div className="mt-4 flex flex-col gap-4">{children}</div>
-    </section>
-  );
-}
-
-/** Interpretation sits below its evidence, in secondary ink. */
-export function Note({ children }: { children: React.ReactNode }) {
-  return <p className="max-w-[68ch] text-sm leading-relaxed text-ink-2">{children}</p>;
-}
-
-/**
- * One measure, one hue. `scale` is the value that fills the track — 100 when the
- * quantity is genuinely a share of a whole, the row maximum when the bars are
- * only being compared with each other.
- */
-export function Bar({ value, scale }: { value: number; scale: number }) {
-  const pct = scale > 0 ? Math.max(0.8, Math.min(100, (100 * value) / scale)) : 0;
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-accent-soft/50">
-      <div
-        className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-[width] duration-700 ease-out"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
-
-export default async function InsightsPage() {
   // Before any query runs — the proxy redirect is not the boundary.
   await requireUser();
 
+  const params = await searchParams;
+  // The master filter (`master-filter-bar.tsx`), same `from`/`to`/`store` keys
+  // the dashboard reads — every sales-derived figure below narrows with it.
+  const range: DateRange = {
+    from: parseDateParam(one(params.from)),
+    to: parseDateParam(one(params.to)),
+    store: one(params.store) ?? null,
+  };
+
   const [deciles, channels, stores, repeat, completeness] = await Promise.all([
-    getRevenueConcentration(),
+    getRevenueConcentration(range),
     getChannelValue(),
-    getStoreChannelMix(),
-    getRepeatPurchase(),
+    getStoreChannelMix(range),
+    getRepeatPurchase(range),
     getContactCompleteness(),
   ]);
 

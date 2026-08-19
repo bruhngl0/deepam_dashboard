@@ -85,7 +85,7 @@ export function InstagramLeadsImportForm() {
           </span>
           <span className="flex flex-col">
             <span className="font-medium text-ink">
-              {fileName ?? 'Choose Instagram/Meta export (.xlsx)'}
+              {fileName ?? 'Choose Meta export (.xlsx)'}
             </span>
             <span className="text-xs text-ink-muted">
               {fileName ? 'Click to choose a different file' : 'Per-campaign export — one sheet per campaign'}

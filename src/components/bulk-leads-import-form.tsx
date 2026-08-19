@@ -47,7 +47,7 @@ const IDLE_SALES: ZoneState<SalesPreviewResponse> = {
 };
 
 const LEAD_ZONES: { key: BulkLeadChannel; label: string; hint: string }[] = [
-  { key: 'meta', label: 'Meta', hint: 'Instagram / Facebook lead-form export' },
+  { key: 'meta', label: 'Meta', hint: 'Meta / Facebook lead-form export' },
   { key: 'whatsapp', label: 'WhatsApp', hint: 'WhatsApp broadcast or contact list' },
   { key: 'google', label: 'Google Ads', hint: 'Google Ads leads export' },
   { key: 'other', label: 'Others', hint: 'Any other lead source' },
@@ -347,7 +347,7 @@ export function BulkLeadsImportForm() {
           <p className="text-sm font-medium text-ink">Done.</p>
           <p className="mt-2 text-sm text-ink-2">
             Refresh the dashboard, or go to{' '}
-            <a href="/analysis" className="text-accent hover:underline">
+            <a href="/crm/analysis" className="text-accent hover:underline">
               Analysis
             </a>{' '}
             to see the sales and lead numbers together.

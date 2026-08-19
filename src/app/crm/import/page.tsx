@@ -16,6 +16,7 @@ import { BulkLeadsImportForm } from '@/components/bulk-leads-import-form';
 import { ImportForm } from '@/components/import-form';
 import { InstagramLeadsImportForm } from '@/components/instagram-leads-import-form';
 import { SalesImportForm } from '@/components/sales-import-form';
+import { ExistingCustomersImportForm } from '@/components/existing-customers-import-form';
 import { requireUser } from '@/lib/auth';
 
 export default async function ImportPage() {
@@ -34,6 +35,18 @@ export default async function ImportPage() {
       </header>
 
       <div className="flex flex-col gap-6">
+        <section className="card rounded-2xl border border-line bg-surface p-6">
+          <h2 className="text-lg font-semibold tracking-tight text-ink">Existing customers</h2>
+          <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
+            A loyalty/CRM customer master (Capillary-style export). Run this <strong>first</strong>,
+            before any lead or sales import — it seeds lifecycle = existing for everyone in it, so
+            later imports never mistake a known customer for a new acquisition.
+          </p>
+          <div className="mt-4">
+            <ExistingCustomersImportForm />
+          </div>
+        </section>
+
         <section className="card rounded-2xl border border-line bg-surface p-6">
           <h2 className="text-lg font-semibold tracking-tight text-ink">Bulk import</h2>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
@@ -59,7 +72,7 @@ export default async function ImportPage() {
         </section>
 
         <section className="card rounded-2xl border border-line bg-surface p-6">
-          <h2 className="text-lg font-semibold tracking-tight text-ink">Instagram / Meta leads</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-ink">Meta leads</h2>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
             A per-campaign Meta export (one sheet per campaign — the original lead-form shape,
             D-08). Adds new phone numbers under the existing Master Sheet — Meta campaign;

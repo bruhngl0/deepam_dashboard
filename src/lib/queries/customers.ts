@@ -30,7 +30,6 @@ import { sql, type SQL } from 'drizzle-orm';
 import {
   SCOPED_CHANNELS,
   VALUE_TIER,
-  WINDOW_DAYS_EXPR,
   dateCondition,
   type DateRange,
   type ValueTierCode,
@@ -103,12 +102,14 @@ const IN_SCOPE = SCOPED_CHANNELS.map((c) => `'${c}'`).join(',');
  * Stands in for `customer_attribution`, narrowed to the in-scope channels and
  * exposed under the same `ca` alias so the sort expressions above still apply.
  *
- * Built fresh per call, like `dashboard.ts`'s `buildScoped`, so `sale_agg` can
- * carry both bounds: `bill_count`/`total_sales`/`converted`/`first_sale_at` all
- * narrow to sales inside [touched_at, touched_at + attribution window) — the
- * same rule migration 0007 enforces in `customer_attribution` — further
- * narrowed to `range` if one is given. `value_tier` stays lifetime regardless
- * of either bound, for the reason documented on `VALUE_TIER` in dashboard.ts.
+ * Built fresh per call, like `dashboard.ts`'s `buildScoped` — `sale_agg`
+ * matches on customer identity (phone) alone, not a `touched_at`-relative
+ * window, for the reason documented there: these four channels carry no
+ * real per-lead date, so `touched_at` is only ever an estimate defaulting to
+ * whenever the import happened to run, and window-bounding against it
+ * silently drops real conversions rather than measuring anything. Further
+ * narrowed to `range` if one is given. `value_tier` stays lifetime
+ * regardless, for the reason documented on `VALUE_TIER` in dashboard.ts.
  */
 function buildScopedCte(range: DateRange = {}) {
   return sql.raw(`
@@ -134,9 +135,7 @@ function buildScopedCte(range: DateRange = {}) {
            MIN(s.billed_at) AS first_sale_at
     FROM   sales s
     JOIN   scoped_touch st ON st.customer_id = s.customer_id
-    WHERE  s.customer_id IS NOT NULL
-      AND  s.billed_at >= st.touched_at
-      AND  s.billed_at < st.touched_at + (${WINDOW_DAYS_EXPR} * INTERVAL '1 day')${dateCondition('s', range)}
+    WHERE  s.customer_id IS NOT NULL${dateCondition('s', range)}
     GROUP  BY s.customer_id
   ),
   ${VALUE_TIER},

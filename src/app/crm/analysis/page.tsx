@@ -18,7 +18,8 @@ import {
   getSalesmanPerformance,
   getSalesReports,
 } from '@/lib/queries/analysis';
-import { Finding, Note, Bar } from '@/app/insights/page';
+import { parseDateParam, type DateRange } from '@/lib/queries/dashboard';
+import { Finding, Note, Bar } from '@/components/finding-card';
 import { ReportSelect } from '@/components/report-select';
 import { formatCurrency, formatDate, formatNumber, CHANNEL_LABEL } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
@@ -28,6 +29,10 @@ export const dynamic = 'force-dynamic';
 const scopeLabel = (key: string) => (key === 'unmatched' ? 'No phone captured' : (CHANNEL_LABEL[key] ?? key));
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function one(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 export default async function AnalysisPage({
   searchParams,
@@ -40,6 +45,14 @@ export default async function AnalysisPage({
   const params = await searchParams;
   const requestedBatch = Array.isArray(params.batch) ? params.batch[0] : params.batch;
 
+  // The master filter narrows further, on top of whichever report is
+  // selected below — "this report, this store, this window" all at once.
+  const range: DateRange = {
+    from: parseDateParam(one(params.from)),
+    to: parseDateParam(one(params.to)),
+    store: one(params.store) ?? null,
+  };
+
   const reports = await getSalesReports();
   // Only a batch id the DB actually has is trusted — a stale bookmark or a
   // hand-edited URL falls back to "all reports" rather than erroring or
@@ -48,10 +61,10 @@ export default async function AnalysisPage({
   const batchId = selectedReport?.id;
 
   const [segments, orderValue, rhythm, salesmen] = await Promise.all([
-    getCustomerSegments(batchId),
-    getOrderValueDistribution(batchId),
-    getSalesRhythm(batchId),
-    getSalesmanPerformance(batchId),
+    getCustomerSegments(batchId, range),
+    getOrderValueDistribution(batchId, range),
+    getSalesRhythm(batchId, range),
+    getSalesmanPerformance(batchId, range),
   ]);
 
   const coreRepeat = segments.segments.find((s) => s.segment === 'repeat_high');

@@ -21,7 +21,7 @@ import type { MasterSheetCommitSummary } from '@/lib/import/master-sheet';
 type Status = 'idle' | 'previewing' | 'previewed' | 'committing' | 'committed' | 'error';
 
 const SHEET_LABEL: Record<string, string> = {
-  meta: 'Instagram',
+  meta: 'Meta',
   whatsapp: 'WhatsApp',
   google: 'Google Ads',
   other: 'Others',

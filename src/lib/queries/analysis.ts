@@ -12,6 +12,7 @@
 
 import { db } from '@/db';
 import { sql } from 'drizzle-orm';
+import { scopeCondition, type DateRange } from './dashboard';
 
 type Row = Record<string, unknown>;
 
@@ -116,7 +117,10 @@ const SEGMENT_ORDER: CustomerSegment['segment'][] = [
  * purchase is within the same week, so a recency score would just repeat the
  * calendar back rather than say anything about churn risk.
  */
-export async function getCustomerSegments(batchId?: string | null): Promise<{
+export async function getCustomerSegments(
+  batchId?: string | null,
+  range: DateRange = {},
+): Promise<{
   segments: CustomerSegment[];
   totalPeople: number;
   totalRevenue: number;
@@ -124,11 +128,13 @@ export async function getCustomerSegments(batchId?: string | null): Promise<{
   // Computed straight from `sales` rather than the `customer_attribution` MV
   // (whose totals are always lifetime) so the value band — top 30% by spend —
   // is ranked within whichever report is selected, not globally, when one is.
+  // `range` (the master date+store filter) narrows further, on top of
+  // whichever report `batchId` already selected.
   const rows = await query(`
     WITH scoped AS (
       SELECT customer_id, bill_amount
       FROM   sales
-      WHERE  customer_id IS NOT NULL ${batchClause('batch_id', batchId)}
+      WHERE  customer_id IS NOT NULL ${batchClause('batch_id', batchId)}${scopeCondition('sales', range)}
     ),
     agg AS (
       SELECT customer_id,
@@ -201,7 +207,10 @@ export interface OrderValueDistribution {
  * other panel. A mean gets pulled hard by a handful of large saree
  * purchases; the gap between mean and median on a row is the skew itself.
  */
-export async function getOrderValueDistribution(batchId?: string | null): Promise<OrderValueDistribution> {
+export async function getOrderValueDistribution(
+  batchId?: string | null,
+  range: DateRange = {},
+): Promise<OrderValueDistribution> {
   const byStore = await query(`
     SELECT st.name AS key,
            COUNT(*)::int                                                        AS bills,
@@ -209,7 +218,7 @@ export async function getOrderValueDistribution(batchId?: string | null): Promis
            ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY s.bill_amount))::bigint AS median_bill,
            ROUND(PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY s.bill_amount))::bigint AS p90_bill
     FROM   sales s JOIN stores st ON st.id = s.store_id
-    WHERE  TRUE ${batchClause('s.batch_id', batchId)}
+    WHERE  TRUE ${batchClause('s.batch_id', batchId)}${scopeCondition('s', range)}
     GROUP  BY st.name ORDER BY median_bill DESC`);
 
   const byChannel = await query(`
@@ -220,7 +229,7 @@ export async function getOrderValueDistribution(batchId?: string | null): Promis
            ROUND(PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY s.bill_amount))::bigint AS p90_bill
     FROM   sales s
     LEFT   JOIN customer_attribution ca ON ca.customer_id = s.customer_id
-    WHERE  TRUE ${batchClause('s.batch_id', batchId)}
+    WHERE  TRUE ${batchClause('s.batch_id', batchId)}${scopeCondition('s', range)}
     GROUP  BY 1 ORDER BY median_bill DESC NULLS LAST`);
 
   const map = (rows: Row[]): OrderValueRow[] =>
@@ -260,8 +269,9 @@ const BAND_LABEL = ['Morning · before 12pm', 'Afternoon · 12–5pm', 'Evening 
  */
 export async function getSalesRhythm(
   batchId?: string | null,
+  range: DateRange = {},
 ): Promise<{ byDay: DayRow[]; byTimeBand: TimeBandRow[] }> {
-  const clause = batchClause('batch_id', batchId);
+  const clause = batchClause('batch_id', batchId) + scopeCondition('sales', range);
 
   const dayRows = await query(`
     SELECT EXTRACT(ISODOW FROM billed_at AT TIME ZONE 'Asia/Kolkata')::int AS dow,
@@ -311,7 +321,10 @@ export interface SalesmanRow {
  * Capped at 12 rows: 40 distinct codes exist, and a ranked list past the
  * first dozen stops being something anyone reads.
  */
-export async function getSalesmanPerformance(batchId?: string | null): Promise<SalesmanRow[]> {
+export async function getSalesmanPerformance(
+  batchId?: string | null,
+  range: DateRange = {},
+): Promise<SalesmanRow[]> {
   const rows = await query(`
     SELECT COALESCE(NULLIF(TRIM(s.salesman_code), ''), 'Unassigned') AS code,
            st.name                                    AS store,
@@ -319,7 +332,7 @@ export async function getSalesmanPerformance(batchId?: string | null): Promise<S
            COALESCE(SUM(s.bill_amount), 0)::numeric    AS revenue,
            ROUND(AVG(s.bill_amount))::bigint           AS avg_bill
     FROM   sales s JOIN stores st ON st.id = s.store_id
-    WHERE  TRUE ${batchClause('s.batch_id', batchId)}
+    WHERE  TRUE ${batchClause('s.batch_id', batchId)}${scopeCondition('s', range)}
     GROUP  BY 1, 2 ORDER BY revenue DESC LIMIT 12`);
 
   return rows.map((r) => ({

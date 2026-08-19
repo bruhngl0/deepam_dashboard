@@ -43,6 +43,34 @@
       "when": 1785327101274,
       "tag": "0005_attribution_prefers_real_timestamps",
       "breakpoints": false
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785500000000,
+      "tag": "0006_master_sheet_channel_priority",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785700000000,
+      "tag": "0007_attribution_window",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786184566631,
+      "tag": "0008_vendor_module",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786429148000,
+      "tag": "0009_loyalty_customers",
+      "breakpoints": true
     }
   ]
 }

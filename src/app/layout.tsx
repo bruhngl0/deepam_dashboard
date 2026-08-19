@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Deepam CRM",
-  description: "Lead-to-sale attribution across Instagram, WhatsApp, Google Ads and other sources.",
+  description: "Lead-to-sale attribution across Meta, WhatsApp, Google Ads and other sources.",
 };
 
 export default function RootLayout({

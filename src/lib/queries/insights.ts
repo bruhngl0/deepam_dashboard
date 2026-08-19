@@ -18,6 +18,7 @@
 
 import { db } from '@/db';
 import { sql } from 'drizzle-orm';
+import { scopeCondition, type DateRange } from './dashboard';
 
 type Row = Record<string, unknown>;
 
@@ -41,12 +42,16 @@ export interface DecileRow {
  * which is the case against reading this business through conversion rates.
  * Phone-less bills are excluded — they belong to no customer, so they cannot be
  * ranked by customer value.
+ *
+ * `range` (date + store, the master filter) narrows which sales count toward
+ * a buyer's total before the deciles are cut — the same `scopeCondition`
+ * `dashboard.ts` uses.
  */
-export async function getRevenueConcentration(): Promise<DecileRow[]> {
+export async function getRevenueConcentration(range: DateRange = {}): Promise<DecileRow[]> {
   const rows = await query(`
     WITH buyer AS (
       SELECT customer_id, SUM(bill_amount) AS value
-      FROM   sales WHERE customer_id IS NOT NULL GROUP BY customer_id
+      FROM   sales WHERE customer_id IS NOT NULL${scopeCondition('sales', range)} GROUP BY customer_id
     ),
     ranked AS (
       SELECT value, NTILE(10) OVER (ORDER BY value DESC) AS decile FROM buyer
@@ -86,6 +91,10 @@ export interface ChannelValueRow {
  * Conversion rate beside value per sale — the two disagree, which is the point.
  * Deliberately one table and not a two-axis chart: they are different units and
  * the comparison is the finding, so the reader needs both numbers exactly.
+ *
+ * Deliberately no `range`: this reads `customer_attribution`, a lifetime,
+ * business-wide materialized view with no store column — the same reason
+ * `getCustomerValueTiers` in dashboard.ts stays unscoped.
  */
 export async function getChannelValue(): Promise<ChannelValueRow[]> {
   const rows = await query(`
@@ -122,13 +131,13 @@ export interface RepeatRow {
   revenue: number;
 }
 
-/** How many customers bought more than once inside the loaded period. */
-export async function getRepeatPurchase(): Promise<RepeatRow[]> {
+/** How many customers bought more than once inside the loaded period (and, with the master filter, within `range`). */
+export async function getRepeatPurchase(range: DateRange = {}): Promise<RepeatRow[]> {
   const rows = await query(`
     SELECT bills, COUNT(*)::int AS customers, ROUND(SUM(spend))::bigint AS revenue
     FROM (
       SELECT customer_id, COUNT(*)::int AS bills, SUM(bill_amount) AS spend
-      FROM   sales WHERE customer_id IS NOT NULL GROUP BY customer_id
+      FROM   sales WHERE customer_id IS NOT NULL${scopeCondition('sales', range)} GROUP BY customer_id
     ) x
     GROUP BY bills ORDER BY bills`);
 
@@ -144,7 +153,12 @@ export interface Completeness {
   fields: { field: string; missing: number; share: number }[];
 }
 
-/** What we do and do not know about the people in the database. */
+/**
+ * What we do and do not know about the people in the database.
+ *
+ * Deliberately no `range`: a name or email is either on file or it isn't —
+ * neither fact is a sale that happened in a window or at a branch.
+ */
 export async function getContactCompleteness(): Promise<Completeness> {
   const [row] = await query(`
     SELECT COUNT(*)::int                                     AS total,

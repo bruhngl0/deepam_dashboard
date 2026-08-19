@@ -65,9 +65,13 @@ const IN_SCOPE = SCOPED_CHANNELS.map((c) => `'${c}'`).join(',');
 export interface DateRange {
   from?: string | null;
   to?: string | null;
+  /** Store code (`stores.code`), e.g. 'MG_ROAD' | 'JAYANAGAR'. */
+  store?: string | null;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** Store codes are hand-seeded, uppercase-and-underscore identifiers (D-27) — never user text. */
+const STORE_CODE_RE = /^[A-Z0-9_]{1,40}$/;
 
 /**
  * The only gate a date string passes through before it is ever interpolated
@@ -98,6 +102,27 @@ export function dateCondition(alias: string, range: DateRange): string {
   return parts.length ? ` AND ${parts.join(' AND ')}` : '';
 }
 
+/** The only gate a store code passes through before interpolation — same shape as `parseDateParam`. */
+export function parseStoreParam(value: string | null | undefined): string | null {
+  return value && STORE_CODE_RE.test(value) ? value : null;
+}
+
+/**
+ * `AND <alias>.store_id = (SELECT id FROM stores WHERE code = ...)` for the
+ * given range, or `''` when unbounded. `alias` must reference a row that
+ * itself carries a `store_id` (`sales`, chiefly) — this is the master
+ * filter's store leg, `dateCondition`'s sibling.
+ */
+export function storeCondition(alias: string, range: DateRange): string {
+  const store = parseStoreParam(range.store);
+  return store ? ` AND ${alias}.store_id = (SELECT id FROM stores WHERE code = '${store}')` : '';
+}
+
+/** `dateCondition` + `storeCondition` combined — the common case for any query scoped to `sales`. */
+export function scopeCondition(alias: string, range: DateRange): string {
+  return dateCondition(alias, range) + storeCondition(alias, range);
+}
+
 /**
  * First touch across the in-scope channels, with each person's sales attached.
  * Precedence matches `customer_attribution` (migration 0006): real timestamps
@@ -117,23 +142,37 @@ const PRIORITY = `CASE lt.channel
             END`;
 
 /**
- * The attribution window (D-45, migration 0007), read from `settings` at
- * query time rather than hardcoded — unlike `PRIORITY` above, this value has
- * exactly one meaning everywhere it's read, so there is nothing to keep "in
- * step" by duplicating it; the query can just point at the row.
- */
-export const WINDOW_DAYS_EXPR =
-  `(SELECT (value #>> '{}')::int FROM settings WHERE key = 'attribution_window_days')`;
-
-/**
- * `scoped_touch`/`sale_agg`/`scoped`, built fresh per call so `sale_agg` can
- * carry both bounds. `bill_count`/`total_sales`/`converted` count only sales
- * inside [touched_at, touched_at + window) — the same rule migration 0007
- * enforces in `customer_attribution` — further narrowed to `range` if one is
- * given. `scoped_touch` itself carries neither bound: leads have no date to
- * window at all (D-84), and existing customers never reach this CTE in the
- * first place (they have no lead touch, D-36), so the existing-customer
- * exemption that matters in the materialized view has nothing to exempt here.
+ * `scoped_touch`/`sale_agg`/`scoped`, built fresh per call. `bill_count`/
+ * `total_sales`/`converted` count every sale by this customer, matched on
+ * identity (phone) alone — no `touched_at`-relative window — further
+ * narrowed to `range.from`/`to` and, via `scopeCondition`, `range.store` if
+ * given. `scoped_touch` itself carries neither bound: leads have no date or
+ * store to window at all (D-84) — a lead is a lead regardless of which
+ * branch later billed them — and existing customers never reach this CTE in
+ * the first place (they have no lead touch, D-36).
+ *
+ * Deliberately not window-bound to [touched_at, touched_at + window) the way
+ * `customer_attribution` (migration 0007) is. That rule assumes `touched_at`
+ * is a meaningful date; for these four channels it never is (D-84 — no
+ * per-lead date in any of them) — it's an estimate that defaults to the
+ * *campaign's creation date*, i.e. whenever someone happened to run the
+ * import. Loading months of historical sales after that import moment made
+ * every real conversion fail the window (every bill predates the "touch"),
+ * not because nobody converted. Matching on phone alone answers the
+ * question these four channels can actually support — "did this contact
+ * ever buy" — instead of a precise-looking but fabricated "when."
+ *
+ * `in_funnel` (used by `getKpis`/`getChannelBreakdown` for the "new
+ * customer" split) means a non-foreign lead who is absent from the loyalty
+ * list. Structural membership in `scoped_touch` already means "on a lead
+ * sheet"; the loyalty list, rather than `customers.lifecycle`, is the durable
+ * evidence that the person was already known to the business. This keeps the
+ * sales represented in `multi_source` out of the new-customer figure.
+ * `lifecycle`/`lifecycle_basis` are still carried through on each row for
+ * display, but no longer gate anything here — `lifecycle_basis =
+ * 'prior_purchase'` depends on comparing against `MIN(campaigns.started_on)`,
+ * which for the same reason above is only ever "whenever an import happened
+ * to run," not a real campaign date.
  */
 function buildScoped(range: DateRange = {}): string {
   return `
@@ -154,9 +193,7 @@ function buildScoped(range: DateRange = {}): string {
            SUM(s.bill_amount)   AS total_sales
     FROM   sales s
     JOIN   scoped_touch st ON st.customer_id = s.customer_id
-    WHERE  s.customer_id IS NOT NULL
-      AND  s.billed_at >= st.touched_at
-      AND  s.billed_at < st.touched_at + (${WINDOW_DAYS_EXPR} * INTERVAL '1 day')${dateCondition('s', range)}
+    WHERE  s.customer_id IS NOT NULL${scopeCondition('s', range)}
     GROUP  BY s.customer_id
   ),
   scoped AS (
@@ -168,7 +205,10 @@ function buildScoped(range: DateRange = {}): string {
            COALESCE(sa.bill_count, 0)::int      AS bill_count,
            COALESCE(sa.total_sales, 0)::numeric AS total_sales,
            (sa.customer_id IS NOT NULL)         AS converted,
-           (c.lifecycle <> 'existing' AND NOT c.is_foreign) AS in_funnel
+           (NOT c.is_foreign
+             AND NOT EXISTS (
+               SELECT 1 FROM loyalty_customers lc WHERE lc.customer_id = c.id
+             ))                                  AS in_funnel
     FROM   scoped_touch st
     JOIN   customers c ON c.id = st.customer_id
     LEFT   JOIN sale_agg sa ON sa.customer_id = st.customer_id
@@ -188,6 +228,8 @@ export async function getSalesDateBounds(): Promise<SalesDateBounds> {
 }
 
 export interface Kpis {
+  /** Loyalty customers plus newly acquired buyers; lead-only prospects are excluded. */
+  totalCustomers: number;
   /** Every in-scope lead, existing customers included. */
   totalLeads: number;
   leadsConverted: number;
@@ -199,11 +241,16 @@ export interface Kpis {
   newLeads: number;
   newConverted: number;
   newRevenue: number;
+  newBills: number;
   /** Business-wide, not scope-limited — existing customers have no lead touch. */
   existingPeople: number;
   existingBuyers: number;
   existingRevenue: number;
   existingBills: number;
+  /** Buyers represented in sales, the loyalty list, and at least one lead sheet. */
+  multiSourceBuyers: number;
+  multiSourceRevenue: number;
+  multiSourceBills: number;
   /** Whole-business context — not limited to the in-scope channels. */
   grossSales: number;
   totalBills: number;
@@ -221,33 +268,45 @@ export async function getKpis(range: DateRange = {}): Promise<Kpis> {
              COALESCE(SUM(bill_count), 0)::int                    AS bills,
              COUNT(*) FILTER (WHERE in_funnel)::int               AS new_leads,
              COUNT(*) FILTER (WHERE in_funnel AND converted)::int AS new_converted,
-             COALESCE(SUM(total_sales) FILTER (WHERE in_funnel AND converted), 0)::numeric AS new_revenue
+             COALESCE(SUM(total_sales) FILTER (WHERE in_funnel AND converted), 0)::numeric AS new_revenue,
+             COALESCE(SUM(bill_count) FILTER (WHERE in_funnel), 0)::int AS new_bills
       FROM   scoped
     ),
-    -- Existing customers are counted business-wide, not within lead scope, and
-    -- read live from customers/sales rather than from customer_attribution.
-    -- Two reasons, not one. First: sourcing them from the scoped CTE (as this
-    -- once did) silently returned zero -- every existing customer is
-    -- no_lead_match, which is what makes them existing (D-36), so by
-    -- definition none has a lead touch and none survives that join. Second:
-    -- customer_attribution.total_sales is a materialized lifetime figure and
-    -- cannot be windowed by the selected range without a live rebuild, so once
-    -- a date range is selected it would drift out of step with the
-    -- newly-windowed new_revenue above and silently break the reconciliation
-    -- this tile promises on screen. existing_people is the one field here that
-    -- stays a headcount regardless of range -- a person doesn't stop being an
-    -- existing customer because their bill falls outside the selected window.
-    -- No double count: in_funnel excludes lifecycle = 'existing', so the new and
-    -- existing segments are disjoint and sum with phone-less to gross (D-50).
+    -- "Already customers" is the business's loyalty/CRM list, not the
+    -- residual set of buyers who happen to be absent from a lead sheet. The
+    -- latter included every buyer after the lead data was cleared, which
+    -- overstated this tile. Both the population and purchase metrics now use
+    -- the same normalized-phone identity via loyalty_customers.customer_id.
     existing AS (
       SELECT
-        (SELECT COUNT(*)::int FROM customers WHERE lifecycle = 'existing') AS existing_people,
+        (SELECT COUNT(*)::int FROM loyalty_customers) AS existing_people,
+        -- This is deliberately lifetime-based: changing the sales period must
+        -- not make a person disappear from the CRM's total-customer count.
+        (SELECT COUNT(*)::int
+         FROM   customers c
+         WHERE  NOT c.is_foreign
+           AND  NOT EXISTS (
+                  SELECT 1 FROM loyalty_customers lc WHERE lc.customer_id = c.id
+                )
+           AND  EXISTS (SELECT 1 FROM lead_touches lt WHERE lt.customer_id = c.id)
+           AND  EXISTS (SELECT 1 FROM sales s WHERE s.customer_id = c.id)
+        ) AS new_customer_people,
         COUNT(DISTINCT s.customer_id)::int      AS existing_buyers,
         COALESCE(SUM(s.bill_amount), 0)::numeric AS existing_revenue,
         COUNT(s.id)::int                        AS existing_bills
       FROM   sales s
-      JOIN   customers c ON c.id = s.customer_id AND c.lifecycle = 'existing'
-      WHERE  s.customer_id IS NOT NULL${dateCondition('s', range)}
+      JOIN   loyalty_customers lc ON lc.customer_id = s.customer_id
+      WHERE  true${scopeCondition('s', range)}
+    ),
+    multi_source AS (
+      SELECT COUNT(DISTINCT s.customer_id)::int       AS multi_source_buyers,
+             COALESCE(SUM(s.bill_amount), 0)::numeric AS multi_source_revenue,
+             COUNT(s.id)::int                         AS multi_source_bills
+      FROM   sales s
+      JOIN   loyalty_customers lc ON lc.customer_id = s.customer_id
+      WHERE  EXISTS (
+               SELECT 1 FROM lead_touches lt WHERE lt.customer_id = s.customer_id
+             )${scopeCondition('s', range)}
     ),
     bills AS (
       SELECT COUNT(*)::int AS n,
@@ -255,15 +314,17 @@ export async function getKpis(range: DateRange = {}): Promise<Kpis> {
              COUNT(*) FILTER (WHERE customer_id IS NULL)::int AS phoneless_n,
              COALESCE(SUM(bill_amount) FILTER (WHERE customer_id IS NULL), 0)::numeric AS phoneless_rev
       FROM   sales
-      WHERE  true${dateCondition('sales', range)}
+      WHERE  true${scopeCondition('sales', range)}
     )
-    SELECT a.*, e.*, b.n, b.gross, b.phoneless_n, b.phoneless_rev
-    FROM   agg a, existing e, bills b`);
+    SELECT a.*, e.*, m.*, b.n, b.gross, b.phoneless_n, b.phoneless_rev,
+           (e.existing_people + e.new_customer_people)::int AS total_customers
+    FROM   agg a, existing e, multi_source m, bills b`);
 
   const leads = Number(row.leads ?? 0);
   const converted = Number(row.converted ?? 0);
 
   return {
+    totalCustomers: Number(row.total_customers ?? 0),
     totalLeads: leads,
     leadsConverted: converted,
     conversionRate: leads ? (100 * converted) / leads : 0,
@@ -272,10 +333,14 @@ export async function getKpis(range: DateRange = {}): Promise<Kpis> {
     newLeads: Number(row.new_leads ?? 0),
     newConverted: Number(row.new_converted ?? 0),
     newRevenue: Number(row.new_revenue ?? 0),
+    newBills: Number(row.new_bills ?? 0),
     existingPeople: Number(row.existing_people ?? 0),
     existingBuyers: Number(row.existing_buyers ?? 0),
     existingRevenue: Number(row.existing_revenue ?? 0),
     existingBills: Number(row.existing_bills ?? 0),
+    multiSourceBuyers: Number(row.multi_source_buyers ?? 0),
+    multiSourceRevenue: Number(row.multi_source_revenue ?? 0),
+    multiSourceBills: Number(row.multi_source_bills ?? 0),
     grossSales: Number(row.gross ?? 0),
     totalBills: Number(row.n ?? 0),
     phonelessBills: Number(row.phoneless_n ?? 0),
@@ -472,8 +537,14 @@ export interface StoreRow {
 /**
  * Billed revenue per branch, and the share traceable to a master-sheet lead.
  * The walk-in submission count that used to sit here went with that channel.
+ *
+ * `range.store`, if given, filters which *rows* appear (`st.code = ...`)
+ * rather than joining `scopeCondition` on `s` — a store breakdown filtered
+ * to one store should show one row, not every store with the others zeroed
+ * out. The date bound still applies to the join, same as ever.
  */
 export async function getStoreBreakdown(range: DateRange = {}): Promise<StoreRow[]> {
+  const store = parseStoreParam(range.store);
   const rows = await query(`
     WITH scoped_customers AS (
       SELECT DISTINCT customer_id FROM lead_touches WHERE channel IN (${IN_SCOPE})
@@ -486,6 +557,7 @@ export async function getStoreBreakdown(range: DateRange = {}): Promise<StoreRow
     FROM   stores st
     LEFT   JOIN sales s ON s.store_id = st.id${dateCondition('s', range)}
     LEFT   JOIN scoped_customers sc ON sc.customer_id = s.customer_id
+    WHERE  true${store ? ` AND st.code = '${store}'` : ''}
     GROUP  BY st.id, st.code, st.name, st.voucher_prefix
     ORDER  BY revenue DESC`);
 
@@ -540,7 +612,7 @@ export async function getStoreChannelMix(range: DateRange = {}): Promise<StoreCh
     FROM   sales s
     JOIN   stores st ON st.id = s.store_id
     JOIN   customer_attribution ca ON ca.customer_id = s.customer_id
-    WHERE  true${dateCondition('s', range)}
+    WHERE  true${scopeCondition('s', range)}
     GROUP  BY 1, 2 ORDER BY st.name, revenue DESC`);
 
   const byStore = new Map<string, StoreChannelMix>();
@@ -696,11 +768,11 @@ export interface DataQuality {
  * distorts a KPI if it goes unmentioned. (D-56) Rejects are counted from the
  * in-scope import batches only.
  *
- * `range` bounds the two sales-derived figures (phone-less, unmatched) — a
- * date filter should shrink "how much is unexplained" along with everything
- * else it shrinks. Rejects and estimated-touch counts are import- and
- * lead-time facts, not sale-time ones, so they stay whole-of-load regardless
- * of `range`.
+ * `range` bounds the two sales-derived figures (phone-less, unmatched) by
+ * date and, via `scopeCondition`, store — a filter should shrink "how much
+ * is unexplained" along with everything else it shrinks. Rejects and
+ * estimated-touch counts are import- and lead-time facts, not sale-time
+ * ones, so they stay whole-of-load regardless of `range`.
  */
 export async function getDataQuality(range: DateRange = {}): Promise<DataQuality> {
   const [row] = await query(`
@@ -711,13 +783,13 @@ export async function getDataQuality(range: DateRange = {}): Promise<DataQuality
       (SELECT COUNT(*)::int FROM import_rows_rejected r
         JOIN import_batches b ON b.id = r.batch_id
         WHERE NOT r.resolved AND b.source_type IN (${IN_SCOPE})) AS rejected,
-      (SELECT COUNT(*)::int FROM sales WHERE customer_id IS NULL AND true${dateCondition('sales', range)}) AS phoneless_n,
-      (SELECT COALESCE(SUM(bill_amount),0)::numeric FROM sales WHERE customer_id IS NULL AND true${dateCondition('sales', range)}) AS phoneless_rev,
+      (SELECT COUNT(*)::int FROM sales WHERE customer_id IS NULL AND true${scopeCondition('sales', range)}) AS phoneless_n,
+      (SELECT COALESCE(SUM(bill_amount),0)::numeric FROM sales WHERE customer_id IS NULL AND true${scopeCondition('sales', range)}) AS phoneless_rev,
       (SELECT COUNT(DISTINCT s.customer_id)::int FROM sales s
-        WHERE s.customer_id IS NOT NULL${dateCondition('s', range)}
+        WHERE s.customer_id IS NOT NULL${scopeCondition('s', range)}
           AND NOT EXISTS (SELECT 1 FROM scoped_customers sc WHERE sc.customer_id = s.customer_id)) AS unmatched_n,
       (SELECT COALESCE(SUM(s.bill_amount),0)::numeric FROM sales s
-        WHERE s.customer_id IS NOT NULL${dateCondition('s', range)}
+        WHERE s.customer_id IS NOT NULL${scopeCondition('s', range)}
           AND NOT EXISTS (SELECT 1 FROM scoped_customers sc WHERE sc.customer_id = s.customer_id)) AS unmatched_rev,
       (SELECT COUNT(*)::int FROM lead_touches
         WHERE channel IN (${IN_SCOPE}) AND touched_at_is_estimated) AS estimated,

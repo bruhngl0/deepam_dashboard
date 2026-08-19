@@ -200,7 +200,7 @@ export function SalesImportForm() {
             {formatNumber(commitResult.rejectedStored)} rows rejected
           </p>
           <p className="mt-2 text-sm text-ink-2">
-            Refresh the <a href="/analysis" className="text-accent hover:underline">Analysis page</a>{' '}
+            Refresh the <a href="/crm/analysis" className="text-accent hover:underline">Analysis page</a>{' '}
             to see it in the report dropdown.
           </p>
         </div>

@@ -81,7 +81,7 @@ export function orNotProvided(value: string | null | undefined): string {
 }
 
 export const CHANNEL_LABEL: Record<string, string> = {
-  meta: 'Instagram',
+  meta: 'Meta',
   whatsapp: 'WhatsApp',
   walkin: 'Walk-in',
   existing: 'Existing',
