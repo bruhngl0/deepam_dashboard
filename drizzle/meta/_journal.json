@@ -71,6 +71,13 @@
       "when": 1786429148000,
       "tag": "0009_loyalty_customers",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787200000000,
+      "tag": "0010_outreach_log",
+      "breakpoints": true
     }
   ]
 }

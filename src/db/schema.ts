@@ -86,6 +86,9 @@ export const remarkStatusEnum = pgEnum('remark_status', [
   'pending',
 ]);
 
+/** Which worklist an outreach attempt came from. (see migration 0010) */
+export const outreachListEnum = pgEnum('outreach_list', ['reactivation', 'second_visit']);
+
 // ── Reference ────────────────────────────────────────────────────────────────
 
 /**
@@ -540,6 +543,52 @@ export const saleLineItems = pgTable(
   ],
 );
 
+// ── Outreach ─────────────────────────────────────────────────────────────────
+
+/**
+ * Append-only log of contact attempts — the first table in this schema that
+ * records what the business *did* rather than what happened to it.
+ *
+ * Keyed to `customerId`, not to a lead touch, because the largest outreach
+ * population has no lead touch at all: 67,400 people carry real purchase
+ * history in `loyalty_customers` and appear on no lead sheet. `lead_followups`
+ * hangs off `leadTouchId` and is structurally unable to describe them.
+ *
+ * One row per attempt, never updated in place (D-40's reasoning applied to
+ * outreach): three calls across two months are three facts, and a
+ * `last_contacted` column on `customers` would keep only the last of them
+ * while making "how many times have we chased this person" unanswerable.
+ * Suppression windows are derived from this log rather than stored.
+ *
+ * `outcome` reuses `remarkStatusEnum` (D-67) rather than defining a parallel
+ * vocabulary that would inevitably drift from it. `scoreAtContact` freezes the
+ * score the row carried when it was surfaced — the weights in
+ * `lib/queries/worklist.ts` are an untested hypothesis, and this is what makes
+ * it possible to find out later whether a high score predicted anything.
+ */
+export const outreachContacts = pgTable(
+  'outreach_contacts',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    customerId: bigint('customer_id', { mode: 'number' })
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    listKind: outreachListEnum('list_kind').notNull(),
+    outcome: remarkStatusEnum('outcome').notNull().default('pending'),
+    note: text('note'),
+    /** Clerk user id of whoever logged it. */
+    contactedBy: text('contacted_by'),
+    contactedAt: timestamp('contacted_at', { withTimezone: true }).notNull().defaultNow(),
+    scoreAtContact: numeric('score_at_contact', { precision: 6, scale: 2 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('outreach_contacts_customer_idx').on(t.customerId, t.contactedAt.desc()),
+    index('outreach_contacts_list_idx').on(t.listKind, t.contactedAt.desc()),
+    index('outreach_contacts_outcome_idx').on(t.outcome),
+  ],
+);
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 /**
@@ -567,3 +616,4 @@ export type Sale = typeof sales.$inferSelect;
 export type Vendor = typeof vendors.$inferSelect;
 export type VendorStockLedgerRow = typeof vendorStockLedger.$inferSelect;
 export type SaleLineItem = typeof saleLineItems.$inferSelect;
+export type OutreachContact = typeof outreachContacts.$inferSelect;
