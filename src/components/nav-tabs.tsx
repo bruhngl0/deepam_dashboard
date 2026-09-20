@@ -34,7 +34,12 @@ const CRM_TABS = [
 ] as const;
 
 const VENDOR_TABS = [
-  { href: '/vendor', label: 'Dashboard' },
+  { href: '/vendor', label: 'Overview' },
+  { href: '/vendor/vendors', label: 'Vendors' },
+  { href: '/vendor/purchases', label: 'Purchases' },
+  { href: '/vendor/performance', label: 'Performance' },
+  { href: '/vendor/customer-insights', label: 'Customer hub' },
+  { href: '/vendor/demand', label: 'Demand' },
   { href: '/vendor/import', label: 'Import' },
 ] as const;
 

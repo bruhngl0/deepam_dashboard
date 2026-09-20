@@ -78,6 +78,20 @@
       "when": 1787200000000,
       "tag": "0010_outreach_log",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788250389388,
+      "tag": "0011_nervous_master_chief",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789641000000,
+      "tag": "0012_vendor_operations",
+      "breakpoints": true
     }
   ]
 }

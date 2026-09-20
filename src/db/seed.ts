@@ -1,5 +1,5 @@
 /**
- * Seed reference data: the two stores and the five Meta campaigns.
+ * Seed reference data: the three stores and the five Meta campaigns.
  *
  *   npm run db:seed
  *
@@ -28,6 +28,7 @@ import { sql } from 'drizzle-orm';
 const STORES = [
   { code: 'MG_ROAD', name: 'MG Road', voucherPrefix: 'BK01-' },
   { code: 'JAYANAGAR', name: 'Jayanagar', voucherPrefix: 'BK02-' },
+  { code: 'ONLINE', name: 'Online', voucherPrefix: 'BK03-' },
 ];
 
 /**

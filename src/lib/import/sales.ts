@@ -253,7 +253,7 @@ export async function commitSalesImport(
         customerId: row.phoneE164 ? (idByPhone.get(row.phoneE164) ?? null) : null,
         customerNameRaw: row.customerNameRaw,
         phoneRaw: row.phoneRaw,
-        qty: row.qty,
+        qty: row.qty === null ? null : String(row.qty),
         billAmount: String(row.billAmount),
         taxableAmount: row.taxableAmount === null ? null : String(row.taxableAmount),
         itemDiscAmount: row.itemDiscAmount === null ? null : String(row.itemDiscAmount),

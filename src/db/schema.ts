@@ -339,7 +339,8 @@ export const sales = pgTable(
     ),
     customerNameRaw: text('customer_name_raw'),
     phoneRaw: text('phone_raw'),
-    qty: integer('qty'),
+    // POS reports can contain fractional quantities (for example, 1.25 m).
+    qty: numeric('qty', { precision: 12, scale: 2 }),
     billAmount: numeric('bill_amount', { precision: 12, scale: 2 }).notNull(), // D-13, D-68
     taxableAmount: numeric('taxable_amount', { precision: 12, scale: 2 }),
     itemDiscAmount: numeric('item_disc_amount', { precision: 12, scale: 2 }),
@@ -421,10 +422,99 @@ export const loyaltyCustomers = pgTable(
 export const vendors = pgTable('vendors', {
   id: serial('id').primaryKey(),
   name: text('name').notNull().unique(), // trimmed, e.g. 'ARTHA HI FASHION'
+  vendorCode: text('vendor_code').unique(),
+  brandName: text('brand_name'),
+  contactPerson: text('contact_person'),
+  phone: text('phone'),
+  email: text('email'),
+  address: text('address'),
+  city: text('city'),
+  state: text('state'),
+  gstin: text('gstin'),
+  pan: text('pan'),
+  categorySupplied: text('category_supplied'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
+
+/** A purchase order and its commercial/payment lifecycle. */
+export const vendorPurchaseOrders = pgTable(
+  'vendor_purchase_orders',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    poNumber: text('po_number').notNull().unique(),
+    vendorId: integer('vendor_id').notNull().references(() => vendors.id),
+    purchaseDate: date('purchase_date').notNull(),
+    category: text('category'),
+    receivedDate: date('received_date'),
+    qcStatus: text('qc_status').notNull().default('pending'),
+    paymentDueDate: date('payment_due_date'),
+    paymentStatus: text('payment_status').notNull().default('unpaid'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('vendor_purchase_orders_vendor_idx').on(t.vendorId, t.purchaseDate.desc())],
+);
+
+/** SKU-level purchase/receipt, QC, return, and store-allocation facts. */
+export const vendorPurchaseItems = pgTable(
+  'vendor_purchase_items',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    purchaseOrderId: bigint('purchase_order_id', { mode: 'number' })
+      .notNull()
+      .references(() => vendorPurchaseOrders.id, { onDelete: 'cascade' }),
+    skuNo: text('sku_no').notNull(),
+    itemName: text('item_name'),
+    qty: numeric('qty', { precision: 12, scale: 2 }).notNull(),
+    cost: numeric('cost', { precision: 12, scale: 2 }).notNull(),
+    mrp: numeric('mrp', { precision: 12, scale: 2 }),
+    receivedQty: numeric('received_qty', { precision: 12, scale: 2 }),
+    qcStatus: text('qc_status').notNull().default('pending'),
+    returnQty: numeric('return_qty', { precision: 12, scale: 2 }).notNull().default('0'),
+    returnValue: numeric('return_value', { precision: 12, scale: 2 }).notNull().default('0'),
+    storeId: integer('store_id').references(() => stores.id),
+    allocatedQty: numeric('allocated_qty', { precision: 12, scale: 2 }).notNull().default('0'),
+  },
+  (t) => [index('vendor_purchase_items_po_idx').on(t.purchaseOrderId), index('vendor_purchase_items_sku_idx').on(t.skuNo)],
+);
+
+/** Payments made against vendor purchase orders. */
+export const vendorPayments = pgTable(
+  'vendor_payments',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    vendorId: integer('vendor_id').notNull().references(() => vendors.id),
+    purchaseOrderId: bigint('purchase_order_id', { mode: 'number' }).references(
+      () => vendorPurchaseOrders.id,
+      { onDelete: 'set null' },
+    ),
+    paidAt: date('paid_at').notNull(),
+    amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+    reference: text('reference'),
+  },
+  (t) => [index('vendor_payments_vendor_idx').on(t.vendorId, t.paidAt.desc())],
+);
+
+/** A customer request mapped to the supplier expected to fulfil it. */
+export const vendorCustomerDemands = pgTable(
+  'vendor_customer_demands',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    customerId: bigint('customer_id', { mode: 'number' }).references(() => customers.id),
+    vendorId: integer('vendor_id').references(() => vendors.id),
+    skuNo: text('sku_no'),
+    category: text('category').notNull(),
+    requestedQty: numeric('requested_qty', { precision: 12, scale: 2 }).notNull(),
+    fulfilledQty: numeric('fulfilled_qty', { precision: 12, scale: 2 }).notNull().default('0'),
+    expectedRevenue: numeric('expected_revenue', { precision: 12, scale: 2 }),
+    status: text('status').notNull().default('open'),
+    requestedAt: date('requested_at').notNull(),
+    notes: text('notes'),
+  },
+  (t) => [index('vendor_customer_demands_vendor_idx').on(t.vendorId, t.requestedAt.desc()), index('vendor_customer_demands_customer_idx').on(t.customerId)],
+);
 
 /**
  * One row per barcode per reporting period, from `Party Wise.xlsx` — a
@@ -615,5 +705,9 @@ export type WalkinSubmission = typeof walkinSubmissions.$inferSelect;
 export type Sale = typeof sales.$inferSelect;
 export type Vendor = typeof vendors.$inferSelect;
 export type VendorStockLedgerRow = typeof vendorStockLedger.$inferSelect;
+export type VendorPurchaseOrder = typeof vendorPurchaseOrders.$inferSelect;
+export type VendorPurchaseItem = typeof vendorPurchaseItems.$inferSelect;
+export type VendorPayment = typeof vendorPayments.$inferSelect;
+export type VendorCustomerDemand = typeof vendorCustomerDemands.$inferSelect;
 export type SaleLineItem = typeof saleLineItems.$inferSelect;
 export type OutreachContact = typeof outreachContacts.$inferSelect;
