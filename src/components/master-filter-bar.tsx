@@ -34,7 +34,7 @@ export function MasterFilterBar({
   const pathname = usePathname();
   const { setParam, params, pending } = useSetParam();
 
-  if (pathname === '/crm/import') return null;
+  if (pathname === '/crm/import' || pathname.startsWith('/crm/marketing')) return null;
 
   const from = params.get('from');
   const to = params.get('to');

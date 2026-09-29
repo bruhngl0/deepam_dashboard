@@ -679,6 +679,55 @@ export const outreachContacts = pgTable(
   ],
 );
 
+// ── Cross-application integration ─────────────────────────────────────────────────
+
+/** Idempotency ledger for events received from the other Deepam applications. */
+export const integrationInbox = pgTable(
+  'integration_inbox',
+  {
+    eventId: uuid('event_id').primaryKey(),
+    source: text('source').notNull(),
+    eventType: text('event_type').notNull(),
+    entityId: text('entity_id').notNull(),
+    payload: jsonb('payload').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('integration_inbox_source_entity_idx').on(t.source, t.entityId)],
+);
+
+/** Operational visits projected from WalkTrack. WalkTrack remains their owner. */
+export const storeVisits = pgTable(
+  'store_visits',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    sourceSystem: text('source_system').notNull().default('walktrack'),
+    externalId: text('external_id').notNull(),
+    storeId: integer('store_id').notNull().references(() => stores.id),
+    customerId: bigint('customer_id', { mode: 'number' }).references(() => customers.id),
+    externalCustomerRef: text('external_customer_ref'),
+    visitedAt: timestamp('visited_at', { withTimezone: true }).notNull(),
+    stoppedAt: timestamp('stopped_at', { withTimezone: true }),
+    staffConverted: boolean('staff_converted').notNull().default(false),
+    posSaleId: bigint('pos_sale_id', { mode: 'number' }).references(() => sales.id),
+    source: text('source'),
+    shoppingIntent: text('shopping_intent'),
+    people: integer('people').notNull().default(1),
+    driverCode: text('driver_code'),
+    raw: jsonb('raw').notNull(),
+    sourceUpdatedAt: timestamp('source_updated_at', { withTimezone: true }).notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('store_visits_source_external_uidx').on(t.sourceSystem, t.externalId),
+    index('store_visits_customer_idx').on(t.customerId),
+    index('store_visits_store_visited_idx').on(t.storeId, t.visitedAt),
+    uniqueIndex('store_visits_pos_sale_uidx').on(t.posSaleId).where(sql`pos_sale_id IS NOT NULL`),
+  ],
+);
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 /**
@@ -711,3 +760,4 @@ export type VendorPayment = typeof vendorPayments.$inferSelect;
 export type VendorCustomerDemand = typeof vendorCustomerDemands.$inferSelect;
 export type SaleLineItem = typeof saleLineItems.$inferSelect;
 export type OutreachContact = typeof outreachContacts.$inferSelect;
+export type StoreVisit = typeof storeVisits.$inferSelect;

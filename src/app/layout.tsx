@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
-import { ClerkProvider } from "@clerk/nextjs";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -26,25 +25,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html
-        lang="en"
-        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-        suppressHydrationWarning
-      >
-        <body className="min-h-full flex flex-col">
-          <Script id="theme-preference" strategy="beforeInteractive">
-            {`try {
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
+      <body className="min-h-full flex flex-col">
+        <Script id="theme-preference" strategy="beforeInteractive">
+          {`try {
               const theme = localStorage.getItem('deepam-theme');
               if (theme === 'light' || theme === 'dark') {
                 document.documentElement.dataset.theme = theme;
               }
             } catch {}`}
-          </Script>
-          <SiteHeader />
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+        </Script>
+        <SiteHeader />
+        {children}
+      </body>
+    </html>
   );
 }

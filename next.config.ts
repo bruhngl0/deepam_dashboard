@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // (D-70's Node-runtime requirement — xlsx parsing and the pooled Postgres
   // driver — still holds; this only changes how that Node process ships).
   output: "standalone",
+  turbopack: {
+    root: __dirname,
+  },
   experimental: {
     // `proxy.ts` (Clerk's middleware) clones every request body for
     // inspection, capped independently of any route handler's own limit —

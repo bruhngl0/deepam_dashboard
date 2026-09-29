@@ -18,6 +18,7 @@ import {
   sales as salesTable,
 } from '@/db/schema';
 import { parseSalesWorkbook, type ParsedSale, type SalesParseResult } from '../parsers/sales';
+import { reconcileStoreVisits } from '../integration/reconcile';
 
 /** Postgres caps a statement at 65535 parameters; stay well clear. (D-62) */
 const CHUNK_SIZE = 500;
@@ -120,6 +121,7 @@ export interface SalesCommitResult {
   salesInserted: number;
   salesSkipped: number;
   rejectedStored: number;
+  visitsReconciled: number;
 }
 
 /**
@@ -303,6 +305,7 @@ export async function commitSalesImport(
         salesInserted,
         salesSkipped: uniqueSales.length - salesInserted,
         rejectedStored: rejected.length,
+        visitsReconciled: 0,
       };
     });
   } finally {
@@ -311,6 +314,7 @@ export async function commitSalesImport(
 
   // Outside the transaction: CONCURRENTLY is illegal inside one. (D-61)
   await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY customer_attribution`);
+  result.visitsReconciled = await reconcileStoreVisits();
 
   return result;
 }

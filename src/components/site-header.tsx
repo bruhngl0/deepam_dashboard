@@ -4,15 +4,11 @@
  * Lives in the root layout so it renders once and survives navigation between
  * Home and Insights rather than being rebuilt per page.
  *
- * A Server Component. Clerk Core 3 replaced `<SignedIn>` with `<Show>`, which
- * resolves server-side, so the signed-out header renders correctly on the first
- * paint instead of briefly showing navigation the visitor cannot use. The tabs
- * are a client child (`nav-tabs.tsx`) only because the active state needs
- * `usePathname`.
+ * A Server Component. The tabs are a client child (`nav-tabs.tsx`) only because
+ * the active state needs `usePathname`.
  */
 
 import Link from 'next/link';
-import { Show, UserButton } from '@clerk/nextjs';
 import { NavTabs } from '@/components/nav-tabs';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -30,16 +26,10 @@ export function SiteHeader() {
           <span className="text-base font-semibold tracking-tight text-ink">Ananta OS</span>
         </Link>
 
-        {/* Tabs are useless signed out — every destination redirects back. */}
-        <Show when="signed-in">
-          <NavTabs />
-        </Show>
+        <NavTabs />
 
         <div className="ml-auto flex items-center gap-3">
           <ThemeToggle />
-          <Show when="signed-in">
-            <UserButton appearance={{ elements: { avatarBox: 'size-8' } }} />
-          </Show>
         </div>
       </div>
     </header>

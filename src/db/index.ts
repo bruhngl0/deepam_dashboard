@@ -14,6 +14,8 @@
 import { neon, neonConfig, Pool } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { drizzle as drizzlePool } from 'drizzle-orm/neon-serverless';
+import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
+import { Pool as PgPool } from 'pg';
 import ws from 'ws';
 import * as schema from './schema';
 
@@ -32,7 +34,13 @@ if (!connectionString) {
 }
 
 /** Read path. Safe to import from Server Components. */
-export const db = drizzle(neon(connectionString), { schema });
+const useLocalPg = process.env.DATABASE_DRIVER === 'pg';
+const localPool = useLocalPg ? new PgPool({ connectionString }) : null;
+
+/** DATABASE_DRIVER=pg exists for local/E2E PostgreSQL; production remains Neon HTTP. */
+export const db = (useLocalPg
+  ? drizzlePg(localPool!, { schema })
+  : drizzle(neon(connectionString), { schema })) as ReturnType<typeof drizzle<typeof schema>>;
 
 /**
  * Write path for transactional imports. Caller owns the pool lifecycle:
@@ -42,6 +50,13 @@ export const db = drizzle(neon(connectionString), { schema });
  *   finally { await pool.end(); }
  */
 export function txDb() {
+  if (useLocalPg) {
+    const pool = new PgPool({ connectionString });
+    return {
+      db: drizzlePg(pool, { schema }) as unknown as ReturnType<typeof drizzlePool<typeof schema>>,
+      pool: { end: () => pool.end() },
+    };
+  }
   const pool = new Pool({ connectionString });
   return { db: drizzlePool(pool, { schema }), pool };
 }
