@@ -6,6 +6,8 @@ import { button, card, dateLabel, Field, input } from './marketing-shared';
 
 const PAGE = 25;
 /** Calls logged from the salesperson desk live under their own storage key in this browser. */
+/** Always offered in the filter, even before they have logged a call. */
+const KNOWN_SALESPEOPLE = ['Abishek'];
 const DESK_KEYS = ['marketing-local-v1:salesperson:abishek'];
 
 export function MarketingSalespeople({ data }: { data: Dataset }) {
@@ -22,7 +24,7 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
   }, []);
 
   const all = callLog([data, ...desks]);
-  const people = [...new Set(all.map(c => c.salesperson))].sort();
+  const people = [...new Set([...KNOWN_SALESPEOPLE, ...all.map(c => c.salesperson)])].sort();
   const q = search.trim().toLowerCase();
   const rows = all.filter(c => (!person || c.salesperson === person) && (!from || c.at.slice(0, 10) >= from) && (!to || c.at.slice(0, 10) <= to) && (!outcome || c.outcome === outcome)
     && (!q || c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.note.toLowerCase().includes(q)));
@@ -47,7 +49,7 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">{[
       ['Calls logged', rows.length], ['Customers called', customers], ['Days with calls', days], ['Connected', count('Connected')], ['Interested', count('Connected / interested')], ['No answer', count('No answer')],
     ].map(([label, value]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-2 text-3xl font-semibold tracking-tight text-ink">{value}</p></div>)}</div>
-    {!person && perPerson.length > 1 && <section className={card}><h2 className="text-lg font-semibold text-ink">Calls by salesperson</h2><div className="mt-3 flex flex-wrap gap-2">{perPerson.map(({ p, n }) => <button key={p} className={button} onClick={() => { setPerson(p); setPage(0); }}>{p} · {n}</button>)}</div></section>}
+    {!person && perPerson.length > 0 && <section className={card}><h2 className="text-lg font-semibold text-ink">Calls by salesperson</h2><div className="mt-3 flex flex-wrap gap-2">{perPerson.map(({ p, n }) => <button key={p} className={button} onClick={() => { setPerson(p); setPage(0); }}>{p} · {n}</button>)}</div></section>}
     <section className="overflow-hidden rounded-2xl border border-line bg-surface">
       <div className="p-4"><h2 className="text-lg font-semibold text-ink">{person ? `${person}'s call log` : 'Call log'}</h2><p className="text-xs text-ink-muted">Every call logged from the calling queue, newest first. Times are IST.</p></div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Customer', 'Phone', 'Call logged at', 'Outcome', 'Note', 'Logged by'].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead>
