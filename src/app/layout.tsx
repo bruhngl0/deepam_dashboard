@@ -14,6 +14,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Pages read the database per request; without Clerk's auth() call nothing else forces them dynamic, so a build would try to prerender them.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Deepam CRM",
   description: "Lead-to-sale attribution across Meta, WhatsApp, Google Ads and other sources.",

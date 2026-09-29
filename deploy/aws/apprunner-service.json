@@ -11,12 +11,9 @@
       "ImageConfiguration": {
         "Port": "3000",
         "RuntimeEnvironmentSecrets": {
-          "DATABASE_URL": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:deepam-crm/database-url",
-          "CLERK_SECRET_KEY": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:deepam-crm/clerk-secret-key"
+          "DATABASE_URL": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:deepam-crm/database-url"
         },
         "RuntimeEnvironmentVariables": {
-          "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "<pk_live_xxx>",
-          "NEXT_PUBLIC_CLERK_SIGN_IN_URL": "/sign-in",
           "ALLOW_MASTER_SHEET_IMPORT": "false",
           "HOSTNAME": "0.0.0.0",
           "PORT": "3000"

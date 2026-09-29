@@ -9,6 +9,7 @@
  */
 
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { NavTabs } from '@/components/nav-tabs';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -26,7 +27,10 @@ export function SiteHeader() {
           <span className="text-base font-semibold tracking-tight text-ink">Ananta OS</span>
         </Link>
 
-        <NavTabs />
+        {/* NavTabs reads useSearchParams, which must sit inside Suspense or static pages (/_not-found) fail to prerender. */}
+        <Suspense fallback={null}>
+          <NavTabs />
+        </Suspense>
 
         <div className="ml-auto flex items-center gap-3">
           <ThemeToggle />

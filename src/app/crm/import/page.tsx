@@ -19,6 +19,8 @@ import { SalesImportForm } from '@/components/sales-import-form';
 import { ExistingCustomersImportForm } from '@/components/existing-customers-import-form';
 import { requireUser } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ImportPage() {
   await requireUser();
 
