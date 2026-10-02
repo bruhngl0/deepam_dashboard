@@ -88,7 +88,10 @@ export function BuyerTable({ rows }: { rows: BuyerListRow[] }) {
                 >
                   {orNotProvided(r.fullName)}
                 </Link>
-                <p className="tnum text-xs text-ink-muted">{formatPhone(r.phoneE164)}</p>
+                <p className="tnum text-xs text-ink-muted">
+                  {r.customerCode && `ID ${r.customerCode} · `}
+                  {formatPhone(r.phoneE164)}
+                </p>
               </td>
 
               <td className="px-4 py-3">

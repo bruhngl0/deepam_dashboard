@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from 'drizzle-orm';
 import { txDb } from '@/db';
 import { isIntegrationAuthorized } from '@/lib/integration/auth';
-import { canonicalStoreCode, parseWalktrackEvent, possibleNationalPhone } from '@/lib/integration/events';
+import { canonicalStoreCode, parseWalktrackEvent, possibleCustomerCode, possibleNationalPhone } from '@/lib/integration/events';
 import { reconcileStoreVisits } from '@/lib/integration/reconcile';
 
 export const runtime = 'nodejs';
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
       const phone = possibleNationalPhone(event.data.customerId);
       const customerRef = String(event.data.customerId ?? '');
-      const customerIdRef = /^\d{1,9}$/.test(customerRef) ? Number(customerRef) : null;
+      const customerCode = possibleCustomerCode(customerRef);
       const visitedAt = String(event.data.startTime ?? '');
       const sourceUpdatedAt = String(event.data.updatedAt ?? event.occurredAt);
       if (Number.isNaN(Date.parse(visitedAt)) || Number.isNaN(Date.parse(sourceUpdatedAt))) {
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
           ${event.data.driverSerial ? String(event.data.driverSerial) : null}, ${dataJson}::jsonb,
           ${sourceUpdatedAt}::timestamptz, NULL
         FROM stores st
-        LEFT JOIN customers c ON c.phone_national=${phone} OR c.id=${customerIdRef}
+        LEFT JOIN customers c ON c.phone_national=${phone} OR c.customer_code=${customerCode}
         WHERE st.code=${storeCode}
         ON CONFLICT (source_system, external_id) DO UPDATE SET
           store_id=excluded.store_id, customer_id=COALESCE(excluded.customer_id, store_visits.customer_id),
@@ -73,10 +73,17 @@ export async function POST(request: Request) {
       `);
       return 'processed';
     });
+    // Hand CRM's Customer ID back so WalkTrack can show the same number. (INTEGRATION.md)
+    const resolved = outcome === 'processed' && event.type !== 'walkin.deleted'
+      ? await db.execute(sql`
+          SELECT c.customer_code FROM store_visits sv JOIN customers c ON c.id = sv.customer_id
+          WHERE sv.source_system='walktrack' AND sv.external_id=${event.entityId}`)
+      : null;
+    const customerCode = (resolved?.rows[0]?.customer_code as string | undefined) ?? null;
     const reconciled = outcome === 'processed' && event.type !== 'walkin.deleted'
       ? await reconcileStoreVisits(event.entityId)
       : 0;
-    return NextResponse.json({ status: outcome, salesReconciled: reconciled });
+    return NextResponse.json({ status: outcome, salesReconciled: reconciled, customerCode });
   } catch (error) {
     console.error('integration/events', error);
     return NextResponse.json({ error: 'Event processing failed' }, { status: 500 });

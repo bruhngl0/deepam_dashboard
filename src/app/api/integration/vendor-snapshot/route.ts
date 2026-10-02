@@ -10,18 +10,19 @@ export async function GET(request: Request) {
   if (!isIntegrationAuthorized(request)) return Response.json({ error: 'Unauthorized' }, { status: 401 });
   const [vendors, products, stockUnits, dailySales] = await Promise.all([
     db.execute(sql`WITH latest AS (SELECT DISTINCT ON (barcode) * FROM vendor_stock_ledger ORDER BY barcode, period_to DESC)
-      SELECT v.name AS brand, COALESCE(SUM(l.purc_qty),0)::float8 AS purchase_qty,
+      SELECT v.name AS brand, v.vendor_code, COALESCE(SUM(l.purc_qty),0)::float8 AS purchase_qty,
         COALESCE(SUM(l.purc_amt),0)::float8 AS purchase_value, COALESCE(SUM(l.net_sales_amt),0)::float8 AS purchase_total,
         COALESCE(SUM(l.cl_qty),0)::float8 AS stock_qty, COALESCE(SUM(l.cl_amt)/NULLIF(SUM(l.cl_qty),0),0)::float8 AS avg_cost,
         COALESCE(SUM(l.cl_mrp)/NULLIF(SUM(l.cl_qty),0),0)::float8 AS avg_mrp,
         COALESCE(SUM(l.cl_amt),0)::float8 AS stock_cost_est, COALESCE(SUM(l.cl_mrp),0)::float8 AS stock_mrp_est
-      FROM latest l JOIN vendors v ON v.id=l.vendor_id GROUP BY v.id,v.name ORDER BY v.name`),
+      FROM latest l JOIN vendors v ON v.id=l.vendor_id GROUP BY v.id,v.name,v.vendor_code ORDER BY v.name`),
     db.execute(sql`WITH latest AS (SELECT DISTINCT ON (barcode) * FROM vendor_stock_ledger ORDER BY barcode, period_to DESC)
-      SELECT v.name AS brand, COALESCE(l.item_name,'Unclassified') AS name, COALESCE(SUM(l.net_sales_qty),0)::float8 AS quantity,
+      SELECT v.name AS brand, COALESCE(l.item_name,'Unclassified') AS name, cat.category_code, COALESCE(SUM(l.net_sales_qty),0)::float8 AS quantity,
         COALESCE(SUM(l.net_sales_amt),0)::float8 AS sales_value, COALESCE(SUM(l.net_purc_amt),0)::float8 AS cost_value,
         COALESCE(SUM(l.net_purc_amt)/NULLIF(SUM(l.net_purc_qty),0),0)::float8 AS unit_cost,
         COALESCE(SUM(l.cl_mrp)/NULLIF(SUM(l.cl_qty),0),0)::float8 AS mrp
-      FROM latest l JOIN vendors v ON v.id=l.vendor_id GROUP BY v.name,l.item_name`),
+      FROM latest l JOIN vendors v ON v.id=l.vendor_id LEFT JOIN categories cat ON lower(cat.name)=lower(l.item_name)
+      GROUP BY v.name,l.item_name,cat.category_code`),
     db.execute(sql`WITH latest AS (SELECT DISTINCT ON (barcode) * FROM vendor_stock_ledger ORDER BY barcode, period_to DESC)
       SELECT v.name AS brand, COALESCE(l.item_name,'Unclassified') AS name, l.barcode, COALESCE(l.cl_qty,0)::float8 AS quantity,
         COALESCE(l.cl_amt/NULLIF(l.cl_qty,0),0)::float8 AS purchase_cost, COALESCE(l.cl_mrp/NULLIF(l.cl_qty,0),0)::float8 AS mrp,

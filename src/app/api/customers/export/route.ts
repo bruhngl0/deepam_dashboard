@@ -35,6 +35,7 @@ function tierParam(value: string | null): ValueTierCode | undefined {
 }
 
 const HEADERS = [
+  'Customer ID',
   'Name',
   'Phone',
   'Email',
@@ -80,6 +81,7 @@ export async function GET(request: Request) {
   const body = toCsv(
     HEADERS,
     rows.map((r) => [
+      r.customerCode ?? '',
       r.fullName ?? '',
       formatPhone(r.phoneE164),
       r.email ?? '',

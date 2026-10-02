@@ -407,6 +407,8 @@ export async function getChannelBreakdown(range: DateRange = {}): Promise<Channe
 }
 
 export interface CampaignRow {
+  id: number;
+  campaignCode: string | null;
   name: string;
   channel: string;
   people: number;
@@ -422,7 +424,7 @@ export interface CampaignRow {
 export async function getCampaignBreakdown(range: DateRange = {}): Promise<CampaignRow[]> {
   const rows = await query(`
     WITH ${buildScoped(range)}
-    SELECT cp.name,
+    SELECT cp.id, cp.campaign_code, cp.name,
            s.channel,
            COUNT(*)::int                            AS people,
            COUNT(*) FILTER (WHERE s.converted)::int AS buyers,
@@ -430,7 +432,7 @@ export async function getCampaignBreakdown(range: DateRange = {}): Promise<Campa
            COALESCE(SUM(s.bill_count), 0)::int      AS bills
     FROM   scoped s
     JOIN   campaigns cp ON cp.id = s.campaign_id
-    GROUP  BY cp.name, s.channel
+    GROUP  BY cp.id, cp.campaign_code, cp.name, s.channel
     ORDER  BY revenue DESC`);
 
   return rows.map((r) => {
@@ -442,6 +444,8 @@ export async function getCampaignBreakdown(range: DateRange = {}): Promise<Campa
       // Campaign names are prefixed by their source: "Master Sheet — Meta",
       // "Varamahalakshmi — WhatsApp Broadcast". The prefix is constant within a
       // load, so it carries no information in a table already grouped by it.
+      id: Number(r.id),
+      campaignCode: r.campaign_code ? String(r.campaign_code) : null,
       name: String(r.name).replace(/^(Master Sheet|Varamahalakshmi) — /, ''),
       channel: String(r.channel),
       people,

@@ -141,6 +141,7 @@ export interface BuyerFilters {
 
 export interface BuyerListRow {
   id: number;
+  customerCode: string | null;
   fullName: string | null;
   phoneE164: string;
   bills: number;
@@ -213,7 +214,7 @@ export async function getBuyers(filters: BuyerFilters = {}): Promise<BuyerPage> 
   if (filters.q?.trim()) {
     const term = `%${filters.q.trim()}%`;
     conditions.push(
-      sql`(c.full_name ILIKE ${term} OR c.phone_national LIKE ${term} OR c.email ILIKE ${term})`,
+      sql`(c.full_name ILIKE ${term} OR c.phone_national LIKE ${term} OR c.email ILIKE ${term} OR c.customer_code = ${filters.q.trim()})`,
     );
   }
   if (filters.tier && filters.tier !== 'none') conditions.push(sql`t.value_tier = ${filters.tier}`);
@@ -245,7 +246,7 @@ export async function getBuyers(filters: BuyerFilters = {}): Promise<BuyerPage> 
 
   const rows = await query(sql`
     ${cte}
-    SELECT b.customer_id, c.full_name, c.phone_e164,
+    SELECT b.customer_id, c.customer_code, c.full_name, c.phone_e164,
            b.bills, b.visits, b.total_spend, b.units, b.store_count,
            b.first_purchase, b.last_purchase,
            t.value_tier, h.store_name,
@@ -263,6 +264,7 @@ export async function getBuyers(filters: BuyerFilters = {}): Promise<BuyerPage> 
       const totalSpend = num(r.total_spend);
       return {
         id: num(r.customer_id),
+        customerCode: str(r.customer_code),
         fullName: str(r.full_name),
         phoneE164: String(r.phone_e164),
         bills,
@@ -355,6 +357,7 @@ export interface Visit {
 
 export interface BuyerProfile {
   id: number;
+  customerCode: string | null;
   fullName: string | null;
   phoneE164: string;
   email: string | null;
@@ -438,7 +441,7 @@ export async function getBuyerProfile(
 
   const [head] = await query(sql`
     ${cte}
-    SELECT c.id, c.full_name, c.phone_e164, c.email, c.city, c.date_of_birth, c.anniversary,
+    SELECT c.id, c.customer_code, c.full_name, c.phone_e164, c.email, c.city, c.date_of_birth, c.anniversary,
            b.bills, b.visits, b.total_spend, b.units, b.discount,
            b.first_purchase, b.last_purchase,
            t.value_tier, t.spend_rank,
@@ -587,6 +590,7 @@ export async function getBuyerProfile(
 
   return {
     id: num(head.id),
+    customerCode: str(head.customer_code),
     fullName: str(head.full_name),
     phoneE164: String(head.phone_e164),
     email: str(head.email),

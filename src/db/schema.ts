@@ -98,6 +98,8 @@ export const outreachListEnum = pgEnum('outreach_list', ['reactivation', 'second
 export const stores = pgTable('stores', {
   id: serial('id').primaryKey(),
   code: text('code').notNull().unique(), // 'MG_ROAD' | 'JAYANAGAR'
+  /** Store ID: 3 digits, same in every app (001 MG Road, 002 Jayanagar, 003 Online). Assigned by trigger. */
+  storeCode: text('store_code').unique(),
   name: text('name').notNull(),
   voucherPrefix: text('voucher_prefix').unique(), // 'BK01-' | 'BK02-'
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -115,6 +117,8 @@ export const campaigns = pgTable(
   {
     id: serial('id').primaryKey(),
     name: text('name').notNull(),
+    /** Campaign ID: pre-given, entered by hand. */
+    campaignCode: text('campaign_code').unique(),
     channel: channelEnum('channel').notNull(),
     platform: text('platform'), // 'instagram' | 'whatsapp_business'
     startedOn: date('started_on').notNull(),
@@ -126,6 +130,23 @@ export const campaigns = pgTable(
       .defaultNow(),
   },
   (t) => [uniqueIndex('campaigns_name_started_idx').on(t.name, t.startedOn)],
+);
+
+/**
+ * Product categories. Registered automatically (by trigger) from the free-text
+ * category columns on purchase orders, demands, vendors and the item group on
+ * the stock ledger and line items, so those columns keep working unchanged.
+ */
+export const categories = pgTable(
+  'categories',
+  {
+    id: serial('id').primaryKey(),
+    /** Category ID: 5 digits, assigned by trigger on insert (drizzle/0015). */
+    categoryCode: text('category_code').unique(),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('categories_name_uidx').on(sql`lower(${t.name})`)],
 );
 
 // ── Ingestion audit ──────────────────────────────────────────────────────────
@@ -186,6 +207,8 @@ export const customers = pgTable(
   'customers',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
+    /** Customer ID: 6 digits, assigned by trigger on insert (drizzle/0015). */
+    customerCode: text('customer_code').unique(),
     phoneE164: text('phone_e164').notNull().unique(), // '+919964767307'
     phoneNational: text('phone_national').notNull(), // '9964767307'
     isForeign: boolean('is_foreign').notNull().default(false), // D-21
@@ -234,6 +257,8 @@ export const leadTouches = pgTable(
   'lead_touches',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
+    /** Lead ID: 10 digits, assigned by trigger on insert (drizzle/0015). */
+    leadCode: text('lead_code').unique(),
     customerId: bigint('customer_id', { mode: 'number' })
       .notNull()
       .references(() => customers.id, { onDelete: 'cascade' }),
@@ -422,6 +447,7 @@ export const loyaltyCustomers = pgTable(
 export const vendors = pgTable('vendors', {
   id: serial('id').primaryKey(),
   name: text('name').notNull().unique(), // trimmed, e.g. 'ARTHA HI FASHION'
+  /** Vendor ID: 5 digits, assigned by trigger on insert (drizzle/0015). */
   vendorCode: text('vendor_code').unique(),
   brandName: text('brand_name'),
   contactPerson: text('contact_person'),
@@ -728,6 +754,34 @@ export const storeVisits = pgTable(
   ],
 );
 
+// ── Marketing calls ──────────────────────────────────────────────────────────
+
+/**
+ * Calls logged from the marketing calling queue. Leads themselves still live in
+ * each browser's local storage, so a call row carries its own copy of the
+ * lead's name and phone. `id` is the client-side interaction id, which makes
+ * syncing idempotent. `called_at` is IST wall-clock time, matching the app's
+ * `nowLocal()` convention (no timezone).
+ */
+export const marketingCalls = pgTable(
+  'marketing_calls',
+  {
+    id: text('id').primaryKey(),
+    leadId: text('lead_id').notNull(),
+    leadName: text('lead_name').notNull(),
+    phone: text('phone').notNull(),
+    salesperson: text('salesperson').notNull(),
+    outcome: text('outcome'),
+    note: text('note').notNull().default(''),
+    calledAt: timestamp('called_at', { mode: 'string' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('marketing_calls_salesperson_called_idx').on(t.salesperson, t.calledAt),
+    index('marketing_calls_called_idx').on(t.calledAt),
+  ],
+);
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 /**
@@ -747,6 +801,7 @@ export const settings = pgTable('settings', {
 
 export type Store = typeof stores.$inferSelect;
 export type Campaign = typeof campaigns.$inferSelect;
+export type Category = typeof categories.$inferSelect;
 export type ImportBatch = typeof importBatches.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
 export type LeadTouch = typeof leadTouches.$inferSelect;
@@ -761,3 +816,4 @@ export type VendorCustomerDemand = typeof vendorCustomerDemands.$inferSelect;
 export type SaleLineItem = typeof saleLineItems.$inferSelect;
 export type OutreachContact = typeof outreachContacts.$inferSelect;
 export type StoreVisit = typeof storeVisits.$inferSelect;
+export type MarketingCall = typeof marketingCalls.$inferSelect;

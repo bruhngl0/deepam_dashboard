@@ -190,7 +190,10 @@ export default async function BuyerProfilePage({
         <h1 className="text-2xl font-semibold tracking-tight text-ink">
           {orNotProvided(p.fullName)}
         </h1>
-        <p className="tnum mt-1 text-sm text-ink-2">{formatPhone(p.phoneE164)}</p>
+        <p className="tnum mt-1 text-sm text-ink-2">
+          {p.customerCode && `Customer ID ${p.customerCode} · `}
+          {formatPhone(p.phoneE164)}
+        </p>
         <p className="mt-2 max-w-[80ch] text-sm text-ink-2">{headline(p)}</p>
         <p className="tnum mt-2 text-xs text-ink-muted">
           Figures as of {formatDate(p.dataThrough)}, the last bill loaded — recency below is

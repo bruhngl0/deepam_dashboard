@@ -59,6 +59,7 @@ export interface CustomerFilters {
 
 export interface CustomerRow {
   id: number;
+  customerCode: string | null;
   phoneE164: string;
   fullName: string | null;
   email: string | null;
@@ -171,7 +172,8 @@ function buildConditions(filters: CustomerFilters): SQL[] {
     const term = `%${filters.q.trim()}%`;
     conditions.push(
       sql`(c.full_name ILIKE ${term} OR c.email ILIKE ${term}
-           OR c.phone_national LIKE ${term} OR c.city ILIKE ${term})`,
+           OR c.phone_national LIKE ${term} OR c.city ILIKE ${term}
+           OR c.customer_code = ${filters.q.trim()})`,
     );
   }
   if (filters.store) {
@@ -222,7 +224,7 @@ export async function getCustomers(filters: CustomerFilters): Promise<CustomerPa
   const rows = await query(sql`
     ${SCOPED_CTE}
     SELECT
-      c.id, c.phone_e164, c.full_name, c.email, c.area, c.city,
+      c.id, c.customer_code, c.phone_e164, c.full_name, c.email, c.area, c.city,
       c.date_of_birth::text AS date_of_birth,
       c.anniversary::text AS anniversary,
       c.lifecycle::text AS lifecycle,
@@ -264,6 +266,7 @@ export async function getCustomers(filters: CustomerFilters): Promise<CustomerPa
   return {
     rows: rows.map((r) => ({
       id: Number(r.id),
+      customerCode: r.customer_code ? String(r.customer_code) : null,
       phoneE164: String(r.phone_e164),
       fullName: r.full_name ? String(r.full_name) : null,
       email: r.email ? String(r.email) : null,
@@ -312,7 +315,7 @@ export async function getCustomersForExport(
   const rows = await query(sql`
     ${SCOPED_CTE}
     SELECT
-      c.id, c.phone_e164, c.full_name, c.email, c.area, c.city,
+      c.id, c.customer_code, c.phone_e164, c.full_name, c.email, c.area, c.city,
       c.date_of_birth::text AS date_of_birth,
       c.anniversary::text AS anniversary,
       c.lifecycle::text AS lifecycle,
@@ -353,6 +356,7 @@ export async function getCustomersForExport(
 
   return rows.map((r) => ({
     id: Number(r.id),
+    customerCode: r.customer_code ? String(r.customer_code) : null,
     phoneE164: String(r.phone_e164),
     fullName: r.full_name ? String(r.full_name) : null,
     email: r.email ? String(r.email) : null,

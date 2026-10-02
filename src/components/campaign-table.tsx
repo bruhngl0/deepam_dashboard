@@ -8,6 +8,7 @@
 
 import { formatNumber, formatCurrency, CHANNEL_LABEL } from '@/lib/format';
 import type { CampaignRow } from '@/lib/queries/dashboard';
+import { CampaignCodeCell } from '@/components/campaign-code-cell';
 
 export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
   return (
@@ -18,9 +19,10 @@ export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
       </p>
 
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[42rem] text-sm">
+        <table className="w-full min-w-[50rem] text-sm">
           <thead>
             <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+              <th className="pb-2 text-left font-bold">Campaign ID</th>
               <th className="pb-2 text-left font-bold">Campaign</th>
               <th className="pb-2 text-right font-bold">Leads</th>
               <th className="pb-2 text-right font-bold">Bought</th>
@@ -32,7 +34,10 @@ export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={`${r.channel}-${r.name}`} className="border-t border-grid">
+              <tr key={`${r.channel}-${r.id}`} className="border-t border-grid">
+                <td className="py-2.5 pr-3">
+                  <CampaignCodeCell campaignId={r.id} code={r.campaignCode} />
+                </td>
                 <td className="py-2.5 text-ink">
                   {r.name}
                   <span className="ml-2 text-xs text-ink-muted">

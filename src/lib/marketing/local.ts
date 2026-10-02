@@ -210,9 +210,9 @@ export function readDataset(raw: string): Dataset {
 
 export type CallEntry = { id: string; at: string; salesperson: string; outcome: Outcome | ''; note: string; leadId: string; name: string; phone: string };
 /** Every logged call across the given datasets, newest first. Older records only carry the name in the text, so fall back to that. */
-export function callLog(datasets: Dataset[]): CallEntry[] {
-  const seen = new Set<string>();
-  const entries: CallEntry[] = [];
+export function callLog(datasets: Dataset[], stored: CallEntry[] = []): CallEntry[] {
+  const seen = new Set<string>(stored.map(c => c.id));
+  const entries: CallEntry[] = [...stored];
   for (const d of datasets) for (const lead of d.leads) for (const i of lead.interactions) {
     if (i.type !== 'call' || seen.has(i.id)) continue;
     seen.add(i.id);
@@ -220,4 +220,8 @@ export function callLog(datasets: Dataset[]): CallEntry[] {
     entries.push({ id: i.id, at: i.at, salesperson: i.by ?? m?.[2] ?? 'Unknown', outcome: i.outcome ?? '', note: m?.[1] ?? i.text, leadId: lead.id, name: lead.name, phone: lead.phone });
   }
   return entries.sort((a, b) => b.at.localeCompare(a.at));
+}
+/** Calls in a dataset that belong in the shared database (demo records are excluded). */
+export function callsForSync(d: Dataset) {
+  return callLog([d]).filter(c => !c.id.startsWith('demo-')).map(c => ({ id: c.id, leadId: c.leadId, leadName: c.name, phone: c.phone, salesperson: c.salesperson, outcome: c.outcome || undefined, note: c.note, at: c.at.slice(0, 19) }));
 }

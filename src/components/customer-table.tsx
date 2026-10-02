@@ -107,7 +107,10 @@ function Row({ row }: { row: CustomerRow }) {
           ) : (
             <p className="font-medium text-ink">{orNotProvided(row.fullName)}</p>
           )}
-          <p className="text-xs text-ink-muted">{row.email ?? 'No email'}</p>
+          <p className="text-xs text-ink-muted">
+            {row.customerCode && <span className="tnum">ID {row.customerCode} · </span>}
+            {row.email ?? 'No email'}
+          </p>
         </td>
         <td className="px-4 py-3">
           {row.storeName ? (

@@ -34,3 +34,10 @@ export function possibleNationalPhone(value: unknown): string | null {
   const national = digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
   return /^[6-9]\d{9}$/.test(national) ? national : null;
 }
+
+/** A CRM Customer ID: exactly six digits (drizzle/0015). */
+export function possibleCustomerCode(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return /^\d{6}$/.test(trimmed) ? trimmed : null;
+}

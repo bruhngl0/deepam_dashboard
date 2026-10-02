@@ -242,6 +242,12 @@ export async function commitMasterSheet(
       // them would either fail the constraint or take the revenue with it.
       // `customers` and `sales` are never touched (§O).
       await t.execute(sql`DELETE FROM lead_followups`);
+      // Campaign IDs are typed in by hand; carry them across the rebuild by name.
+      const keptCodes = new Map(
+        (await t.select({ name: campaignsTable.name, code: campaignsTable.campaignCode }).from(campaignsTable))
+          .filter((c) => c.code)
+          .map((c) => [c.name, c.code]),
+      );
       await t.execute(sql`DELETE FROM lead_touches`);
       await t.execute(sql`DELETE FROM walkin_submissions`);
       await t.execute(sql`
@@ -264,6 +270,7 @@ export async function commitMasterSheet(
           .insert(campaignsTable)
           .values({
             name: spec.campaign,
+            campaignCode: keptCodes.get(spec.campaign) ?? null,
             channel: spec.channel,
             platform: spec.platform,
             startedOn: STARTED_ON,
