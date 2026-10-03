@@ -70,7 +70,7 @@ export default async function FlowPage() {
         <div className="mx-auto mt-6 max-w-5xl">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <ModuleCard
-              name="Walkin Track"
+              name="Store Performance Tracker"
               description="Store arrivals, enquiries and product interest."
               produces="Visit · prospect · store event"
               href="https://na8yspyqqp.ap-south-1.awsapprunner.com"
@@ -78,21 +78,21 @@ export default async function FlowPage() {
               icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="10" r="2.5" /></svg>}
             />
             <ModuleCard
-              name="CRM"
+              name="Customer Intelligence"
               description="Lead ownership, follow-up, sale and customer history."
               produces="Lead · customer · order event"
               href="/crm"
               icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><circle cx="12" cy="8" r="3.5" /><path d="M5 21a7 7 0 0 1 14 0" strokeLinecap="round" /></svg>}
             />
             <ModuleCard
-              name="Vendor"
+              name="Vendor Intelligence"
               description="SKU availability, purchase cost and stock movement."
               produces="SKU · stock · cost event"
               href="/vendor"
               icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="m3 7 9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10" strokeLinejoin="round" /></svg>}
             />
             <ModuleCard
-              name="Driver RC"
+              name="Driver Network Management"
               description="Delivery assignments, status and proof of delivery."
               produces="Dispatch · delivery · cost event"
               href="https://2q9cmkmxnu.ap-south-1.awsapprunner.com/"
