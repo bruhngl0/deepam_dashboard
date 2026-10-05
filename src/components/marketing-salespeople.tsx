@@ -60,7 +60,7 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
       <div className="p-4"><h2 className="text-lg font-semibold text-ink">{person ? `${person}'s call log` : 'Call log'}</h2><p className="text-xs text-ink-muted">Every call logged from the calling queue, from any browser, newest first. Times are IST.</p>{loadError && <p role="alert" className="mt-1 text-xs text-red-600">Could not load the shared call log; showing calls saved in this browser only.</p>}</div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Customer', 'Phone', 'Call logged at', 'Outcome', 'Note', 'Logged by'].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead>
         <tbody>{rows.slice(currentPage * PAGE, currentPage * PAGE + PAGE).map(c => <tr key={c.id} className="border-t border-line align-top text-ink">
-          <td className="px-4 py-3"><Link href={`/crm/marketing/leads/${c.leadId}`} className="font-semibold text-accent hover:underline">{c.name}</Link></td>
+          <td className="px-4 py-3"><Link href={`/marketing/leads/${c.leadId}`} className="font-semibold text-accent hover:underline">{c.name}</Link></td>
           <td className="whitespace-nowrap px-4 py-3 text-ink-2">{c.phone}</td><td className="whitespace-nowrap px-4 py-3 text-ink-2">{dateLabel(c.at)}</td>
           <td className="px-4 py-3">{c.outcome || '—'}</td><td className="min-w-48 px-4 py-3 text-ink-2">{c.note}</td><td className="px-4 py-3">{c.salesperson}</td></tr>)}</tbody></table></div>
       {!rows.length && <p className="p-10 text-center text-sm text-ink-muted">No logged calls match these filters.</p>}

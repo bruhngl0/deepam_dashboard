@@ -88,7 +88,8 @@ export default async function FlowPage() {
               name="Vendor Intelligence"
               description="SKU availability, purchase cost and stock movement."
               produces="SKU · stock · cost event"
-              href="/vendor"
+              href="https://n7v6pm6bm2.ap-south-1.awsapprunner.com"
+              external
               icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="m3 7 9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10" strokeLinejoin="round" /></svg>}
             />
             <ModuleCard

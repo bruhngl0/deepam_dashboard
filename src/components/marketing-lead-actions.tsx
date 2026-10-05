@@ -15,7 +15,7 @@ export function LeadActions({ lead, update, variant = 'full' }: { lead: Lead; up
       {variant === 'full' && <>
         <a href={`tel:${lead.phone}`} className={button}>Call</a>
         <a href={whatsapp} target="_blank" rel="noreferrer" className={button} onClick={() => update({ ...lead, interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'whatsapp', text: safeProductLink(lead.productLink) ? 'Opened WhatsApp with product link draft; sending is not confirmed.' : 'Opened WhatsApp; sending is not confirmed.' }] })}>WhatsApp</a>
-        {lead.email ? <a className={button} href={`mailto:${encodeURIComponent(lead.email)}`} onClick={() => update({ ...lead, interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'email', text: 'Opened email draft; sending is not confirmed.' }] })}>Email</a> : <Link className={button} href={`/crm/marketing/leads/${lead.id}`}>Add email</Link>}
+        {lead.email ? <a className={button} href={`mailto:${encodeURIComponent(lead.email)}`} onClick={() => update({ ...lead, interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'email', text: 'Opened email draft; sending is not confirmed.' }] })}>Email</a> : <Link className={button} href={`/marketing/leads/${lead.id}`}>Add email</Link>}
       </>}
       {variant === 'call-only' && <button className={callLogged ? 'rounded-xl border border-status-good/30 bg-status-good/10 px-3 py-2 text-xs font-medium text-status-good' : button} onClick={() => start('call')}>{callLogged ? 'Call logged' : 'Log call'}</button>}
       {variant === 'full' && <button className={button} onClick={() => start('visit')}>Store visit</button>}

@@ -6,7 +6,7 @@
  * stay a Server Component, so Clerk's `<Show>` can decide server-side whether
  * the tabs render at all — no signed-out flash of navigation.
  *
- * The hero page (`/`) picks between two independent modules, so it shows no
+ * The hero page (`/`) picks between independent modules, so it shows no
  * tabs of its own; `/crm/*` and `/vendor/*` each get their own scoped set
  * rather than one flat list that doesn't make sense outside its module.
  *
@@ -26,14 +26,15 @@ const CARRIED_PARAMS = ['from', 'to', 'store'];
 
 const CRM_TABS = [
   { href: '/crm', label: 'Home' },
-  { href: '/crm/marketing', label: 'Marketing' },
   { href: '/crm/insights', label: 'Insights' },
   { href: '/crm/analysis', label: 'Analysis' },
   { href: '/crm/import', label: 'Import' },
 ] as const;
 
+// Overview lives in the separately deployed vendor application; linking to it
+// directly avoids the hop through `/vendor`, which only redirects there.
 const VENDOR_TABS = [
-  { href: '/vendor', label: 'Overview' },
+  { href: 'https://n7v6pm6bm2.ap-south-1.awsapprunner.com', label: 'Overview' },
   { href: '/vendor/vendors', label: 'Vendors' },
   { href: '/vendor/purchases', label: 'Purchases' },
   { href: '/vendor/performance', label: 'Performance' },
@@ -69,13 +70,14 @@ export function NavTabs() {
         // moment someone opened a profile. The module roots (`/crm`, `/vendor`)
         // are matched exactly on purpose: prefix-matching them would light
         // every tab at once.
+        const external = tab.href.startsWith('http');
         const active =
           pathname === tab.href ||
-          (tab.href !== '/crm' && tab.href !== '/vendor' && pathname.startsWith(`${tab.href}/`));
+          (tab.href !== '/crm' && !external && pathname.startsWith(`${tab.href}/`));
         return (
           <Link
             key={tab.href}
-            href={`${tab.href}${suffix}`}
+            href={external ? tab.href : `${tab.href}${suffix}`}
             aria-current={active ? 'page' : undefined}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
               active ? 'bg-inset text-ink' : 'text-ink-2 hover:bg-inset hover:text-ink'

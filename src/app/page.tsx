@@ -4,7 +4,7 @@
  * The modules behind this app: the cross-module Overview (`/flow`), Customer
  * Intelligence (`/crm`), Vendor Intelligence (`/vendor`), the external Driver
  * Network Management and Store Performance Tracker services, and Marketing
- * Intelligence (`/crm/marketing`). This page is just the door between them, not
+ * Intelligence (`/marketing`). This page is just the door between them, not
  * a dashboard of its own, so `NavTabs` shows nothing here (see
  * `components/nav-tabs.tsx`).
  */
@@ -19,7 +19,7 @@ export default async function HeroPage() {
   return (
     <main className="mx-auto flex w-full max-w-[64rem] flex-1 flex-col justify-center px-4 py-16 sm:px-6 lg:px-8">
       <header className="mb-10 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight text-ink">Ananta OS</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-ink">Deepam by Ananta</h1>
         <p className="mt-2 text-sm text-ink-2">Pick a module to open.</p>
       </header>
 
@@ -60,7 +60,8 @@ export default async function HeroPage() {
         </Link>
 
         <Link
-          href="/vendor"
+          href="https://n7v6pm6bm2.ap-south-1.awsapprunner.com"
+          rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
@@ -78,7 +79,6 @@ export default async function HeroPage() {
 
         <Link
           href="https://2q9cmkmxnu.ap-south-1.awsapprunner.com/"
-          target="_blank"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -92,12 +92,10 @@ export default async function HeroPage() {
           <p className="max-w-[36ch] text-sm text-ink-2">
             Open the Driver Network Management workspace in its dedicated application.
           </p>
-          <span className="mt-auto text-sm font-medium text-accent">Open module ↗</span>
         </Link>
 
         <Link
           href="https://na8yspyqqp.ap-south-1.awsapprunner.com"
-          target="_blank"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -111,11 +109,10 @@ export default async function HeroPage() {
           <p className="max-w-[36ch] text-sm text-ink-2">
             Open the Store Performance Tracker workspace in its dedicated application.
           </p>
-          <span className="mt-auto text-sm font-medium text-accent">Open module ↗</span>
         </Link>
 
         <Link
-          href="/crm/marketing"
+          href="/marketing"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">

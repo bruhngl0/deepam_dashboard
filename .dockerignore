@@ -9,6 +9,8 @@ coverage
 !.env.example
 .vercel
 .agents
+.codex
+.scratch
 .claude
 *.tsbuildinfo
 npm-debug.log*

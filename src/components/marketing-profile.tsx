@@ -7,12 +7,12 @@ export function MarketingProfile({ userId, leadId }: { userId: string; leadId: s
   const { data, save, message, setMessage } = useMarketing(userId);
   if (!data) return <p className="p-8" role="status">{message || 'Loading customer profile…'}</p>;
   const lead = data.leads.find(l => l.id === leadId);
-  if (!lead) return <div className="p-8 text-ink"><h1 className="text-xl font-semibold">Lead not found in this browser</h1><Link className={`${button} mt-4`} href="/crm/marketing">Back to Marketing</Link></div>;
+  if (!lead) return <div className="p-8 text-ink"><h1 className="text-xl font-semibold">Lead not found in this browser</h1><Link className={`${button} mt-4`} href="/marketing">Back to Marketing</Link></div>;
   const update = (next: Lead) => { const ok = save({ ...data, leads: data.leads.map(l => l.id === lead.id ? next : l) }); if (ok) setMessage('Profile saved locally.'); return ok; };
   const sales = data.sales.filter(s => s.phone === lead.phone);
   const timeline = [...lead.interactions.map(i => ({ id: i.id, at: i.at, title: i.outcome ?? i.type, text: i.text })), ...sales.map(s => ({ id: `sale-${s.invoice}`, at: s.date, title: 'Purchase', text: `${s.invoice} · ${s.amount === null ? 'Amount not recorded' : money(s.amount)} · ${s.store || 'Store not recorded'}` }))].sort((a, b) => b.at.localeCompare(a.at));
   return <main className="mx-auto max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-    <Link href="/crm/marketing" className="text-sm text-accent">← Marketing workspace</Link>
+    <Link href="/marketing" className="text-sm text-accent">← Marketing workspace</Link>
     <header><p className="text-xs uppercase tracking-widest text-ink-muted">Customer profile · Local</p><h1 className="mt-2 text-3xl font-semibold text-ink">{lead.name}</h1><p className="mt-2 break-all text-sm text-ink-2">{lead.id} · {lead.phone}</p></header>
     <LeadActions key={lead.id} lead={lead} update={update} />
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}

@@ -22,9 +22,9 @@ export function SiteHeader() {
           className="group flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
         >
           <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-strong text-[13px] font-semibold text-white shadow-sm transition-transform group-hover:scale-105">
-            A
+            H
           </span>
-          <span className="text-base font-semibold tracking-tight text-ink">Ananta OS</span>
+          <span className="text-base font-semibold tracking-tight text-ink">Hemparshwa OS</span>
         </Link>
 
         {/* NavTabs reads useSearchParams, which must sit inside Suspense or static pages (/_not-found) fail to prerender. */}
