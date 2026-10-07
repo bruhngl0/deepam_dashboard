@@ -23,7 +23,7 @@ export default async function StoreVisitsPage({ searchParams }: { searchParams: 
     pageSize: Number(one(params.pageSize) ?? 50) || 50,
   });
   const cards = [
-    ['All visits', visits.counts.total],
+    ['All walk-ins', visits.counts.total],
     ['Active', visits.counts.active],
     ['Deleted', visits.counts.deleted],
     ['Linked to CRM customer', visits.counts.linked],
