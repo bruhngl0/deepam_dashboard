@@ -288,7 +288,7 @@ export default async function AnalysisPage({
         </Finding>
 
         <Finding
-          eyebrow="Salesman performance"
+          eyebrow="Salesperson performance"
           title={`Top 12 of 40 salesman codes, by revenue`}
         >
           <div className="overflow-x-auto">
@@ -298,8 +298,8 @@ export default async function AnalysisPage({
                   <th className="pb-2 text-left font-bold">Code</th>
                   <th className="pb-2 text-left font-bold">Store</th>
                   <th className="pb-2 text-right font-bold">Bills</th>
-                  <th className="pb-2 text-right font-bold">Revenue</th>
-                  <th className="pb-2 text-right font-bold">Avg bill</th>
+                  <th className="pb-2 text-right font-bold">Sales</th>
+                  <th className="pb-2 text-right font-bold">Average bill value</th>
                 </tr>
               </thead>
               <tbody>

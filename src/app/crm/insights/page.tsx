@@ -95,7 +95,7 @@ export default async function InsightsPage({
       {/* ── Findings ─────────────────────────────────────────────────────── */}
       <div className="grid gap-3 lg:grid-cols-2">
         <Finding
-          eyebrow="Revenue concentration"
+          eyebrow="Sales concentration"
           title={`${formatNumber(topDecile?.customers ?? 0)} customers carry ${(topDecile?.share ?? 0).toFixed(1)}% of the revenue`}
         >
           <div className="flex flex-col gap-2.5">
@@ -139,8 +139,8 @@ export default async function InsightsPage({
                 <thead>
                   <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
                     <th className="pb-2 text-left font-bold">Channel</th>
-                    <th className="pb-2 text-right font-bold">Conv. rate</th>
-                    <th className="pb-2 text-right font-bold">Avg bill</th>
+                    <th className="pb-2 text-right font-bold">Conversion rate</th>
+                    <th className="pb-2 text-right font-bold">Average bill value</th>
                     <th className="pb-2 text-right font-bold">Per buyer</th>
                   </tr>
                 </thead>

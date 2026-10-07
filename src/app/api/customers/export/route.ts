@@ -37,7 +37,7 @@ function tierParam(value: string | null): ValueTierCode | undefined {
 const HEADERS = [
   'Customer ID',
   'Name',
-  'Phone',
+  'Contact No.',
   'Email',
   'Area',
   'City',

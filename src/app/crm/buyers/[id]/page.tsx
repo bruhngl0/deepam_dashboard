@@ -209,7 +209,7 @@ export default async function BuyerProfilePage({
           caption={`Outspends ${p.spendPercentile.toFixed(1)}% of buyers. Average buyer: ${formatCurrency(p.peerAvgSpend)}.`}
         />
         <Stat
-          label="Average bill"
+          label="Average bill value"
           value={formatCurrency(p.avgBill)}
           caption={`Median ${formatCurrency(p.medianBill)}, largest ${formatCurrency(p.largestBill)}. Book average: ${formatCurrency(p.peerAvgBill)}.`}
         />

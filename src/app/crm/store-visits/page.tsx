@@ -31,8 +31,8 @@ export default async function StoreVisitsPage({ searchParams }: { searchParams: 
 
   return <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
     <header className="mb-6">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Store Visits</h1>
-      <p className="mt-1 text-sm text-ink-2">Walk-in activity received from Walkin Track.</p>
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">Walk-ins</h1>
+      <p className="mt-1 text-sm text-ink-2">Walk-in activity received from WalkTrack.</p>
     </header>
     <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map(([label, value]) => <section key={label} className="rounded-lg border border-line bg-surface px-4 py-3">

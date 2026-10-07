@@ -12,6 +12,7 @@ export async function reconcileStoreVisits(externalId?: string): Promise<number>
     WHERE sv.customer_id IS NULL AND sv.deleted_at IS NULL AND (
       regexp_replace(sv.external_customer_ref, '\\D', '', 'g') = c.phone_national
       OR (sv.external_customer_ref ~ '^\\d{1,9}$' AND c.id::text = sv.external_customer_ref)
+      OR c.customer_code = upper(trim(sv.external_customer_ref))
     )
   `);
   const filter = externalId ? sql`AND sv.external_id = ${externalId}` : sql``;

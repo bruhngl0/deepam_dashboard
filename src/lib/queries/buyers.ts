@@ -52,6 +52,7 @@
  */
 
 import { db } from '@/db';
+import { possibleCustomerCode } from '@/lib/integration/events';
 import { sql, type SQL } from 'drizzle-orm';
 import { scopeCondition, type DateRange } from './dashboard';
 import type { ValueTierCode } from '@/lib/format';
@@ -214,7 +215,7 @@ export async function getBuyers(filters: BuyerFilters = {}): Promise<BuyerPage> 
   if (filters.q?.trim()) {
     const term = `%${filters.q.trim()}%`;
     conditions.push(
-      sql`(c.full_name ILIKE ${term} OR c.phone_national LIKE ${term} OR c.email ILIKE ${term} OR c.customer_code = ${filters.q.trim()})`,
+      sql`(c.full_name ILIKE ${term} OR c.phone_national LIKE ${term} OR c.email ILIKE ${term} OR c.customer_code = ${possibleCustomerCode(filters.q) ?? filters.q.trim()})`,
     );
   }
   if (filters.tier && filters.tier !== 'none') conditions.push(sql`t.value_tier = ${filters.tier}`);

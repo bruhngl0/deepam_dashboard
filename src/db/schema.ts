@@ -98,7 +98,7 @@ export const outreachListEnum = pgEnum('outreach_list', ['reactivation', 'second
 export const stores = pgTable('stores', {
   id: serial('id').primaryKey(),
   code: text('code').notNull().unique(), // 'MG_ROAD' | 'JAYANAGAR'
-  /** Store ID: 3 digits, same in every app (001 MG Road, 002 Jayanagar, 003 Online). Assigned by trigger. */
+  /** Store ID, same in every app (STR-001 MG Road, STR-002 Jayanagar, STR-003 Online). Assigned by trigger. */
   storeCode: text('store_code').unique(),
   name: text('name').notNull(),
   voucherPrefix: text('voucher_prefix').unique(), // 'BK01-' | 'BK02-'
@@ -141,7 +141,7 @@ export const categories = pgTable(
   'categories',
   {
     id: serial('id').primaryKey(),
-    /** Category ID: 5 digits, assigned by trigger on insert (drizzle/0015). */
+    /** Category ID: CAT-0001, assigned by trigger on insert (drizzle/0017). */
     categoryCode: text('category_code').unique(),
     name: text('name').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -207,7 +207,7 @@ export const customers = pgTable(
   'customers',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    /** Customer ID: 6 digits, assigned by trigger on insert (drizzle/0015). */
+    /** Customer ID: CUS-000001, assigned by trigger on insert (drizzle/0017). */
     customerCode: text('customer_code').unique(),
     phoneE164: text('phone_e164').notNull().unique(), // '+919964767307'
     phoneNational: text('phone_national').notNull(), // '9964767307'
@@ -257,7 +257,7 @@ export const leadTouches = pgTable(
   'lead_touches',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    /** Lead ID: 10 digits, assigned by trigger on insert (drizzle/0015). */
+    /** Lead ID: LED-000001, assigned by trigger on insert (drizzle/0017). */
     leadCode: text('lead_code').unique(),
     customerId: bigint('customer_id', { mode: 'number' })
       .notNull()
@@ -447,7 +447,7 @@ export const loyaltyCustomers = pgTable(
 export const vendors = pgTable('vendors', {
   id: serial('id').primaryKey(),
   name: text('name').notNull().unique(), // trimmed, e.g. 'ARTHA HI FASHION'
-  /** Vendor ID: 5 digits, assigned by trigger on insert (drizzle/0015). */
+  /** Vendor ID: VEN-000001, assigned by trigger on insert (drizzle/0017). */
   vendorCode: text('vendor_code').unique(),
   brandName: text('brand_name'),
   contactPerson: text('contact_person'),
@@ -757,9 +757,9 @@ export const storeVisits = pgTable(
 // ── Marketing calls ──────────────────────────────────────────────────────────
 
 /**
- * Calls logged from the marketing calling queue. Leads themselves still live in
- * each browser's local storage, so a call row carries its own copy of the
- * lead's name and phone. `id` is the client-side interaction id, which makes
+ * Calls logged from the marketing calling queue. A call row carries its own
+ * copy of the lead's name and phone, so the log survives independently of
+ * `marketing_leads`. `id` is the client-side interaction id, which makes
  * syncing idempotent. `called_at` is IST wall-clock time, matching the app's
  * `nowLocal()` convention (no timezone).
  */
@@ -779,6 +779,56 @@ export const marketingCalls = pgTable(
   (t) => [
     index('marketing_calls_salesperson_called_idx').on(t.salesperson, t.calledAt),
     index('marketing_calls_called_idx').on(t.calledAt),
+  ],
+);
+
+// ── Marketing leads and bills ────────────────────────────────────────────────
+
+/**
+ * Marketing Intelligence leads, shared by every browser and written by the
+ * Google Sheet sync. `doc` is the whole `Lead` from `lib/marketing/local.ts`
+ * (acquisitions, interactions, follow-ups) so the import and merge rules run
+ * unchanged on the server. `phone` is the identity key, one lead per number.
+ * `version` is bumped on every write; a writer must present the version it
+ * read, so two people (or a person and the sync) cannot silently overwrite
+ * each other. `seq` keeps insertion order and pages the dataset.
+ */
+export const marketingLeads = pgTable(
+  'marketing_leads',
+  {
+    id: text('id').primaryKey(),
+    seq: bigserial('seq', { mode: 'number' }).notNull(),
+    phone: text('phone').notNull(),
+    doc: jsonb('doc').notNull(),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('marketing_leads_phone_uidx').on(t.phone),
+    uniqueIndex('marketing_leads_seq_uidx').on(t.seq),
+  ],
+);
+
+/**
+ * Bills imported into Marketing Intelligence, matched to leads by phone.
+ * `sold_at` is IST wall-clock text because a bill may carry a date without a
+ * time, or no date at all.
+ */
+export const marketingSales = pgTable(
+  'marketing_sales',
+  {
+    invoice: text('invoice').primaryKey(),
+    seq: bigserial('seq', { mode: 'number' }).notNull(),
+    phone: text('phone').notNull(),
+    amount: numeric('amount', { precision: 12, scale: 2 }),
+    soldAt: text('sold_at').notNull().default(''),
+    store: text('store').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('marketing_sales_seq_uidx').on(t.seq),
+    index('marketing_sales_phone_idx').on(t.phone),
   ],
 );
 
@@ -817,3 +867,5 @@ export type SaleLineItem = typeof saleLineItems.$inferSelect;
 export type OutreachContact = typeof outreachContacts.$inferSelect;
 export type StoreVisit = typeof storeVisits.$inferSelect;
 export type MarketingCall = typeof marketingCalls.$inferSelect;
+export type MarketingLeadRow = typeof marketingLeads.$inferSelect;
+export type MarketingSaleRow = typeof marketingSales.$inferSelect;

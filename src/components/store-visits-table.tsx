@@ -12,7 +12,7 @@ export function StoreVisitsTable({ rows, total, page, pageCount }: {
   const { setParam, params, pending } = useSetParam();
   return <>
     <div className={`flex flex-wrap items-center gap-2 border-b border-grid px-4 py-3 ${pending ? 'opacity-70' : ''}`}>
-      <input type="search" defaultValue={params.get('q') ?? ''} placeholder="Search customer, phone, visit ID or driver"
+      <input type="search" defaultValue={params.get('q') ?? ''} placeholder="Search customer, phone, visit ID or Driver ID"
         onChange={(e) => {
           const value = e.target.value;
           clearTimeout((window as unknown as { __sv?: number }).__sv);
@@ -30,12 +30,12 @@ export function StoreVisitsTable({ rows, total, page, pageCount }: {
       <table className="w-full min-w-[68rem] text-sm">
         <thead className="bg-inset text-left text-[11px] font-bold uppercase text-ink-muted"><tr>
           <th className="px-4 py-3">Visited</th><th className="px-4 py-3">Store</th><th className="px-4 py-3">Customer</th>
-          <th className="px-4 py-3">Visit details</th><th className="px-4 py-3">Driver</th><th className="px-4 py-3">Status</th>
+          <th className="px-4 py-3">Visit details</th><th className="px-4 py-3">Driver ID</th><th className="px-4 py-3">Status</th>
         </tr></thead>
         <tbody>{rows.map((visit) => <tr key={visit.id} className="border-t border-grid align-top">
           <td className="tnum whitespace-nowrap px-4 py-3 text-ink">{formatDateTime(visit.visitedAt)}{visit.stoppedAt && <div className="mt-1 text-xs text-ink-muted">Ended {formatDateTime(visit.stoppedAt)}</div>}</td>
           <td className="px-4 py-3 text-ink">{visit.store}</td>
-          <td className="px-4 py-3"><div className="font-medium text-ink">{orNotProvided(visit.customer)}</div><div className="text-xs text-ink-2">{formatPhone(visit.phone)}</div>{visit.externalCustomerRef && <div className="text-xs text-ink-muted">Ref {visit.externalCustomerRef}</div>}</td>
+          <td className="px-4 py-3"><div className="font-medium text-ink">{orNotProvided(visit.customer)}</div><div className="text-xs text-ink-2">{formatPhone(visit.phone)}</div>{visit.externalCustomerRef && <div className="text-xs text-ink-muted">Contact No. {visit.externalCustomerRef}</div>}</td>
           <td className="px-4 py-3 text-ink"><div>{orNotProvided(visit.shoppingIntent)}</div><div className="mt-1 text-xs text-ink-muted">{formatNumber(visit.people)} people{visit.staffConverted ? ' · staff converted' : ''}{visit.source ? ` · ${visit.source}` : ''}</div><div className="text-xs text-ink-muted">ID {visit.externalId}</div></td>
           <td className="px-4 py-3 text-ink">{orNotProvided(visit.driverCode)}</td>
           <td className="px-4 py-3">{visit.deletedAt ? <span className="text-status-critical">Deleted</span> : <span className="text-status-positive">Active</span>}</td>

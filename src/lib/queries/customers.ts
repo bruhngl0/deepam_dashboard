@@ -26,6 +26,7 @@
  */
 
 import { db } from '@/db';
+import { possibleCustomerCode } from '@/lib/integration/events';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   SCOPED_CHANNELS,
@@ -173,7 +174,7 @@ function buildConditions(filters: CustomerFilters): SQL[] {
     conditions.push(
       sql`(c.full_name ILIKE ${term} OR c.email ILIKE ${term}
            OR c.phone_national LIKE ${term} OR c.city ILIKE ${term}
-           OR c.customer_code = ${filters.q.trim()})`,
+           OR c.customer_code = ${possibleCustomerCode(filters.q) ?? filters.q.trim()})`,
     );
   }
   if (filters.store) {

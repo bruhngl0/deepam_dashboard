@@ -134,7 +134,7 @@ export function SalesImportForm() {
                   <th className="px-3 py-2 text-left font-bold">Prefix</th>
                   <th className="px-3 py-2 text-left font-bold">Store</th>
                   <th className="px-3 py-2 text-right font-bold">Bills</th>
-                  <th className="px-3 py-2 text-right font-bold">Revenue</th>
+                  <th className="px-3 py-2 text-right font-bold">Sales</th>
                 </tr>
               </thead>
               <tbody>

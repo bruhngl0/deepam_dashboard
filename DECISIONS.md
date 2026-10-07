@@ -39,7 +39,7 @@ Every decision has an ID (`D-01`…). Reference them from code comments so a fut
 - [G. Attribution](#g-attribution) — D-40…D-45, D-85, D-92
 - [H. Metrics and denominators](#h-metrics-and-denominators) — D-46…D-52, D-91
 - [I. Data quality](#i-data-quality-and-rejection) — D-53…D-57
-- [J. Import mechanics](#j-import-mechanics) — D-58…D-63, D-84, D-89, D-93 (authentication)
+- [J. Import mechanics](#j-import-mechanics) — D-58…D-63, D-84, D-89, D-93 (authentication), D-94 (live Google Sheet)
 - [K. Schema principles](#k-schema-principles) — D-64…D-69
 - [L. Tech stack](#l-tech-stack) — D-70…D-76
 - [M. UI rules](#m-ui-rules) — D-77…D-83, D-86…D-88, D-90
@@ -61,6 +61,7 @@ Every decision has an ID (`D-01`…). Reference them from code comments so a fut
 **Rule:** Data arrives as uploaded `.xlsx`/`.csv` files. No Meta Lead Ads webhook, no POS API, no WhatsApp Business API in v1.
 **Why:** All four feeds are already exports and the reporting cadence is weekly. A webhook adds OAuth, token refresh, retry handling, and a whole failure surface to save a manual upload nobody minds doing. Revisit when someone actually wants a live number.
 **Confidence:** Reasoned · **Reversal:** Cheap — `import_batches` already models a batch with a source; a webhook just becomes another writer.
+**Revisited 2026-10-05:** Marketing Intelligence leads now also arrive from a live Google Sheet (D-94). The four CRM feeds above are still batch uploads.
 
 ### D-03 — Phone number is the only identity key
 **Rule:** Customers are joined across all four sources on the normalized phone number. Nothing else.
@@ -505,6 +506,17 @@ total_leads                                        = sum(leads by channel) - exi
 **What this cost:** `/import`, `/api/import/master-sheet/{preview,commit}` and `/api/customers/export` — none of which existed when auth was first built — needed the same two-line addition applied to them individually once resumed, since they were built in the gap between when auth was stashed and when it was reapplied. `commitMasterSheet`'s `uploadedBy` now carries the real signed-in user's id instead of the placeholder string it held before auth existed.
 **A real gap the live test caught, not just the fail-closed one:** `NEXT_PUBLIC_CLERK_SIGN_IN_URL` was missing. Without it, Clerk's default is to redirect a signed-out visitor to its own hosted Account Portal (`*.accounts.dev`) instead of this app's own `/sign-in` page — invisible with no keys configured (everything 500s before routing matters), and invisible in a code review, since the custom `/sign-in` page existed and looked complete. Only caught by provisioning real keys and following the redirect. Now set in `.env.local`, `.env.example`, and all three Vercel environments.
 **Confidence:** Proven — provisioned via `vercel integration add clerk` on the free Hobby plan, restricted sign-up confirmed set in the Clerk dashboard, and the full loop verified end to end: signed-out redirects to this app's own `/sign-in`, and a real invited account signed in successfully and reached the dashboard. Every route was also re-confirmed to fail closed (500, never open) before keys existed. **Reversal:** Costly — swapping providers means redoing the sign-in page and every `requireUser`/`requireApiUser` call site, though the boundary pattern itself would carry over.
+
+### D-94 — Marketing Intelligence leads live in Postgres and sync from a Google Sheet *(2026-10-05, revisits D-02)*
+**Rule:** Marketing leads and bills are rows in `marketing_leads` / `marketing_sales`, not per-browser local storage. Google Sheets are connected by link from the Import tab; a background job reads every lead tab in them and imports new rows. The file upload stays.
+**Why the storage moved first:** a server job cannot write into a browser. While leads lived in local storage, each desk also held its own copy, so "import automatically" had no single place to land.
+**Why the lead is one JSONB `doc`, against D-64's thin-table habit:** the calling queue, follow-ups and profile all edit a whole `Lead` (acquisitions, interactions, follow-ups) and the import rules in `lib/marketing/local.ts` are written against that shape. Keeping the shape lets the sheet sync call the same `previewRows` as an upload, so the two paths cannot drift. Nothing reports across these tables in SQL yet; normalise when something does.
+**Why writes carry a `version`:** the HTTP driver has no transactions (D-75), and now two desks and the sync can touch one lead. A write must present the version it read; a loser gets a conflict and reloads, instead of silently erasing someone's logged call. The sync simply retries a conflicted lead on its next run.
+**Why columns are matched by heading on every run, not stored:** the campaign trackers get a new tab each month, the tabs differ (`Campaign ID` vs `Campaign Name`, some with no email or store), and the headings sit under a title banner. A stored per-tab mapping would need re-doing monthly. A tab is a lead list when one of its first rows names a phone and a name column; anything else (the campaign summary) is skipped.
+**Two ways to read a sheet:** with no key configured, the sheet must be shared as "Anyone with the link" and is downloaded through Google's export URL. That works with zero setup and is what the two trackers use today, but anyone holding the link can read every lead in them. With `GOOGLE_SERVICE_ACCOUNT_KEY` set, the sheet is instead shared privately with one robot address and read through the Sheets API: no consent screen, no refresh token, access revoked by un-sharing. Moving the trackers to the second is the open follow-up.
+**Why re-running is safe:** a row only writes when it adds a lead or a new source/campaign/date to one, so the timer, the cron route and the Sync now button can overlap. A sheet unchanged since the process last imported it is skipped before the database is touched, which keeps a 5-minute check from holding Neon awake all day.
+**What did not move:** records already in a browser's local storage are not migrated (decided: re-import from the sheet). They are left in place, unread. The shared `marketing_calls` log is unaffected.
+**Confidence:** Proven for the link-shared path: both live trackers imported (6 tabs, 6,234 rows, 5,616 leads, 93 rejected numbers) and a repeat run wrote nothing. The service-account path is covered by unit tests on the signed request only, until a key is configured · **Reversal:** Cheap for the sync (delete the settings row); Costly for the storage move.
 
 ---
 

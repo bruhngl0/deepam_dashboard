@@ -171,7 +171,7 @@ export default async function DashboardPage({
                 <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
                   <th className="pb-2 text-left font-bold">Store</th>
                   <th className="pb-2 text-right font-bold">Bills</th>
-                  <th className="pb-2 text-right font-bold">Revenue</th>
+                  <th className="pb-2 text-right font-bold">Sales</th>
                   <th className="pb-2 text-right font-bold">Attributed</th>
                 </tr>
               </thead>

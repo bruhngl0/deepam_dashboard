@@ -73,7 +73,7 @@ export function BuyerTable({ rows }: { rows: BuyerListRow[] }) {
             <th className="px-4 py-3 font-bold">Frequency</th>
             <th className="px-4 py-3 text-right font-bold">Units</th>
             <th className="px-4 py-3 text-right font-bold">Total spend</th>
-            <th className="px-4 py-3 text-right font-bold">Avg bill</th>
+            <th className="px-4 py-3 text-right font-bold">Average bill value</th>
             <th className="px-4 py-3 font-bold">Last purchase</th>
             <th className="px-4 py-3 font-bold">History</th>
           </tr>
@@ -89,7 +89,7 @@ export function BuyerTable({ rows }: { rows: BuyerListRow[] }) {
                   {orNotProvided(r.fullName)}
                 </Link>
                 <p className="tnum text-xs text-ink-muted">
-                  {r.customerCode && `ID ${r.customerCode} · `}
+                  {r.customerCode && `${r.customerCode} · `}
                   {formatPhone(r.phoneE164)}
                 </p>
               </td>
