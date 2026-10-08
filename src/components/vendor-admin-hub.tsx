@@ -6,7 +6,7 @@ const MODULES = [
   { href: '/vendor/performance', step: '3', title: 'Performance', detail: 'Stock health, margin, payments, due dates and vendor score.', action: 'Monitor performance' },
   { href: '/vendor/customer-insights', step: '4', title: 'Customer connection', detail: 'See demand records linked from customers to the supplying vendor.', action: 'Open customer hub' },
   { href: '/vendor/demand', step: '5', title: 'Demand planning', detail: 'Prioritise unmet demand and revenue opportunity by category.', action: 'Plan replenishment' },
-  { href: '/vendor/import', step: 'Setup', title: 'Import centre', detail: 'Load stock ledgers and barcode-level sales with a safe preview.', action: 'Import data' },
+  { href: '/vendor/import', step: 'Setup', title: 'Import centre', detail: 'Load stock ledgers with a safe preview. Sales arrive from Hemparshwa OS.', action: 'Import data' },
 ] as const;
 
 export function VendorAdminHub() {

@@ -1,6 +1,7 @@
 /**
  * Bulk import — drag a file onto each channel you have (Meta, WhatsApp,
- * Google Ads, Others) plus, optionally, a sales report, then hit Submit once.
+ * Google Ads, Others), then hit Submit once. Sales are not uploaded here:
+ * they arrive from Hemparshwa OS (lib/integration/hemparshwa.ts).
  *
  * Each zone previews itself the moment a file lands (same auto-preview
  * behavior as the single-file forms above), so by the time Submit is
@@ -10,7 +11,7 @@
  * zone left empty.
  *
  * Dedup by phone is not something this form implements — it's the standing
- * behavior of `commitChannelLeads` / `commitSalesImport` (customers upsert on
+ * behavior of `commitChannelLeads` (customers upsert on
  * `phone_e164`, lead_touches insert `ON CONFLICT DO NOTHING`), so uploading a
  * number that's already on file for a channel is a harmless no-op here too.
  */
@@ -18,11 +19,9 @@
 'use client';
 
 import { useState } from 'react';
-import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
 import type { ChannelLeadsPreviewResponse } from '@/app/api/import/channel-leads/preview/route';
 import type { ChannelLeadsCommitResult, BulkLeadChannel } from '@/lib/import/channel-leads';
-import type { SalesPreviewResponse } from '@/app/api/import/sales/preview/route';
-import type { SalesCommitResult } from '@/lib/import/sales';
 
 type ZoneStatus = 'idle' | 'previewing' | 'previewed' | 'error';
 
@@ -39,13 +38,6 @@ const IDLE_LEAD: ZoneState<ChannelLeadsPreviewResponse> = {
   preview: null,
   error: null,
 };
-const IDLE_SALES: ZoneState<SalesPreviewResponse> = {
-  file: null,
-  status: 'idle',
-  preview: null,
-  error: null,
-};
-
 const LEAD_ZONES: { key: BulkLeadChannel; label: string; hint: string }[] = [
   { key: 'meta', label: 'Meta', hint: 'Meta / Facebook lead-form export' },
   { key: 'whatsapp', label: 'WhatsApp', hint: 'WhatsApp broadcast or contact list' },
@@ -54,7 +46,6 @@ const LEAD_ZONES: { key: BulkLeadChannel; label: string; hint: string }[] = [
 ];
 
 type LeadResult = { ok: true; result: ChannelLeadsCommitResult } | { ok: false; error: string };
-type SalesResult = { ok: true; result: SalesCommitResult } | { ok: false; error: string };
 
 function DropZone({
   id,
@@ -143,11 +134,9 @@ export function BulkLeadsImportForm() {
     google: IDLE_LEAD,
     other: IDLE_LEAD,
   });
-  const [salesZone, setSalesZone] = useState<ZoneState<SalesPreviewResponse>>(IDLE_SALES);
 
   const [submitting, setSubmitting] = useState(false);
   const [leadResults, setLeadResults] = useState<Partial<Record<BulkLeadChannel, LeadResult>>>({});
-  const [salesResult, setSalesResult] = useState<SalesResult | null>(null);
 
   async function previewLead(channel: BulkLeadChannel, file: File) {
     setLeadZones((prev) => ({
@@ -178,33 +167,12 @@ export function BulkLeadsImportForm() {
     }
   }
 
-  async function previewSales(file: File) {
-    setSalesZone({ file, status: 'previewing', preview: null, error: null });
-    try {
-      const body = new FormData();
-      body.append('file', file);
-      const res = await fetch('/api/import/sales/preview', { method: 'POST', body });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? 'Preview failed.');
-      setSalesZone({ file, status: 'previewed', preview: json, error: null });
-    } catch (err) {
-      setSalesZone({
-        file,
-        status: 'error',
-        preview: null,
-        error: err instanceof Error ? err.message : 'Preview failed.',
-      });
-    }
-  }
-
   const readyChannels = LEAD_ZONES.filter((z) => leadZones[z.key].status === 'previewed');
-  const salesReady = salesZone.status === 'previewed';
-  const canSubmit = !submitting && (readyChannels.length > 0 || salesReady);
+  const canSubmit = !submitting && readyChannels.length > 0;
 
   async function handleSubmit() {
     setSubmitting(true);
     setLeadResults({});
-    setSalesResult(null);
 
     for (const zone of LEAD_ZONES) {
       const z = leadZones[zone.key];
@@ -225,23 +193,10 @@ export function BulkLeadsImportForm() {
       }
     }
 
-    if (salesZone.file && salesZone.status === 'previewed') {
-      try {
-        const body = new FormData();
-        body.append('file', salesZone.file);
-        const res = await fetch('/api/import/sales/commit', { method: 'POST', body });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? 'Import failed.');
-        setSalesResult({ ok: true, result: json });
-      } catch (err) {
-        setSalesResult({ ok: false, error: err instanceof Error ? err.message : 'Import failed.' });
-      }
-    }
-
     setSubmitting(false);
   }
 
-  const hasResults = Object.keys(leadResults).length > 0 || salesResult !== null;
+  const hasResults = Object.keys(leadResults).length > 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -290,47 +245,11 @@ export function BulkLeadsImportForm() {
         })}
       </div>
 
-      <DropZone
-        id="bulk-sales"
-        title="Sales report"
-        hint="POS export for one billing period"
-        fileName={salesZone.file?.name ?? null}
-        status={salesZone.status}
-        error={salesZone.error}
-        disabled={submitting}
-        onFile={previewSales}
-      >
-        {salesZone.preview && salesZone.status === 'previewed' && (
-          <p className="tnum mt-2 text-xs text-ink-2">
-            {salesZone.preview.dateRange
-              ? `${formatDate(salesZone.preview.dateRange.from)} – ${formatDate(salesZone.preview.dateRange.to)} · `
-              : ''}
-            {formatNumber(salesZone.preview.billsTotal)} bills · {formatCurrency(salesZone.preview.grossRevenue)}
-            {salesZone.preview.alreadyImported && (
-              <span className="ml-1 text-ink-muted">(already committed once)</span>
-            )}
-          </p>
-        )}
-        {salesResult && (
-          <p
-            className={`tnum mt-2 text-xs font-medium ${
-              salesResult.ok ? 'text-status-good' : 'text-status-critical'
-            }`}
-          >
-            {salesResult.ok
-              ? `Committed — ${formatNumber(salesResult.result.salesInserted)} bills inserted, ${formatNumber(
-                  salesResult.result.salesSkipped,
-                )} skipped (dupes)`
-              : salesResult.error}
-          </p>
-        )}
-      </DropZone>
-
       <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-inset/40 p-4">
         <p className="max-w-[52ch] text-sm text-ink-2">
-          Drop whichever sheets you have — you don&rsquo;t need all five. Submit adds new leads under
-          each channel&rsquo;s campaign and appends the sales report; a phone number already on file is
-          skipped automatically, never duplicated.
+          Drop whichever sheets you have — you don&rsquo;t need all four. Submit adds new leads under
+          each channel&rsquo;s campaign; a phone number already on file is skipped automatically,
+          never duplicated.
         </p>
         <button
           type="button"

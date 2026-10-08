@@ -45,17 +45,6 @@ function one(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-const PAYMENT_LABEL: Record<string, string> = {
-  cash: 'Cash',
-  card: 'Card',
-  phonepe: 'PhonePe',
-  amex: 'Amex',
-  cheque: 'Cheque',
-  advance: 'Advance',
-  gift: 'Gift voucher',
-  creditNote: 'Credit note',
-};
-
 function Stat({
   label,
   value,
@@ -171,9 +160,7 @@ export default async function BuyerProfilePage({
   }
   const backHref = `/crm/buyers${carried.toString() ? `?${carried}` : ''}`;
 
-  const tenderTotal = p.payments.reduce((n, r) => n + r.amount, 0);
   const busiestDay = [...p.byDay].sort((a, b) => b.bills - a.bills)[0];
-  const busiestBand = [...p.byBand].sort((a, b) => b.bills - a.bills)[0];
   const topSalesman = p.salesmen[0];
   const salesmanShare = topSalesman ? (100 * topSalesman.spend) / p.totalSpend : 0;
 
@@ -289,54 +276,11 @@ export default async function BuyerProfilePage({
           )}
         </Finding>
 
-        {/* ── How they pay ────────────────────────────────────────────── */}
-        <Finding
-          eyebrow="How they pay"
-          title={
-            p.payments.length === 0
-              ? 'No tender recorded'
-              : p.payments.length === 1
-                ? `${PAYMENT_LABEL[p.payments[0].method] ?? p.payments[0].method} only`
-                : `Splits across ${formatNumber(p.payments.length)} tenders`
-          }
-        >
-          {p.payments.length === 0 ? (
-            <Note>
-              The payment breakdown is blank on every bill of theirs. 273 bills in the book
-              carry none; the money is still counted in the totals above.
-            </Note>
-          ) : (
-            <SplitList
-              total={tenderTotal}
-              rows={p.payments.map((r) => ({
-                label: PAYMENT_LABEL[r.method] ?? r.method,
-                value: r.amount,
-                caption: `${formatCurrency(r.amount)} on ${formatNumber(r.bills)} bill${r.bills === 1 ? '' : 's'}`,
-              }))}
-            />
-          )}
-          <Note>
-            Shares are of tender recorded, not of total spend — a bill paid half by card and
-            half in cash contributes to both rows, so bill counts here can exceed the{' '}
-            {formatNumber(p.bills)} bills above.
-            {tenderTotal < p.totalSpend - 1 && (
-              <>
-                {' '}
-                {formatCurrency(p.totalSpend - tenderTotal)} of their spend carries no payment
-                breakdown at all and is absent from the split above — the money is still counted
-                in the totals at the top of the page.
-              </>
-            )}
-          </Note>
-        </Finding>
-
         {/* ── When they shop ──────────────────────────────────────────── */}
         <Finding
           eyebrow="When they shop"
           title={
-            busiestDay && busiestBand
-              ? `Mostly ${busiestDay.label}, ${busiestBand.label.split(' · ')[0].toLowerCase()}`
-              : 'Not enough visits to read a pattern'
+            busiestDay ? `Mostly ${busiestDay.label}` : 'Not enough visits to read a pattern'
           }
         >
           <SplitList
@@ -348,8 +292,8 @@ export default async function BuyerProfilePage({
             }))}
           />
           <Note>
-            Times are IST; bill timestamps are stored UTC (D-32). This is when checkout
-            happened, which trails the decision to buy by however long they were in the store.
+            Bills carry their date but not a time of day: sales arrive from the Barcode Wise
+            export, which has none.
             {p.bills < 8 && ' With this few bills, treat the pattern as anecdote, not habit.'}
           </Note>
         </Finding>
@@ -480,10 +424,9 @@ export default async function BuyerProfilePage({
                   <thead>
                     <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
                       <th className="py-2 pr-4 font-bold">Voucher</th>
-                      <th className="py-2 pr-4 font-bold">Time</th>
+                      <th className="py-2 pr-4 font-bold">Date</th>
                       <th className="py-2 pr-4 font-bold">Branch</th>
                       <th className="py-2 pr-4 font-bold">Staff</th>
-                      <th className="py-2 pr-4 font-bold">Tender</th>
                       <th className="py-2 pr-4 text-right font-bold">Units</th>
                       <th className="py-2 pr-4 text-right font-bold">Discount</th>
                       <th className="py-2 text-right font-bold">Amount</th>
@@ -493,17 +436,10 @@ export default async function BuyerProfilePage({
                     {visit.bills.map((b) => (
                       <tr key={b.voucherNo} className="border-t border-grid">
                         <td className="tnum py-2 pr-4 text-ink">{b.voucherNo}</td>
-                        <td className="tnum py-2 pr-4 text-ink-2">{formatDateTime(b.billedAt)}</td>
+                        <td className="tnum py-2 pr-4 text-ink-2">{formatDate(b.billedAt)}</td>
                         <td className="py-2 pr-4 text-ink-2">{b.storeName}</td>
                         <td className="tnum py-2 pr-4 text-ink-2">
                           {orNotProvided(b.salesmanCode)}
-                        </td>
-                        <td className="py-2 pr-4 text-ink-2">
-                          {Object.keys(b.payments).length === 0
-                            ? 'Not recorded'
-                            : Object.entries(b.payments)
-                                .map(([k, v]) => `${PAYMENT_LABEL[k] ?? k} ${formatCurrency(v)}`)
-                                .join(' + ')}
                         </td>
                         <td className="tnum py-2 pr-4 text-right text-ink-2">
                           {formatNumber(b.qty)}
@@ -526,9 +462,8 @@ export default async function BuyerProfilePage({
 
       <p className="mt-4 max-w-[80ch] text-xs leading-relaxed text-ink-muted">
         Item-level detail — what was actually bought, its category, colour, size and the margin
-        on it — is not shown because no item-level sales have been imported yet. The parser,
-        importer and schema are all in place; the barcode-wise register just has not been
-        uploaded.
+        on it — is not shown on this page yet. The line items themselves arrive with every
+        Barcode Wise import made in Hemparshwa OS.
       </p>
     </main>
   );

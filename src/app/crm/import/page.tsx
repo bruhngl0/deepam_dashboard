@@ -15,7 +15,6 @@
 import { BulkLeadsImportForm } from '@/components/bulk-leads-import-form';
 import { ImportForm } from '@/components/import-form';
 import { InstagramLeadsImportForm } from '@/components/instagram-leads-import-form';
-import { SalesImportForm } from '@/components/sales-import-form';
 import { ExistingCustomersImportForm } from '@/components/existing-customers-import-form';
 import { requireUser } from '@/lib/auth';
 
@@ -41,7 +40,7 @@ export default async function ImportPage() {
           <h2 className="text-lg font-semibold tracking-tight text-ink">Existing customers</h2>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
             A loyalty/CRM customer master (Capillary-style export). Run this <strong>first</strong>,
-            before any lead or sales import — it seeds lifecycle = existing for everyone in it, so
+            before any lead import — it seeds lifecycle = existing for everyone in it, so
             later imports never mistake a known customer for a new acquisition.
           </p>
           <div className="mt-4">
@@ -52,24 +51,14 @@ export default async function ImportPage() {
         <section className="card rounded-2xl border border-line bg-surface p-6">
           <h2 className="text-lg font-semibold tracking-tight text-ink">Bulk import</h2>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
-            Drag in whichever lead sheets you have — Meta, WhatsApp, Google Ads, Others — plus a
-            sales report if you&rsquo;ve got one, then press Submit once. Additive only: new leads
+            Drag in whichever lead sheets you have — Meta, WhatsApp, Google Ads, Others — then
+            press Submit once. Sales are imported in Hemparshwa OS and arrive here on their own.
+            Additive only: new leads
             are added under each channel&rsquo;s campaign, a phone number already on file is skipped
             automatically, and nothing existing is ever replaced.
           </p>
           <div className="mt-4">
             <BulkLeadsImportForm />
-          </div>
-        </section>
-
-        <section className="card rounded-2xl border border-line bg-surface p-6">
-          <h2 className="text-lg font-semibold tracking-tight text-ink">Sales report</h2>
-          <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
-            A POS export for one billing period. Additive and idempotent (D-04, D-59) — becomes
-            its own selectable report on the Analysis page, existing reports are never touched.
-          </p>
-          <div className="mt-4">
-            <SalesImportForm />
           </div>
         </section>
 

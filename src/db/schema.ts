@@ -22,6 +22,7 @@ import {
   uuid,
   uniqueIndex,
   index,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -720,6 +721,72 @@ export const integrationInbox = pgTable(
     processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('integration_inbox_source_entity_idx').on(t.source, t.entityId)],
+);
+
+/**
+ * What Hemparshwa OS has imported, copied over its integration feed. Hemparshwa
+ * is where source files are imported; these tables keep its own shape and its
+ * own IDs (store_id, customer_id, vendor_id, category_id are Hemparshwa's).
+ */
+export const hemparshwaImports = pgTable('hemparshwa_imports', {
+  importId: integer('import_id').primaryKey(),
+  source: text('source').notNull(),
+  dataType: text('data_type').notNull(),
+  fileName: text('file_name').notNull(),
+  fileSha256: text('file_sha256').notNull(),
+  rowsImported: integer('rows_imported').notNull(),
+  importedAt: timestamp('imported_at', { withTimezone: true }).notNull(),
+  periodFrom: date('period_from'),
+  periodTo: date('period_to'),
+  /** Hemparshwa changes this whenever the import's rows change. */
+  version: text('version').notNull(),
+  rowsSynced: integer('rows_synced').notNull(),
+  /** The CRM import batch its bills and line items are filed under; set when they are built. */
+  batchId: uuid('batch_id').references(() => importBatches.id),
+  syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** One row per invoice line, as Hemparshwa holds it. `details` carries every mapped column of the source row. */
+export const hemparshwaSalesLines = pgTable(
+  'hemparshwa_sales_lines',
+  {
+    importId: integer('import_id')
+      .notNull()
+      .references(() => hemparshwaImports.importId, { onDelete: 'cascade' }),
+    storeId: text('store_id').notNull(),
+    storeName: text('store_name').notNull(),
+    invoiceId: text('invoice_id').notNull(),
+    invoiceDate: date('invoice_date').notNull(),
+    /** Lower-case, '' when the source has none. The document is voucher number + date + sales type. */
+    salesType: text('sales_type').notNull(),
+    invoiceLineId: text('invoice_line_id').notNull(),
+    skuCode: text('sku_code').notNull(),
+    skuName: text('sku_name'),
+    categoryId: text('category_id'),
+    category: text('category'),
+    subcategory: text('subcategory'),
+    vendorId: text('vendor_id'),
+    vendor: text('vendor'),
+    customerId: text('customer_id'),
+    customerName: text('customer_name'),
+    customerPhone: text('customer_phone'),
+    salesperson: text('salesperson'),
+    quantity: numeric('quantity', { precision: 14, scale: 2 }).notNull(),
+    sellingPrice: numeric('selling_price', { precision: 14, scale: 2 }).notNull(),
+    discount: numeric('discount', { precision: 14, scale: 2 }).notNull(),
+    netAmount: numeric('net_amount', { precision: 14, scale: 2 }).notNull(),
+    cogs: numeric('cogs', { precision: 14, scale: 2 }),
+    details: jsonb('details').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.storeId, t.invoiceId, t.invoiceDate, t.salesType, t.invoiceLineId] }),
+    index('hemparshwa_sales_lines_import_idx').on(t.importId),
+    index('hemparshwa_sales_lines_date_idx').on(t.invoiceDate),
+    index('hemparshwa_sales_lines_phone_idx')
+      .on(t.customerPhone)
+      .where(sql`customer_phone IS NOT NULL`),
+    index('hemparshwa_sales_lines_sku_idx').on(t.skuCode),
+  ],
 );
 
 /** Operational visits projected from WalkTrack. WalkTrack remains their owner. */
