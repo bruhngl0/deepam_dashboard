@@ -35,9 +35,9 @@ export function possibleNationalPhone(value: unknown): string | null {
   return /^[6-9]\d{9}$/.test(national) ? national : null;
 }
 
-/** A CRM Customer ID: exactly six digits (drizzle/0015). */
+/** A CRM Customer ID, CUS-000001 (drizzle/0017). The prefix may be left off when typed. */
 export function possibleCustomerCode(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return /^\d{6}$/.test(trimmed) ? trimmed : null;
+  const match = /^(?:CUS-?)?(\d{6})$/i.exec(value.trim());
+  return match ? `CUS-${match[1]}` : null;
 }

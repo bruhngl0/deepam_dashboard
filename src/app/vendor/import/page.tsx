@@ -1,15 +1,14 @@
 /**
- * Vendor import — load a vendor stock ledger or a barcode-wise sales
- * register. Both paths upsert on a natural key (D-64) rather than replacing
- * anything, so unlike `/crm/import`'s master workbook there's no `ALLOW_*`
- * gate to read here.
+ * Vendor import — load a vendor stock ledger. It upserts on a natural key
+ * (D-64) rather than replacing anything, so unlike `/crm/import`'s master
+ * workbook there's no `ALLOW_*` gate to read here. Barcode-wise sales are no
+ * longer uploaded here: they arrive from Hemparshwa OS (lib/integration/hemparshwa.ts).
  *
  * `requireUser()` for the same reason it's on every other page — the proxy
  * redirect is not the boundary.
  */
 
 import { VendorStockImportForm } from '@/components/vendor-stock-import-form';
-import { SaleLineItemsImportForm } from '@/components/sale-line-items-import-form';
 import { requireUser } from '@/lib/auth';
 
 export default async function VendorImportPage() {
@@ -20,8 +19,9 @@ export default async function VendorImportPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Vendor import</h1>
         <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
-          Both files preview first; nothing is written until you confirm. Neither replaces
-          anything already loaded — a corrected re-export just upserts its own rows.
+          The file previews first; nothing is written until you confirm. It doesn&rsquo;t replace
+          anything already loaded — a corrected re-export just upserts its own rows. Barcode-wise
+          sales are imported in Hemparshwa OS and arrive here on their own.
         </p>
       </header>
 
@@ -34,18 +34,6 @@ export default async function VendorImportPage() {
           </p>
           <div className="mt-4">
             <VendorStockImportForm />
-          </div>
-        </section>
-
-        <section className="card rounded-2xl border border-line bg-surface p-6">
-          <h2 className="text-lg font-semibold tracking-tight text-ink">Barcode-wise sales</h2>
-          <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
-            Item-level detail per bill. Links back to an existing bill in the CRM&rsquo;s sales
-            table where a match is found, by voucher date and number — bills themselves are
-            never replaced.
-          </p>
-          <div className="mt-4">
-            <SaleLineItemsImportForm />
           </div>
         </section>
       </div>

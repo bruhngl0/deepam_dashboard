@@ -11,8 +11,9 @@ describe('integration event boundary', () => {
     expect(possibleNationalPhone('123')).toBeNull();
   });
 
-  it('accepts only six-digit CRM Customer IDs', () => {
-    expect(possibleCustomerCode(' 004217 ')).toBe('004217');
+  it('accepts CRM Customer IDs, with or without the prefix', () => {
+    expect(possibleCustomerCode(' cus-004217 ')).toBe('CUS-004217');
+    expect(possibleCustomerCode('004217')).toBe('CUS-004217');
     expect(possibleCustomerCode('4217')).toBeNull();
     expect(possibleCustomerCode('9876543210')).toBeNull();
   });

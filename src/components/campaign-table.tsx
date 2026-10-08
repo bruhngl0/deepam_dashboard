@@ -27,8 +27,8 @@ export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
               <th className="pb-2 text-right font-bold">Leads</th>
               <th className="pb-2 text-right font-bold">Bought</th>
               <th className="pb-2 text-right font-bold">Rate</th>
-              <th className="pb-2 text-right font-bold">Revenue</th>
-              <th className="pb-2 text-right font-bold">Avg bill</th>
+              <th className="pb-2 text-right font-bold">Sales</th>
+              <th className="pb-2 text-right font-bold">Average bill value</th>
               <th className="pb-2 text-right font-bold">Per lead</th>
             </tr>
           </thead>

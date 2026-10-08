@@ -26,9 +26,11 @@ import { sql } from 'drizzle-orm';
  * once; if it is wrong, every per-store number inverts and nothing else breaks.
  */
 const STORES = [
-  { code: 'MG_ROAD', name: 'MG Road', voucherPrefix: 'BK01-' },
-  { code: 'JAYANAGAR', name: 'Jayanagar', voucherPrefix: 'BK02-' },
-  { code: 'ONLINE', name: 'Online', voucherPrefix: 'BK03-' },
+  // storeCode is the Store ID every app agrees on, so it is set here rather
+  // than left to the trigger, which would hand a fresh database STR-004 onwards.
+  { code: 'MG_ROAD', storeCode: 'STR-001', name: 'MG Road', voucherPrefix: 'BK01-' },
+  { code: 'JAYANAGAR', storeCode: 'STR-002', name: 'Jayanagar', voucherPrefix: 'BK02-' },
+  { code: 'ONLINE', storeCode: 'STR-003', name: 'Online', voucherPrefix: 'BK03-' },
 ];
 
 /**

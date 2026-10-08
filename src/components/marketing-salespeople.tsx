@@ -1,17 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { callLog, OUTCOMES, readDataset, type CallEntry, type Dataset } from '@/lib/marketing/local';
+import { callLog, OUTCOMES, type CallEntry, type Dataset } from '@/lib/marketing/local';
 import { button, card, dateLabel, Field, input } from './marketing-shared';
 
 const PAGE = 25;
-/** Calls logged from the salesperson desk live under their own storage key in this browser. */
 /** Always offered in the filter, even before they have logged a call. */
 const KNOWN_SALESPEOPLE = ['Abishek'];
-const DESK_KEYS = ['marketing-local-v1:salesperson:abishek'];
 
 export function MarketingSalespeople({ data }: { data: Dataset }) {
-  const [desks, setDesks] = useState<Dataset[]>([]);
   const [stored, setStored] = useState<CallEntry[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [person, setPerson] = useState('');
@@ -19,17 +16,10 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
   const [outcome, setOutcome] = useState(''); const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   useEffect(() => {
-    const load = () => setDesks(DESK_KEYS.flatMap(k => { try { const raw = localStorage.getItem(k); return raw ? [readDataset(raw)] : []; } catch { return []; } }));
-    load();
-    window.addEventListener('storage', load);
-    return () => window.removeEventListener('storage', load);
-  }, []);
-
-  useEffect(() => {
     fetch('/api/marketing/calls', { cache: 'no-store' }).then(r => r.ok ? r.json() : Promise.reject()).then(j => { setStored(j.calls); setLoadError(false); }).catch(() => setLoadError(true));
   }, []);
 
-  const all = callLog([data, ...desks], stored);
+  const all = callLog([data], stored);
   const people = [...new Set([...KNOWN_SALESPEOPLE, ...all.map(c => c.salesperson)])].sort();
   const q = search.trim().toLowerCase();
   const rows = all.filter(c => (!person || c.salesperson === person) && (!from || c.at.slice(0, 10) >= from) && (!to || c.at.slice(0, 10) <= to) && (!outcome || c.outcome === outcome)
@@ -57,8 +47,8 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
     ].map(([label, value]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-2 text-3xl font-semibold tracking-tight text-ink">{value}</p></div>)}</div>
     {!person && perPerson.length > 0 && <section className={card}><h2 className="text-lg font-semibold text-ink">Calls by salesperson</h2><div className="mt-3 flex flex-wrap gap-2">{perPerson.map(({ p, n }) => <button key={p} className={button} onClick={() => { setPerson(p); setPage(0); }}>{p} · {n}</button>)}</div></section>}
     <section className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="p-4"><h2 className="text-lg font-semibold text-ink">{person ? `${person}'s call log` : 'Call log'}</h2><p className="text-xs text-ink-muted">Every call logged from the calling queue, from any browser, newest first. Times are IST.</p>{loadError && <p role="alert" className="mt-1 text-xs text-red-600">Could not load the shared call log; showing calls saved in this browser only.</p>}</div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Customer', 'Phone', 'Call logged at', 'Outcome', 'Note', 'Logged by'].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead>
+      <div className="p-4"><h2 className="text-lg font-semibold text-ink">{person ? `${person}'s call log` : 'Call log'}</h2><p className="text-xs text-ink-muted">Every call logged from the calling queue, from any browser, newest first. Times are IST.</p>{loadError && <p role="alert" className="mt-1 text-xs text-red-600">Could not load the shared call log; showing only calls recorded on current leads.</p>}</div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Customer', 'Contact No.', 'Call logged at', 'Outcome', 'Note', 'Logged by'].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead>
         <tbody>{rows.slice(currentPage * PAGE, currentPage * PAGE + PAGE).map(c => <tr key={c.id} className="border-t border-line align-top text-ink">
           <td className="px-4 py-3"><Link href={`/marketing/leads/${c.leadId}`} className="font-semibold text-accent hover:underline">{c.name}</Link></td>
           <td className="whitespace-nowrap px-4 py-3 text-ink-2">{c.phone}</td><td className="whitespace-nowrap px-4 py-3 text-ink-2">{dateLabel(c.at)}</td>

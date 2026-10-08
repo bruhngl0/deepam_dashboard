@@ -108,7 +108,7 @@ function Row({ row }: { row: CustomerRow }) {
             <p className="font-medium text-ink">{orNotProvided(row.fullName)}</p>
           )}
           <p className="text-xs text-ink-muted">
-            {row.customerCode && <span className="tnum">ID {row.customerCode} · </span>}
+            {row.customerCode && <span className="tnum">{row.customerCode} · </span>}
             {row.email ?? 'No email'}
           </p>
         </td>
@@ -262,7 +262,7 @@ export function CustomerTable({ rows }: { rows: CustomerRow[] }) {
           <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
             <th className="px-4 pb-3 font-bold">Customer</th>
             <th className="px-4 pb-3 font-bold">Store</th>
-            <th className="px-4 pb-3 font-bold">Contact</th>
+            <th className="px-4 pb-3 font-bold">Contact No.</th>
             <th className="px-4 pb-3 font-bold">Channels</th>
             <th className="px-4 pb-3 font-bold">Lifecycle</th>
             <th className="px-4 pb-3 text-right font-bold">Sales</th>

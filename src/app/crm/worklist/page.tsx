@@ -182,8 +182,8 @@ export default async function WorklistPage({ searchParams }: { searchParams: Sea
             Anyone who came back to the store since then is invisible to this query and may still
             appear below. Timing here is measured from today, not from the last loaded bill, because
             what matters for a call is how long the customer has actually had to return — but that
-            only works if the file is fresh. Import the latest sales report before working a long
-            list.
+            only works if sales are up to date. Import the latest Barcode Wise file in Hemparshwa OS
+            before working a long list.
           </p>
         </div>
       )}

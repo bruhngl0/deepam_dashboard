@@ -15,11 +15,11 @@ import {
 } from './schema';
 
 const profiles = [
-  ['00001', 'Kaveri Silks Private Limited', 'Kaveri Heritage', 'R. Meenakshi', '9845011882', 'orders@kaveriheritage.in', '14 Silk Market Road', 'Bengaluru', 'Karnataka', '29AAECK4812F1ZJ', 'AAECK4812F', 'Silk sarees, Bridal'],
-  ['00002', 'Nandini Textiles', 'Nandini Weaves', 'P. Arvind', '9886190413', 'arvind@nandiniweaves.in', '42 Devaraja Market', 'Mysuru', 'Karnataka', '29AAFFN7421D1Z4', 'AAFFN7421D', 'Cotton sarees, Dress material'],
-  ['00003', 'Aarna Handlooms LLP', 'Aarna', 'S. Karthik', '9900522177', 'sales@aarnahandlooms.com', '18 Banjara Hills Road', 'Hyderabad', 'Telangana', '36AAXFA1337M1Z2', 'AAXFA1337M', 'Linen, Handloom'],
-  ['00004', 'Saanvi Fashions', 'Saanvi Studio', 'N. Priya', '9845380062', 'priya@saanvistudio.in', '9 Ring Road', 'Surat', 'Gujarat', '24AAYFS8752H1ZP', 'AAYFS8752H', 'Occasion wear, Lehengas'],
-  ['00005', 'Tirupati Fabrics', 'Tirupati', 'V. Suresh', '9731148809', 'dispatch@tirupatifabrics.in', '61 Avinashi Road', 'Coimbatore', 'Tamil Nadu', '33AAFFT3108C1ZF', 'AAFFT3108C', 'Blouse material, Daily wear'],
+  ['VEN-000001', 'Kaveri Silks Private Limited', 'Kaveri Heritage', 'R. Meenakshi', '9845011882', 'orders@kaveriheritage.in', '14 Silk Market Road', 'Bengaluru', 'Karnataka', '29AAECK4812F1ZJ', 'AAECK4812F', 'Silk sarees, Bridal'],
+  ['VEN-000002', 'Nandini Textiles', 'Nandini Weaves', 'P. Arvind', '9886190413', 'arvind@nandiniweaves.in', '42 Devaraja Market', 'Mysuru', 'Karnataka', '29AAFFN7421D1Z4', 'AAFFN7421D', 'Cotton sarees, Dress material'],
+  ['VEN-000003', 'Aarna Handlooms LLP', 'Aarna', 'S. Karthik', '9900522177', 'sales@aarnahandlooms.com', '18 Banjara Hills Road', 'Hyderabad', 'Telangana', '36AAXFA1337M1Z2', 'AAXFA1337M', 'Linen, Handloom'],
+  ['VEN-000004', 'Saanvi Fashions', 'Saanvi Studio', 'N. Priya', '9845380062', 'priya@saanvistudio.in', '9 Ring Road', 'Surat', 'Gujarat', '24AAYFS8752H1ZP', 'AAYFS8752H', 'Occasion wear, Lehengas'],
+  ['VEN-000005', 'Tirupati Fabrics', 'Tirupati', 'V. Suresh', '9731148809', 'dispatch@tirupatifabrics.in', '61 Avinashi Road', 'Coimbatore', 'Tamil Nadu', '33AAFFT3108C1ZF', 'AAFFT3108C', 'Blouse material, Daily wear'],
 ] as const;
 
 async function main() {
@@ -37,11 +37,11 @@ async function main() {
         sheetName: 'Synthetic demo', status: 'committed', rowsTotal: 5, rowsOk: 5, uploadedBy: 'demo-seed', committedAt: new Date(),
       }).returning({ id: importBatches.id });
       const ledgerRows = [
-        ['00001', 'KAV-SILK-101', 'Kaveri bridal silk', 'Silk sarees', 426, 1842000, 358, 1564800, 68, 384000],
-        ['00002', 'NAN-COT-310', 'Nandini cotton saree', 'Cotton sarees', 710, 1265000, 574, 1012000, 136, 253000],
-        ['00003', 'AAR-LIN-220', 'Aarna handloom linen', 'Linen', 384, 982000, 271, 721000, 113, 261000],
-        ['00004', 'SAA-OCC-510', 'Saanvi occasion lehenga', 'Occasion wear', 202, 1540000, 151, 1183000, 51, 357000],
-        ['00005', 'TIR-BLS-411', 'Tirupati blouse material', 'Blouse material', 926, 743000, 603, 491000, 323, 252000],
+        ['VEN-000001', 'KAV-SILK-101', 'Kaveri bridal silk', 'Silk sarees', 426, 1842000, 358, 1564800, 68, 384000],
+        ['VEN-000002', 'NAN-COT-310', 'Nandini cotton saree', 'Cotton sarees', 710, 1265000, 574, 1012000, 136, 253000],
+        ['VEN-000003', 'AAR-LIN-220', 'Aarna handloom linen', 'Linen', 384, 982000, 271, 721000, 113, 261000],
+        ['VEN-000004', 'SAA-OCC-510', 'Saanvi occasion lehenga', 'Occasion wear', 202, 1540000, 151, 1183000, 51, 357000],
+        ['VEN-000005', 'TIR-BLS-411', 'Tirupati blouse material', 'Blouse material', 926, 743000, 603, 491000, 323, 252000],
       ] as const;
       for (const [code, barcode, itemName, itemGroupName, purcQty, purcAmt, netSalesQty, netSalesAmt, clQty, clAmt] of ledgerRows) {
         await tx.insert(vendorStockLedger).values({ vendorId: vendorId.get(code)!, batchId: ledgerBatch.id, barcode, itemName, itemGroupName, periodFrom: '2026-01-01', periodTo: '2026-09-17', purcQty: String(purcQty), purcAmt: String(purcAmt), netPurcQty: String(purcQty), netPurcAmt: String(purcAmt), netSalesQty: String(netSalesQty), netSalesAmt: String(netSalesAmt), clQty: String(clQty), clAmt: String(clAmt), clMrp: String(clAmt * 1.45), raw: { synthetic: true } })
@@ -65,11 +65,11 @@ async function main() {
       }
       const orders = await tx.select({ id: vendorPurchaseOrders.id, number: vendorPurchaseOrders.poNumber }).from(vendorPurchaseOrders).where(inArray(vendorPurchaseOrders.poNumber, poSeed.map((p) => p[0])));
       const poId = new Map(orders.map((p) => [p.number, p.id]));
-      const payments = [['00001', 'PO-2609-041', '2026-09-16', 240000, 'UTR-KAV-0916'], ['00002', 'PO-2609-034', '2026-09-09', 314400, 'UTR-NAN-0909'], ['00004', 'PO-2608-018', '2026-08-20', 457500, 'UTR-SAA-0820'], ['00005', 'PO-2608-022', '2026-08-28', 130000, 'UTR-TIR-0828']] as const;
+      const payments = [['VEN-000001', 'PO-2609-041', '2026-09-16', 240000, 'UTR-KAV-0916'], ['VEN-000002', 'PO-2609-034', '2026-09-09', 314400, 'UTR-NAN-0909'], ['VEN-000004', 'PO-2608-018', '2026-08-20', 457500, 'UTR-SAA-0820'], ['VEN-000005', 'PO-2608-022', '2026-08-28', 130000, 'UTR-TIR-0828']] as const;
       for (const [code, poNumber, paidAt, amount, reference] of payments) await tx.insert(vendorPayments).values({ vendorId: vendorId.get(code)!, purchaseOrderId: poId.get(poNumber), paidAt, amount: String(amount), reference }).onConflictDoNothing();
       const people = await tx.select({ id: customers.id }).from(customers).limit(5);
       await tx.delete(vendorCustomerDemands).where(inArray(vendorCustomerDemands.category, ['Linen', 'Cotton sarees', 'Silk sarees', 'Blouse material', 'Occasion wear']));
-      const demands = [['00003', 'Linen', 86, 51, 186000, 'open'], ['00002', 'Cotton sarees', 142, 121, 84000, 'partially_fulfilled'], ['00001', 'Silk sarees', 118, 110, 64000, 'partially_fulfilled'], ['00005', 'Blouse material', 164, 101, 126000, 'open'], ['00004', 'Occasion wear', 74, 68, 72000, 'partially_fulfilled']] as const;
+      const demands = [['VEN-000003', 'Linen', 86, 51, 186000, 'open'], ['VEN-000002', 'Cotton sarees', 142, 121, 84000, 'partially_fulfilled'], ['VEN-000001', 'Silk sarees', 118, 110, 64000, 'partially_fulfilled'], ['VEN-000005', 'Blouse material', 164, 101, 126000, 'open'], ['VEN-000004', 'Occasion wear', 74, 68, 72000, 'partially_fulfilled']] as const;
       for (const [i, [code, category, requestedQty, fulfilledQty, expectedRevenue, status]] of demands.entries()) await tx.insert(vendorCustomerDemands).values({ customerId: people[i]?.id, vendorId: vendorId.get(code), category, requestedQty: String(requestedQty), fulfilledQty: String(fulfilledQty), expectedRevenue: String(expectedRevenue), status, requestedAt: '2026-09-17', notes: 'Synthetic seed demand' });
     });
     console.log('Vendor demo data seeded.');

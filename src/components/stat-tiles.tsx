@@ -198,7 +198,7 @@ export function RevenueRow({
         definition="Matched to sales, the loyalty list, and at least one lead sheet by normalized phone number."
       />
       <StatTile
-        label="Phone-less bills"
+        label="Bills without Contact No."
         value={formatCurrencyCompact(phonelessRevenue)}
         caption={`${formatNumber(phonelessBills)} bills · no number captured`}
         definition="No phone was taken at billing, so these can never match a lead even in principle. The ceiling on what attribution can explain."

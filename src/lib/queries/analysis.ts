@@ -251,41 +251,21 @@ export interface DayRow {
   revenue: number;
 }
 
-export interface TimeBandRow {
-  band: number;
-  label: string;
-  bills: number;
-  revenue: number;
-}
-
 const DAY_LABEL = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const BAND_LABEL = ['Morning · before 12pm', 'Afternoon · 12–5pm', 'Evening · 5–9pm', 'Night · after 9pm'];
 
 /**
- * When the stores actually sell — day of week and time of day, both in IST
- * (`billed_at` is stored UTC, D-32). Useful for staffing, not marketing: this
- * is when checkout happens, which lags "when people decided to buy" by
- * whatever the in-store dwell time is.
+ * When the stores actually sell — day of week, in IST (`billed_at` is stored
+ * UTC, D-32). There is no time-of-day view: sales come from the Barcode Wise
+ * export via Hemparshwa OS, which carries a bill's date but not its time.
  */
 export async function getSalesRhythm(
   batchId?: string | null,
   range: DateRange = {},
-): Promise<{ byDay: DayRow[]; byTimeBand: TimeBandRow[] }> {
+): Promise<{ byDay: DayRow[] }> {
   const clause = batchClause('batch_id', batchId) + scopeCondition('sales', range);
 
   const dayRows = await query(`
     SELECT EXTRACT(ISODOW FROM billed_at AT TIME ZONE 'Asia/Kolkata')::int AS dow,
-           COUNT(*)::int                          AS bills,
-           COALESCE(SUM(bill_amount), 0)::numeric AS revenue
-    FROM   sales WHERE TRUE ${clause} GROUP BY 1 ORDER BY 1`);
-
-  const bandRows = await query(`
-    SELECT (CASE
-              WHEN EXTRACT(HOUR FROM billed_at AT TIME ZONE 'Asia/Kolkata') < 12 THEN 0
-              WHEN EXTRACT(HOUR FROM billed_at AT TIME ZONE 'Asia/Kolkata') < 17 THEN 1
-              WHEN EXTRACT(HOUR FROM billed_at AT TIME ZONE 'Asia/Kolkata') < 21 THEN 2
-              ELSE 3
-            END)::int                              AS band,
            COUNT(*)::int                          AS bills,
            COALESCE(SUM(bill_amount), 0)::numeric AS revenue
     FROM   sales WHERE TRUE ${clause} GROUP BY 1 ORDER BY 1`);
@@ -297,14 +277,7 @@ export async function getSalesRhythm(
     revenue: Number(r.revenue ?? 0),
   }));
 
-  const byTimeBand = bandRows.map((r) => ({
-    band: Number(r.band),
-    label: BAND_LABEL[Number(r.band)] ?? String(r.band),
-    bills: Number(r.bills ?? 0),
-    revenue: Number(r.revenue ?? 0),
-  }));
-
-  return { byDay, byTimeBand };
+  return { byDay };
 }
 
 export interface SalesmanRow {

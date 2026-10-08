@@ -71,9 +71,7 @@ export default async function AnalysisPage({
   const maxSegmentShare = Math.max(...segments.segments.map((s) => s.shareOfRevenue), 1);
 
   const maxDayBills = Math.max(...rhythm.byDay.map((d) => d.bills), 1);
-  const maxBandBills = Math.max(...rhythm.byTimeBand.map((b) => b.bills), 1);
   const busiestDay = [...rhythm.byDay].sort((a, b) => b.bills - a.bills)[0];
-  const busiestBand = [...rhythm.byTimeBand].sort((a, b) => b.bills - a.bills)[0];
 
   const topStoreGap = [...orderValue.byStore].sort(
     (a, b) => b.meanBill - b.medianBill - (a.meanBill - a.medianBill),
@@ -241,7 +239,7 @@ export default async function AnalysisPage({
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <Finding
           eyebrow="Sales rhythm"
-          title={`${busiestDay?.label ?? '—'} is the busiest day, ${(busiestBand?.label ?? '').split(' ·')[0] ?? '—'} the busiest time`}
+          title={`${busiestDay?.label ?? '—'} is the busiest day`}
         >
           <div className="flex flex-col gap-2">
             {rhythm.byDay.map((d) => (
@@ -259,36 +257,14 @@ export default async function AnalysisPage({
             ))}
           </div>
 
-          <div className="border-t border-grid pt-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
-              By time of day
-            </p>
-            <div className="mt-2 flex flex-col gap-2">
-              {rhythm.byTimeBand.map((b) => (
-                <div key={b.band}>
-                  <div className="flex items-baseline justify-between gap-4 text-sm">
-                    <span className="text-ink">{b.label}</span>
-                    <span className="tnum text-ink-2">
-                      {formatNumber(b.bills)} bills · {formatCurrency(b.revenue)}
-                    </span>
-                  </div>
-                  <div className="mt-1">
-                    <Bar value={b.bills} scale={maxBandBills} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <Note>
-            Checkout time, not decision time — a bill is timestamped when it&rsquo;s billed, which
-            lags however long the customer spent in the store. Useful for staffing shifts, not
-            for reading campaign timing.
+            By the bill&rsquo;s date. Sales arrive from the Barcode Wise export, which has no time
+            of day, so there is no hourly view.
           </Note>
         </Finding>
 
         <Finding
-          eyebrow="Salesman performance"
+          eyebrow="Salesperson performance"
           title={`Top 12 of 40 salesman codes, by revenue`}
         >
           <div className="overflow-x-auto">
@@ -298,8 +274,8 @@ export default async function AnalysisPage({
                   <th className="pb-2 text-left font-bold">Code</th>
                   <th className="pb-2 text-left font-bold">Store</th>
                   <th className="pb-2 text-right font-bold">Bills</th>
-                  <th className="pb-2 text-right font-bold">Revenue</th>
-                  <th className="pb-2 text-right font-bold">Avg bill</th>
+                  <th className="pb-2 text-right font-bold">Sales</th>
+                  <th className="pb-2 text-right font-bold">Average bill value</th>
                 </tr>
               </thead>
               <tbody>

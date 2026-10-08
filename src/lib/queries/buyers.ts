@@ -52,6 +52,7 @@
  */
 
 import { db } from '@/db';
+import { possibleCustomerCode } from '@/lib/integration/events';
 import { sql, type SQL } from 'drizzle-orm';
 import { scopeCondition, type DateRange } from './dashboard';
 import type { ValueTierCode } from '@/lib/format';
@@ -214,7 +215,7 @@ export async function getBuyers(filters: BuyerFilters = {}): Promise<BuyerPage> 
   if (filters.q?.trim()) {
     const term = `%${filters.q.trim()}%`;
     conditions.push(
-      sql`(c.full_name ILIKE ${term} OR c.phone_national LIKE ${term} OR c.email ILIKE ${term} OR c.customer_code = ${filters.q.trim()})`,
+      sql`(c.full_name ILIKE ${term} OR c.phone_national LIKE ${term} OR c.email ILIKE ${term} OR c.customer_code = ${possibleCustomerCode(filters.q) ?? filters.q.trim()})`,
     );
   }
   if (filters.tier && filters.tier !== 'none') conditions.push(sql`t.value_tier = ${filters.tier}`);
@@ -298,12 +299,6 @@ export interface StoreSplit {
   spend: number;
 }
 
-export interface PaymentSplit {
-  method: string;
-  bills: number;
-  amount: number;
-}
-
 export interface SalesmanSplit {
   code: string;
   bills: number;
@@ -345,7 +340,6 @@ export interface BillLine {
   qty: number;
   discount: number;
   salesmanCode: string | null;
-  payments: Record<string, number>;
 }
 
 export interface Visit {
@@ -398,25 +392,14 @@ export interface BuyerProfile {
   dataThrough: string | null;
 
   stores: StoreSplit[];
-  payments: PaymentSplit[];
   salesmen: SalesmanSplit[];
   byDay: RhythmSlice[];
-  byBand: RhythmSlice[];
   prior: PriorHistory | null;
   acquisition: Acquisition | null;
   visitLog: Visit[];
 }
 
 const DAY_LABEL = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const BAND_LABEL = ['Morning · before 12pm', 'Afternoon · 12–5pm', 'Evening · 5–9pm', 'Night · after 9pm'];
-
-/** `EXTRACT(HOUR …)` band, matching `analysis.ts`'s `getSalesRhythm` exactly so the two never disagree. */
-const BAND_EXPR = `(CASE
-    WHEN EXTRACT(HOUR FROM s.billed_at AT TIME ZONE 'Asia/Kolkata') < 12 THEN 0
-    WHEN EXTRACT(HOUR FROM s.billed_at AT TIME ZONE 'Asia/Kolkata') < 17 THEN 1
-    WHEN EXTRACT(HOUR FROM s.billed_at AT TIME ZONE 'Asia/Kolkata') < 21 THEN 2
-    ELSE 3 END)::int`;
-
 /**
  * One buyer, every angle the bill-level data supports.
  *
@@ -459,7 +442,7 @@ export async function getBuyerProfile(
   // page; the caller cannot tell them apart and does not need to.
   if (!head) return null;
 
-  const [billStats, stores, payments, salesmen, dayRows, bandRows, priorRow, acqRow, billRows] =
+  const [billStats, stores, salesmen, dayRows, priorRow, acqRow, billRows] =
     await Promise.all([
       query(sql`
         SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY s.bill_amount)::numeric AS median_bill,
@@ -473,16 +456,6 @@ export async function getBuyerProfile(
         WHERE  s.customer_id = ${id}${scope}
         GROUP  BY st.name ORDER BY spend DESC`),
 
-      // `jsonb_each_text` fans a split-tender bill into one row per method, so
-      // `SUM(amount)` stays the money actually taken by that method while
-      // `COUNT(*)` counts bills that used it — the two never add to the same
-      // total for a split-tender buyer, and shouldn't.
-      query(sql`
-        SELECT p.key AS method, COUNT(*)::int AS bills, SUM(p.value::numeric) AS amount
-        FROM   sales s, LATERAL jsonb_each_text(s.payments) p
-        WHERE  s.customer_id = ${id}${scope}
-        GROUP  BY p.key ORDER BY amount DESC`),
-
       query(sql`
         SELECT s.salesman_code AS code, COUNT(*)::int AS bills, SUM(s.bill_amount) AS spend
         FROM   sales s
@@ -492,11 +465,6 @@ export async function getBuyerProfile(
       query(sql`
         SELECT EXTRACT(ISODOW FROM s.billed_at AT TIME ZONE 'Asia/Kolkata')::int AS dow,
                COUNT(*)::int AS bills, SUM(s.bill_amount) AS spend
-        FROM   sales s WHERE s.customer_id = ${id}${scope}
-        GROUP  BY 1 ORDER BY 1`),
-
-      query(sql`
-        SELECT ${sql.raw(BAND_EXPR)} AS band, COUNT(*)::int AS bills, SUM(s.bill_amount) AS spend
         FROM   sales s WHERE s.customer_id = ${id}${scope}
         GROUP  BY 1 ORDER BY 1`),
 
@@ -519,7 +487,7 @@ export async function getBuyerProfile(
       query(sql`
         SELECT s.voucher_no, s.billed_at, ${sql.raw(VISIT_DATE)} AS visit_date,
                st.name AS store_name, s.bill_amount, COALESCE(s.qty, 0)::int AS qty,
-               COALESCE(s.item_disc_amount, 0) AS discount, s.salesman_code, s.payments
+               COALESCE(s.item_disc_amount, 0) AS discount, s.salesman_code
         FROM   sales s JOIN stores st ON st.id = s.store_id
         WHERE  s.customer_id = ${id}${scope}
         ORDER  BY s.billed_at DESC`),
@@ -552,7 +520,6 @@ export async function getBuyerProfile(
       qty: num(r.qty),
       discount: num(r.discount),
       salesmanCode: str(r.salesman_code),
-      payments: (r.payments as Record<string, number>) ?? {},
     };
     const visit = byVisit.get(date) ?? { date, bills: [], spend: 0, qty: 0 };
     visit.bills.push(line);
@@ -629,11 +596,6 @@ export async function getBuyerProfile(
       bills: num(r.bills),
       spend: num(r.spend),
     })),
-    payments: payments.map((r) => ({
-      method: String(r.method),
-      bills: num(r.bills),
-      amount: num(r.amount),
-    })),
     salesmen: salesmen.map((r) => ({
       code: String(r.code),
       bills: num(r.bills),
@@ -641,11 +603,6 @@ export async function getBuyerProfile(
     })),
     byDay: dayRows.map((r) => ({
       label: DAY_LABEL[num(r.dow)] ?? String(r.dow),
-      bills: num(r.bills),
-      spend: num(r.spend),
-    })),
-    byBand: bandRows.map((r) => ({
-      label: BAND_LABEL[num(r.band)] ?? String(r.band),
       bills: num(r.bills),
       spend: num(r.spend),
     })),

@@ -8,7 +8,7 @@ import { LeadActions } from './marketing-lead-actions';
 type SalesTab = 'Calling queue' | 'Follow-ups';
 
 export function SalespersonMarketingWorkspace() {
-  const { data, save, message } = useMarketing('salesperson:abishek');
+  const { data, save, message } = useMarketing();
   const [tab, setTab] = useState<SalesTab>('Calling queue');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -30,7 +30,7 @@ export function SalespersonMarketingWorkspace() {
   }
 
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Salesperson workspace</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Abishek calling desk</h1><p className="mt-2 text-sm text-ink-2">Calling queue and follow-ups only.</p></div><span className="rounded-full bg-inset px-3 py-2 text-xs text-ink-2">Local browser records</span></header>
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Salesperson workspace</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Abishek calling desk</h1><p className="mt-2 text-sm text-ink-2">Calling queue and follow-ups only.</p></div><span className="rounded-full bg-inset px-3 py-2 text-xs text-ink-2">Shared records</span></header>
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
     <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Salesperson sections">
       {(['Calling queue', 'Follow-ups'] as const).map(t => <button key={t} className={tab === t ? primary : button} aria-current={tab === t ? 'page' : undefined} onClick={() => changeTab(t)}>{t}{t === 'Calling queue' ? ` (${queue.length})` : ` (${pending.length})`}</button>)}

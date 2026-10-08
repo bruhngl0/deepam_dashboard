@@ -201,6 +201,40 @@ Same five as `.env.example`, now split by where they live:
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Plain env var | Public by design; read per-request, not baked into the image |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Plain env var | `/sign-in` — without it Clerk defaults to its own hosted `*.accounts.dev` page (D-93) |
 | `ALLOW_MASTER_SHEET_IMPORT` | Plain env var | Leave `false` until you deliberately want the lead-layer-replacing commit route live (D-89) |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | Secrets Manager | Service-account JSON key for reading private Google Sheets in the live lead import (D-94). Optional; without it only sheets shared as "Anyone with the link" can be connected |
+| `CRON_SECRET` | Secrets Manager | Bearer token for `/api/marketing/sheet-sync/cron`. Needed only with the scheduler below |
+| `MARKETING_SHEET_SYNC_MINUTES` | Plain env var | In-process sync timer interval, default `5`; `0` disables it |
+
+## Live Google Sheet sync (optional)
+
+Sheets shared as "Anyone with the link" need no setup: connect them in
+Marketing → Import → Live Google Sheets. To keep a sheet private instead:
+
+1. In Google Cloud: create a project, enable the **Google Sheets API**, create
+   a service account, and download a JSON key for it.
+2. Store the key and add both new secrets to the instance role's policy and
+   to `RuntimeEnvironmentSecrets`, the same way as `DATABASE_URL`:
+   `aws secretsmanager create-secret --name deepam-crm/google-service-account --secret-string file://key.json`
+3. Share the lead sheet with the key's `client_email` as a Viewer, then
+   connect it in Marketing → Import → Live Google Sheets.
+
+The app starts a timer that checks the sheet every
+`MARKETING_SHEET_SYNC_MINUTES`. App Runner throttles a container's CPU while
+it is serving no requests, so that timer can run late on a quiet service. For
+a schedule that does not depend on traffic, have EventBridge Scheduler call
+the cron route, which wakes the container itself:
+
+```bash
+aws events create-connection --name deepam-crm-cron \
+  --authorization-type API_KEY \
+  --auth-parameters 'ApiKeyAuthParameters={ApiKeyName=Authorization,ApiKeyValue="Bearer <CRON_SECRET>"}'
+aws events create-api-destination --name deepam-crm-sheet-sync \
+  --connection-arn <connection ARN> --http-method POST \
+  --invocation-endpoint https://<service URL>/api/marketing/sheet-sync/cron
+# then a rule or schedule with rate(5 minutes) targeting that API destination
+```
+
+Running both is fine: a sync that finds nothing new writes nothing.
 
 ## After the service is up
 
