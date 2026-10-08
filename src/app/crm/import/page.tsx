@@ -16,6 +16,9 @@ import { BulkLeadsImportForm } from '@/components/bulk-leads-import-form';
 import { ImportForm } from '@/components/import-form';
 import { InstagramLeadsImportForm } from '@/components/instagram-leads-import-form';
 import { ExistingCustomersImportForm } from '@/components/existing-customers-import-form';
+import { HemparshwaSyncPanel } from '@/components/hemparshwa-sync-panel';
+import { syncIntervalHours } from '@/lib/integration/hemparshwa-schedule';
+import { getHemparshwaCopy } from '@/lib/integration/hemparshwa-status';
 import { requireUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +27,7 @@ export default async function ImportPage() {
   await requireUser();
 
   const commitEnabled = process.env.ALLOW_MASTER_SHEET_IMPORT === 'true';
+  const hemparshwa = await getHemparshwaCopy();
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
@@ -36,6 +40,17 @@ export default async function ImportPage() {
       </header>
 
       <div className="flex flex-col gap-6">
+        <section className="card rounded-2xl border border-line bg-surface p-6">
+          <h2 className="text-lg font-semibold tracking-tight text-ink">Sales from Hemparshwa OS</h2>
+          <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
+            Sales are imported in Hemparshwa OS (the Barcode Wise file) and pulled in here on their
+            own. Press Sync now to pull a new import straight away.
+          </p>
+          <div className="mt-4">
+            <HemparshwaSyncPanel copy={hemparshwa} everyHours={syncIntervalHours()} />
+          </div>
+        </section>
+
         <section className="card rounded-2xl border border-line bg-surface p-6">
           <h2 className="text-lg font-semibold tracking-tight text-ink">Existing customers</h2>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
