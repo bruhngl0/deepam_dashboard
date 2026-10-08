@@ -55,3 +55,18 @@ export function startHemparshwaSyncScheduler() {
   state.hemparshwaSyncTimer = setInterval(tick, hours * 3_600_000);
   state.hemparshwaSyncTimer.unref();
 }
+
+/**
+ * Empties CRM's copy of Hemparshwa's sales and everything built from it (bills
+ * and line items; customers stay). The next sync brings back whatever
+ * Hemparshwa still holds.
+ */
+export async function clearHemparshwaSales(): Promise<ProjectionResult> {
+  await state.hemparshwaSyncRunning?.catch(() => {});
+  const { sql } = await import('drizzle-orm');
+  const { db } = await import('@/db');
+  const { projectHemparshwaSales } = await import('./hemparshwa-project');
+  // The rebuild removes the bills of every batch that no longer has an import.
+  await db.execute(sql`DELETE FROM hemparshwa_imports`);
+  return projectHemparshwaSales();
+}
