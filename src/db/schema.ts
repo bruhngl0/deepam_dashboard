@@ -221,6 +221,9 @@ export const customers = pgTable(
     city: text('city'),
     dateOfBirth: date('date_of_birth'),
     anniversary: date('anniversary'),
+    /** From the ERP's Customer Master, by way of Hemparshwa OS. */
+    gstNo: text('gst_no'),
+    panNo: text('pan_no'),
     preferredStoreId: integer('preferred_store_id').references(() => stores.id),
     lifecycle: lifecycleEnum('lifecycle').notNull().default('unknown'), // D-38
     lifecycleBasis: lifecycleBasisEnum('lifecycle_basis'),
@@ -786,6 +789,37 @@ export const hemparshwaSalesLines = pgTable(
       .on(t.customerPhone)
       .where(sql`customer_phone IS NOT NULL`),
     index('hemparshwa_sales_lines_sku_idx').on(t.skuCode),
+  ],
+);
+
+/** One row per Customer Master row an import wrote, as the file gave it. `customer_id` is Hemparshwa's. */
+export const hemparshwaCustomers = pgTable(
+  'hemparshwa_customers',
+  {
+    importId: integer('import_id')
+      .notNull()
+      .references(() => hemparshwaImports.importId, { onDelete: 'cascade' }),
+    rowNumber: integer('row_number').notNull(),
+    customerId: text('customer_id'),
+    customerCode: text('customer_code'),
+    name: text('name'),
+    phone: text('phone'),
+    email: text('email'),
+    city: text('city'),
+    storeId: text('store_id'),
+    storeName: text('store_name'),
+    birthDate: date('birth_date'),
+    /** As the ERP writes it ("24 Yrs, 6 Month"). */
+    age: text('age'),
+    anniversaryDate: date('anniversary_date'),
+    gstNo: text('gst_no'),
+    panNo: text('pan_no'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.importId, t.rowNumber] }),
+    index('hemparshwa_customers_phone_idx')
+      .on(t.phone)
+      .where(sql`phone IS NOT NULL`),
   ],
 );
 

@@ -41,10 +41,10 @@ export default async function ImportPage() {
 
       <div className="flex flex-col gap-6">
         <section className="card rounded-2xl border border-line bg-surface p-6">
-          <h2 className="text-lg font-semibold tracking-tight text-ink">Sales from Hemparshwa OS</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-ink">Sales and customers from Hemparshwa OS</h2>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
-            Sales are imported in Hemparshwa OS (the Barcode Wise file) and pulled in here on their
-            own. Press Sync now to pull a new import straight away.
+            Sales (the Barcode Wise file) and the Customer Master are imported in Hemparshwa OS and
+            pulled in here on their own. Press Sync now to pull a new import straight away.
           </p>
           <div className="mt-4">
             <HemparshwaSyncPanel copy={hemparshwa} everyHours={syncIntervalHours()} />

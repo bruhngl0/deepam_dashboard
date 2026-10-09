@@ -1,6 +1,6 @@
 /**
  * Hemparshwa OS → CRM. Hemparshwa is where source files are imported; CRM keeps
- * a copy of the imported rows and pulls it here. Hemparshwa's live service has
+ * a copy of the imported sales lines and Customer Master rows and pulls it here. Hemparshwa's live service has
  * no outbound internet, so CRM is always the caller.
  *
  * The feed lists every import whose rows are in Hemparshwa, each with a version
@@ -30,9 +30,12 @@ export interface SyncPlan {
   fetch: FeedImport[];
 }
 
-/** Which copied imports to drop and which feed imports to (re)fetch. Only sales rows are served so far. */
+/** The imports CRM keeps a copy of: sales lines and the Customer Master. */
+const COPIED = new Set(['sales', 'customers']);
+
+/** Which copied imports to drop and which feed imports to (re)fetch. */
 export function planSync(feed: FeedImport[], copied: { importId: number; version: string }[]): SyncPlan {
-  const wanted = feed.filter((i) => i.data_type === 'sales');
+  const wanted = feed.filter((i) => COPIED.has(i.data_type));
   const have = new Map(copied.map((c) => [c.importId, c.version]));
   const listed = new Set(wanted.map((i) => i.import_id));
   return {
@@ -111,6 +114,19 @@ export async function syncHemparshwa(): Promise<SyncResult> {
         for (const page of pages) {
           if (page.length === 0) continue;
           // One JSON parameter per page: a row-per-parameter insert would pass Postgres's 65535 limit. (D-62)
+          if (imp.data_type === 'customers') {
+            await tx.execute(sql`
+              INSERT INTO hemparshwa_customers
+                (import_id, row_number, customer_id, customer_code, name, phone, email, city, store_id, store_name,
+                 birth_date, age, anniversary_date, gst_no, pan_no)
+              SELECT ${imp.import_id}, x.row_number, x.customer_id, x.customer_code, x.name, x.phone, x.email, x.city, x.store_id, x.store_name,
+                 x.birth_date, x.age, x.anniversary_date, x.gst_no, x.pan_no
+              FROM jsonb_to_recordset(${JSON.stringify(page)}::jsonb) AS x(
+                 row_number int, customer_id text, customer_code text, name text, phone text, email text, city text, store_id text,
+                 store_name text, birth_date date, age text, anniversary_date date, gst_no text, pan_no text)
+            `);
+            continue;
+          }
           await tx.execute(sql`
             INSERT INTO hemparshwa_sales_lines
               (import_id, store_id, store_name, invoice_id, invoice_date, sales_type, invoice_line_id, sku_code, sku_name,
@@ -137,7 +153,7 @@ export async function syncHemparshwa(): Promise<SyncResult> {
       });
       synced.push({ importId: imp.import_id, rows });
     }
-    return { removed: plan.remove, synced, unchanged: imports.filter((i) => i.data_type === 'sales').length - plan.fetch.length };
+    return { removed: plan.remove, synced, unchanged: imports.filter((i) => COPIED.has(i.data_type)).length - plan.fetch.length };
   } finally {
     await pool.end();
   }

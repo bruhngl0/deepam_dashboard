@@ -10,9 +10,9 @@
  */
 
 import { syncHemparshwa, type SyncResult } from './hemparshwa';
-import type { ProjectionResult } from './hemparshwa-project';
+import type { CustomerProjectionResult, ProjectionResult } from './hemparshwa-project';
 
-export type HemparshwaRun = SyncResult & { projection: ProjectionResult | null };
+export type HemparshwaRun = SyncResult & { customers: CustomerProjectionResult | null; projection: ProjectionResult | null };
 
 const state = globalThis as unknown as {
   hemparshwaSyncTimer?: ReturnType<typeof setInterval>;
@@ -24,10 +24,12 @@ export function runHemparshwaSync(forceRebuild = false): Promise<HemparshwaRun> 
   state.hemparshwaSyncRunning ??= (async () => {
     const sync = await syncHemparshwa();
     const changed = sync.removed.length > 0 || sync.synced.length > 0;
-    if (!changed && !forceRebuild) return { ...sync, projection: null };
+    if (!changed && !forceRebuild) return { ...sync, customers: null, projection: null };
     // Loaded only when needed: it pulls in the database client.
-    const { projectHemparshwaSales } = await import('./hemparshwa-project');
-    return { ...sync, projection: await projectHemparshwaSales() };
+    const { projectHemparshwaCustomers, projectHemparshwaSales } = await import('./hemparshwa-project');
+    // The Customer Master first: the sales rebuild ends by refreshing what the customer screens read.
+    const customers = await projectHemparshwaCustomers();
+    return { ...sync, customers, projection: await projectHemparshwaSales() };
   })().finally(() => {
     state.hemparshwaSyncRunning = undefined;
   });
@@ -57,7 +59,7 @@ export function startHemparshwaSyncScheduler() {
 }
 
 /**
- * Empties CRM's copy of Hemparshwa's sales and everything built from it (bills
+ * Empties CRM's copy of Hemparshwa's imports and everything built from it (bills
  * and line items; customers stay). The next sync brings back whatever
  * Hemparshwa still holds.
  */
