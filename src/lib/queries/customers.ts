@@ -68,6 +68,8 @@ export interface CustomerRow {
   city: string | null;
   dateOfBirth: string | null;
   anniversary: string | null;
+  gstNo: string | null;
+  panNo: string | null;
   storeName: string | null;
   lifecycle: string;
   lifecycleBasis: string | null;
@@ -228,6 +230,7 @@ export async function getCustomers(filters: CustomerFilters): Promise<CustomerPa
       c.id, c.customer_code, c.phone_e164, c.full_name, c.email, c.area, c.city,
       c.date_of_birth::text AS date_of_birth,
       c.anniversary::text AS anniversary,
+      c.gst_no, c.pan_no,
       c.lifecycle::text AS lifecycle,
       c.lifecycle_basis::text AS lifecycle_basis,
       ca.primary_channel::text AS primary_channel,
@@ -275,6 +278,8 @@ export async function getCustomers(filters: CustomerFilters): Promise<CustomerPa
       city: r.city ? String(r.city) : null,
       dateOfBirth: r.date_of_birth ? String(r.date_of_birth) : null,
       anniversary: r.anniversary ? String(r.anniversary) : null,
+      gstNo: r.gst_no ? String(r.gst_no) : null,
+      panNo: r.pan_no ? String(r.pan_no) : null,
       storeName: r.store_name ? String(r.store_name) : null,
       lifecycle: String(r.lifecycle),
       lifecycleBasis: r.lifecycle_basis ? String(r.lifecycle_basis) : null,
@@ -319,6 +324,7 @@ export async function getCustomersForExport(
       c.id, c.customer_code, c.phone_e164, c.full_name, c.email, c.area, c.city,
       c.date_of_birth::text AS date_of_birth,
       c.anniversary::text AS anniversary,
+      c.gst_no, c.pan_no,
       c.lifecycle::text AS lifecycle,
       c.lifecycle_basis::text AS lifecycle_basis,
       ca.primary_channel::text AS primary_channel,
@@ -365,6 +371,8 @@ export async function getCustomersForExport(
     city: r.city ? String(r.city) : null,
     dateOfBirth: r.date_of_birth ? String(r.date_of_birth) : null,
     anniversary: r.anniversary ? String(r.anniversary) : null,
+    gstNo: r.gst_no ? String(r.gst_no) : null,
+    panNo: r.pan_no ? String(r.pan_no) : null,
     storeName: r.store_name ? String(r.store_name) : null,
     lifecycle: String(r.lifecycle),
     lifecycleBasis: r.lifecycle_basis ? String(r.lifecycle_basis) : null,

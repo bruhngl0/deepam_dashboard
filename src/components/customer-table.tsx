@@ -170,6 +170,8 @@ function Row({ row }: { row: CustomerRow }) {
               <DetailField label="City" value={orNotProvided(row.city)} />
               <DetailField label="Date of birth" value={formatDate(row.dateOfBirth)} />
               <DetailField label="Anniversary" value={formatDate(row.anniversary)} />
+              <DetailField label="GST No" value={orNotProvided(row.gstNo)} />
+              <DetailField label="PAN No" value={orNotProvided(row.panNo)} />
 
               <DetailField
                 label="Campaigns"

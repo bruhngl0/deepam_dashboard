@@ -134,6 +134,13 @@
       "when": 1791441000000,
       "tag": "0018_hemparshwa_mirror",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791527400000,
+      "tag": "0019_hemparshwa_customers",
+      "breakpoints": true
     }
   ]
 }
