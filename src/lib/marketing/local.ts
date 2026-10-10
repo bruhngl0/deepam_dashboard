@@ -1,7 +1,7 @@
 import { normalizePhone } from '@/lib/phone';
 
 export const SOURCES = ['Meta ads', 'Google ads', 'Website', 'WhatsApp', 'Instagram DM', 'Influencer', 'Events', 'Referral', 'Walkin'] as const;
-export const STORES = ['MG', 'JAYNAGAR', 'Online'] as const;
+export const STORES = ['MG', 'JAYNAGAR', 'Online', 'Exhibition'] as const;
 export const OUTCOMES = ['Connected / interested', 'Connected / follow-up required', 'Connected / not interested', 'No answer', 'Callback required', 'Wrong number'] as const;
 export type Outcome = typeof OUTCOMES[number];
 export type Acquisition = { source: string; campaignId: string; at: string; cost: number | null };
@@ -26,7 +26,7 @@ export const nowLocal = () => new Date().toLocaleString('sv-SE', { timeZone: 'As
 
 export function normalizeStore(value: string): string {
   const store = value.toUpperCase().replace(/[\s._-]/g, '');
-  return ['MG', 'MGROAD'].includes(store) ? 'MG' : ['JAYNAGAR', 'JAYANAGAR'].includes(store) ? 'JAYNAGAR' : store === 'ONLINE' ? 'Online' : '';
+  return ['MG', 'MGROAD'].includes(store) ? 'MG' : ['JAYNAGAR', 'JAYANAGAR'].includes(store) ? 'JAYNAGAR' : store === 'ONLINE' ? 'Online' : store === 'EXHIBITION' ? 'Exhibition' : '';
 }
 export function normalizeSource(value: string): string {
   const key = value.toLowerCase().replace(/[^a-z]/g, '');
@@ -116,7 +116,7 @@ export function previewRows(rows: Record<string, unknown>[], kind: Kind, mapping
     const at = parseDateTime(row[mapping.date]);
     if (at === null) { fail('Invalid date/time. Use YYYY-MM-DD HH:mm or DD/MM/YYYY HH:mm'); continue; }
     const store = normalizeStore(get('preferredStore'));
-    if (get('preferredStore') && !store) { fail('Store must be MG, JAYNAGAR, or Online'); continue; }
+    if (get('preferredStore') && !store) { fail('Store must be MG, JAYNAGAR, Online, or Exhibition'); continue; }
     if (kind === 'leads') {
       const sources = [...new Set(get('source').split(/[,;|]/).map(normalizeSource))];
       if (!get('name') || !sources.length || sources.some(s => !s)) { fail('Name and a supported source are required'); continue; }

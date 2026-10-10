@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { callsForSync, type Dataset, type Lead, type Sale } from '@/lib/marketing/local';
+import { callsForSync, campaignTail, type Dataset, type Lead, type Sale } from '@/lib/marketing/local';
+import { routeLabel } from '@/lib/marketing/sheet-routing';
 export const button = 'inline-flex items-center justify-center rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-inset focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40';
 export const primary = `${button} !bg-accent !text-white !border-accent`;
 export const input = 'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-2 focus:outline-accent';
@@ -11,6 +12,23 @@ export const dayMonthYearLabel = (s: string) => {
   const [year, month, day] = s.slice(0, 10).split('-');
   return year && month && day ? `${day}-${month}-${year}` : 'Not recorded';
 };
+export const dayMonthYearTimeLabel = (s: string) => s.length >= 16 ? `${dayMonthYearLabel(s)} ${s.slice(11, 16)}` : dayMonthYearLabel(s);
+
+/** Shubh Convention / BLVD Club style tag for a routed campaign lead; nothing otherwise. */
+export function CampaignTag({ lead }: { lead: Lead }) {
+  const label = routeLabel(lead.claimGroup);
+  return label ? <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-medium text-accent">{label}</span> : null;
+}
+
+/** Source · campaign · date-time · store line shown under a lead everywhere it is listed. */
+export function LeadMeta({ lead, className = 'mt-3' }: { lead: Lead; className?: string }) {
+  return <div className={`${className} flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted`}>
+    <span>{[...new Set(lead.acquisitions.map(acquisition => acquisition.source))].join(', ')}</span>
+    <span>{[...new Set(lead.acquisitions.map(acquisition => campaignTail(acquisition.campaignId)).filter(Boolean))].join(', ') || 'No campaign'}</span>
+    <span>{dayMonthYearTimeLabel(lead.acquiredAt)}</span>
+    <span>{lead.preferredStore || 'Store not recorded'}</span>
+  </div>;
+}
 export function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="flex min-w-0 flex-col gap-1.5 text-sm text-ink-2">{label}{children}</label>; }
 const synced = new Set<string>();
 /** Pushes logged calls to the shared database. Idempotent server-side; failures are retried on the next load or call. */

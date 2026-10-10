@@ -24,6 +24,27 @@ const MAX_DOC_BYTES = 256 * 1024;
 export type LeadWrite = { lead: Lead; version: number };
 export type SaveResult = { versions: Record<string, number>; conflicts: string[]; inserted: number; updated: number; sales: number };
 
+/**
+ * Leads in a salesperson's calling queue: claimed by them, no call logged, not
+ * closed and not converted. Mirrors the queue in the salesperson workspace.
+ */
+export async function openQueueCount(salesperson: string): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT count(*)::int AS n
+    FROM marketing_leads ml
+    WHERE ml.doc->>'claimedBy' = ${salesperson}
+      AND COALESCE(ml.doc->>'status', 'New') NOT IN ('Connected / not interested', 'Wrong number')
+      AND NOT EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(COALESCE(ml.doc->'interactions', '[]'::jsonb)) interaction
+        WHERE interaction->>'type' = 'call'
+      )
+      AND NOT EXISTS (SELECT 1 FROM marketing_sales ms WHERE ms.phone = ml.phone)
+  `) as unknown;
+  const rows = Array.isArray(result) ? result : (result as { rows?: { n: number }[] }).rows ?? [];
+  return Number((rows as { n: number }[])[0]?.n ?? 0);
+}
+
 export async function claimLeads(salesperson: string, claimedAt: string, limit = 10, routing: ClaimRouting = { exclude: [] }): Promise<string[]> {
   const group = sql`COALESCE(ml.doc->>'claimGroup', '')`;
   const groups = (list: string[]) => sql.join(list.map((g) => sql`${g}`), sql`, `);
