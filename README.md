@@ -19,10 +19,17 @@ Code comments reference decision IDs — `// D-20: junk placeholder filter` — 
 
 ```bash
 npm install
-cp .env.example .env.local        # add your PostgreSQL connection string
+docker compose up -d              # local Postgres 18 on localhost:5435 (docker-compose.yml)
+cp .env.example .env.local        # DATABASE_URL="postgresql://deepam_crm:deepam_crm@localhost:5435/deepam_crm"
 npm run db:migrate                # create schema + attribution view
 npm run db:seed                   # stores and campaigns
 npm run dev
+```
+
+Never point `.env.local` at production RDS: `npm test` includes smoke tests that write to whatever `DATABASE_URL` names, and the sheet-sync timer runs in dev too. For realistic data, restore a production dump into the local database instead of seeding:
+
+```bash
+docker compose exec -T db pg_restore -U deepam_crm -d deepam_crm --no-owner --no-acl < <file.dump>
 ```
 
 ## Commands
