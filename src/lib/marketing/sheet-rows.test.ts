@@ -73,4 +73,8 @@ describe('google sheet rows', () => {
     expect(() => gridHeaders([['Name', 'Name']])).toThrow(/Duplicate/);
     expect(() => gridHeaders([])).toThrow(/No columns/);
   });
+  it('picks up the lead form visit day and time slot columns', () => {
+    const tab = tabRows([['full_name', 'phone_number', 'which_day_would_you_like_to_visit?', 'preferred_time_slot'], ['Asha', '9000123410', 'friday,_16_october', '2:30_pm_–_4:30_pm']], 'Meta ads')!;
+    expect(tab.rows[0]).toMatchObject({ visitDay: 'friday,_16_october', visitSlot: '2:30_pm_–_4:30_pm' });
+  });
 });

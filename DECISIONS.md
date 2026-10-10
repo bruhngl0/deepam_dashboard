@@ -563,10 +563,10 @@ total_leads                                        = sum(leads by channel) - exi
 **Confidence:** Reasoned · **Reversal:** Costly
 **Choose Workers instead only if you later need sub-50ms global reads — which a two-store internal CRM does not.**
 
-### D-71 — Neon Postgres
-**Rule:** As stated.
-**Why:** The product is entirely aggregation and joins — that's SQL's job. Branching lets you fork production to test a risky import. Scale-to-zero suits a tool used a few hours a day.
-**Confidence:** Reasoned · **Reversal:** Costly
+### D-71 — PostgreSQL on AWS RDS (was: Neon Postgres)
+**Rule:** Production runs on the RDS instance `deepam-crm-db` (ap-south-1, PostgreSQL 18), alongside the App Runner service.
+**Why:** The product is entirely aggregation and joins — that's SQL's job. Neon was the original choice for branching and scale-to-zero, but the in-process sheet and Hemparshwa timers keep the database awake around the clock, so scale-to-zero never happened; on 2026-10-10 the project hit its plan quota and every query was refused for hours. RDS has no compute quota to run out of and sits in the same region as the app.
+**Confidence:** Proven · **Reversal:** Costly
 
 ### D-72 — Drizzle over Prisma
 **Rule:** As stated.
@@ -583,11 +583,11 @@ total_leads                                        = sum(leads by channel) - exi
 **Why:** Handles `.xlsx` and `.csv`, and reads the multi-sheet Meta workbook natively.
 **Confidence:** Reasoned · **Reversal:** Cheap
 
-### D-75 — Neon serverless HTTP driver
-**Rule:** As stated.
-**Why:** Avoids connection-pool exhaustion under serverless concurrency.
-**Confidence:** Proven (standard) · **Reversal:** Free
-**Caveat:** HTTP driver doesn't support multi-statement transactions — use the pooled WebSocket driver for the D-60 commit path specifically.
+### D-75 — One node-postgres pool per process (was: Neon serverless HTTP driver)
+**Rule:** `src/db/index.ts` builds one shared `pg` pool; `db` and `txDb()` both use it, and `db.transaction()` checks out its own client.
+**Why:** The app is a long-running container, not serverless, so the pool-exhaustion argument for an HTTP driver no longer applies, and one driver means transactions and reads behave the same. Session state cannot leak between pooled callers because every temp table is `ON COMMIT DROP`.
+**Confidence:** Proven · **Reversal:** Cheap
+**Caveat:** RDS needs `sslmode=verify-full&sslrootcert=certs/rds-global-bundle.pem`; Node does not trust the RDS CA on its own.
 
 ### D-76 — Metric SQL lives in one shared module
 **Rule:** All metric queries in `lib/queries/*.ts`, used by both Server Components and REST routes.

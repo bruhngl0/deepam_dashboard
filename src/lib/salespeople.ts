@@ -28,6 +28,7 @@ export const SALESPEOPLE = [
   { employeeNumber: 'DBYA0015', name: 'Srinivas G', slug: 'srinivas-g' },
   { employeeNumber: 'DBYA0011', name: 'Swetha N', slug: 'swetha-n' },
   { employeeNumber: 'DBYA0021', name: 'Yasar Arafat', slug: 'yasar-arafat' },
+  { employeeNumber: 'DBYA0009', name: 'Sandhya', slug: 'sandhya' },
 ] as const satisfies readonly Salesperson[];
 
 export function getSalesperson(slug: string) {

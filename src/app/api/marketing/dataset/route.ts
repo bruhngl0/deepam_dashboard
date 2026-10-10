@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   if (!Number.isSafeInteger(after) || after < 0) return NextResponse.json({ error: 'Invalid cursor.' }, { status: 400 });
   const part = params.get('part');
   if (part === 'stamp') return NextResponse.json({ stamp: await datasetStamp() });
-  if (part === 'leads') return NextResponse.json(await leadPage(after, LEAD_PAGE));
+  if (part === 'leads') return NextResponse.json(await leadPage(after, LEAD_PAGE, true));
   if (part === 'sales') return NextResponse.json(await salePage(after, SALE_PAGE));
   return NextResponse.json({ error: 'part must be stamp, leads or sales.' }, { status: 400 });
 }

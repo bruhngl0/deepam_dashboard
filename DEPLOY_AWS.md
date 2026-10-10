@@ -1,7 +1,7 @@
 # Deploying to AWS (App Runner)
 
-This app has no AWS-specific code — Neon's connection string and Clerk both
-work from anywhere. What's here makes it *runnable* as a container: a
+The database is PostgreSQL on RDS (`deepam-crm-db`, D-71); the image ships the
+Amazon RDS CA bundle in `certs/` so `DATABASE_URL` can use `sslmode=verify-full`. What's here makes it *runnable* as a container: a
 multi-stage `Dockerfile` producing a minimal `next start`-equivalent image
 (`output: 'standalone'`, D-70's Node-runtime requirement unchanged), and
 `GET /api/health` as an unauthenticated liveness endpoint (App Runner has no
@@ -105,7 +105,7 @@ aws iam attach-role-policy \
 #    (Clerk's publishable key, the sign-in URL, the import kill-switch) is
 #    fine as a plain runtime env var — see .env.example for what each does.
 aws secretsmanager create-secret --name deepam-crm/database-url \
-  --secret-string "<your real Neon pooled connection string>"
+  --secret-string "postgresql://<user>:<password>@<instance>.<region>.rds.amazonaws.com:5432/deepam_crm?sslmode=verify-full&sslrootcert=certs/rds-global-bundle.pem"
 aws secretsmanager create-secret --name deepam-crm/clerk-secret-key \
   --secret-string "<sk_live_xxx>"
 
@@ -196,7 +196,7 @@ Same five as `.env.example`, now split by where they live:
 
 | Variable | Where | Why |
 |---|---|---|
-| `DATABASE_URL` | Secrets Manager | Neon pooled connection string |
+| `DATABASE_URL` | Secrets Manager | RDS connection string with `sslmode=verify-full&sslrootcert=certs/rds-global-bundle.pem` |
 | `CLERK_SECRET_KEY` | Secrets Manager | Server-side Clerk API access |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Plain env var | Public by design; read per-request, not baked into the image |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Plain env var | `/sign-in` — without it Clerk defaults to its own hosted `*.accounts.dev` page (D-93) |
@@ -255,7 +255,7 @@ Running both is fine: a sync that finds nothing new writes nothing.
 ```bash
 docker build -t deepam-crm:local .
 docker run -d --name deepam-crm-local -p 8080:3000 \
-  -e DATABASE_URL="<real Neon connection string>" \
+  -e DATABASE_URL="<RDS connection string>" \
   -e CLERK_SECRET_KEY="<sk_...>" \
   -e NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="<pk_...>" \
   -e NEXT_PUBLIC_CLERK_SIGN_IN_URL="/sign-in" \

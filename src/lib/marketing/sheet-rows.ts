@@ -6,7 +6,7 @@
 
 import { guessMapping, type Mapping } from './local';
 
-export const LEAD_FIELDS = ['phone', 'name', 'email', 'city', 'source', 'campaignId', 'preferredStore', 'date', 'cost'] as const;
+export const LEAD_FIELDS = ['phone', 'name', 'email', 'city', 'source', 'campaignId', 'preferredStore', 'date', 'cost', 'visitDay', 'visitSlot'] as const;
 export type LeadField = typeof LEAD_FIELDS[number];
 export type LeadMapping = Record<LeadField, string>;
 
@@ -27,9 +27,18 @@ export function gridToRows(grid: unknown[][]): Record<string, unknown>[] {
   return grid.slice(1).map((row) => Object.fromEntries(headers.flatMap((h, i) => (h ? [[h, row[i] ?? '']] : []))));
 }
 
+// Lead-form questions about the store visit, matched like guessMapping does.
+const VISIT_HEADERS = {
+  visitDay: ['whichdaywouldyouliketovisit', 'preferredday', 'visitday', 'preferredvisitday', 'dayofvisit'],
+  visitSlot: ['preferredtimeslot', 'timeslot', 'visittime', 'preferredtime', 'visitslot'],
+};
+
 export function guessLeadMapping(headers: string[]): LeadMapping {
-  const guess = guessMapping(headers.filter(Boolean));
-  return Object.fromEntries(LEAD_FIELDS.map((f) => [f, guess[f]])) as LeadMapping;
+  const named = headers.filter(Boolean);
+  const guess = guessMapping(named);
+  const pick = (aliases: string[]) => named.find((h) => aliases.includes(h.toLowerCase().replace(/[^a-z0-9]/g, ''))) ?? '';
+  const visit = { visitDay: pick(VISIT_HEADERS.visitDay), visitSlot: pick(VISIT_HEADERS.visitSlot) };
+  return Object.fromEntries(LEAD_FIELDS.map((f) => [f, f === 'visitDay' || f === 'visitSlot' ? visit[f] : guess[f]])) as LeadMapping;
 }
 
 /**

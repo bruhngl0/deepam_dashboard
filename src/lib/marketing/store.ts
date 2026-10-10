@@ -8,11 +8,11 @@
  * gets the id back in `conflicts` and reloads.
  */
 
-import { and, asc, count, eq, gt, sql, sum } from 'drizzle-orm';
+import { and, asc, count, eq, gt, sql, sum, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
 import { marketingLeads, marketingSales } from '@/db/schema';
 import type { Dataset, Lead, Sale } from './local';
-import type { ClaimRouting } from './sheet-routing';
+import { VIRTUAL_CALLS_GROUP, type ClaimRouting } from './sheet-routing';
 
 export type { ClaimRouting };
 
@@ -20,6 +20,16 @@ const INSERT_CHUNK = 500;
 const UPDATE_CONCURRENCY = 8;
 const PHONE = /^\+91\d{10}$/;
 const MAX_DOC_BYTES = 256 * 1024;
+
+/**
+ * Marketing Intelligence shows and hands out only leads dated on or after this
+ * day, plus Virtual calls leads of any date; older leads stay in the table (the
+ * Google Sheet sync still merges against them) but are hidden from every page and
+ * calling queue.
+ */
+export const LEADS_FROM = '2026-10-01';
+const shownWhere = (doc: SQL) => sql`(${doc}->>'date' >= ${LEADS_FROM} OR ${doc}->>'claimGroup' = ${VIRTUAL_CALLS_GROUP})`;
+const shown = shownWhere(sql`ml.doc`);
 
 export type LeadWrite = { lead: Lead; version: number };
 export type SaveResult = { versions: Record<string, number>; conflicts: string[]; inserted: number; updated: number; sales: number };
@@ -33,6 +43,7 @@ export async function openQueueCount(salesperson: string): Promise<number> {
     SELECT count(*)::int AS n
     FROM marketing_leads ml
     WHERE ml.doc->>'claimedBy' = ${salesperson}
+      AND ${shown}
       AND COALESCE(ml.doc->>'status', 'New') NOT IN ('Connected / not interested', 'Wrong number')
       AND NOT EXISTS (
         SELECT 1
@@ -59,6 +70,7 @@ export async function claimLeads(salesperson: string, claimedAt: string, limit =
       SELECT ml.id
       FROM marketing_leads ml
       WHERE COALESCE(ml.doc->>'claimedBy', '') = ''
+        AND ${shown}
         AND COALESCE(ml.doc->>'status', 'New') NOT IN ('Connected / not interested', 'Wrong number')
         AND NOT EXISTS (
           SELECT 1
@@ -95,9 +107,12 @@ export async function datasetStamp(): Promise<string> {
   return `${leads.n}:${leads.v ?? 0}:${sales.n}`;
 }
 
-export async function leadPage(after: number, limit: number) {
+/** `shownOnly` limits the page to the leads Marketing Intelligence shows (see LEADS_FROM). */
+export async function leadPage(after: number, limit: number, shownOnly = false) {
   const rows = await db.select({ seq: marketingLeads.seq, doc: marketingLeads.doc, version: marketingLeads.version })
-    .from(marketingLeads).where(gt(marketingLeads.seq, after)).orderBy(asc(marketingLeads.seq)).limit(limit);
+    .from(marketingLeads)
+    .where(shownOnly ? and(gt(marketingLeads.seq, after), shownWhere(sql`${marketingLeads.doc}`)) : gt(marketingLeads.seq, after))
+    .orderBy(asc(marketingLeads.seq)).limit(limit);
   return { rows: rows.map((r) => ({ lead: r.doc as Lead, version: r.version })), next: rows.length === limit ? rows[rows.length - 1].seq : null };
 }
 

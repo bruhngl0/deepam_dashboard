@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+# Amazon RDS public CA bundle (not a secret), used for sslmode=verify-full.
+!certs/rds-global-bundle.pem
 
 # debug
 npm-debug.log*

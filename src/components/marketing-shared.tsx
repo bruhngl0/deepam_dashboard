@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { callsForSync, campaignTail, type Dataset, type Lead, type Sale } from '@/lib/marketing/local';
+import { callsForSync, campaignName, type Dataset, type Lead, type Sale } from '@/lib/marketing/local';
 import { routeLabel } from '@/lib/marketing/sheet-routing';
 export const button = 'inline-flex items-center justify-center rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-inset focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40';
 export const primary = `${button} !bg-accent !text-white !border-accent`;
@@ -24,7 +24,7 @@ export function CampaignTag({ lead }: { lead: Lead }) {
 export function LeadMeta({ lead, className = 'mt-3' }: { lead: Lead; className?: string }) {
   return <div className={`${className} flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted`}>
     <span>{[...new Set(lead.acquisitions.map(acquisition => acquisition.source))].join(', ')}</span>
-    <span>{[...new Set(lead.acquisitions.map(acquisition => campaignTail(acquisition.campaignId)).filter(Boolean))].join(', ') || 'No campaign'}</span>
+    <span>{[...new Set(lead.acquisitions.map(acquisition => campaignName(acquisition.campaignId)).filter(Boolean))].join(', ') || 'No campaign'}</span>
     <span>{dayMonthYearTimeLabel(lead.acquiredAt)}</span>
     <span>{lead.preferredStore || 'Store not recorded'}</span>
   </div>;

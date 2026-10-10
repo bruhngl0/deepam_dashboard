@@ -12,8 +12,8 @@ import { sql } from 'drizzle-orm';
 type Row = Record<string, unknown>;
 
 async function q(text: string): Promise<Row[]> {
-  // neon-http returns a result object with `.rows`; other drivers return the
-  // array directly. Accept both.
+  // node-postgres returns a result object with `.rows`; some drivers return
+  // the array directly. Accept both.
   const result = (await db.execute(sql.raw(text))) as unknown;
   return Array.isArray(result) ? (result as Row[]) : ((result as { rows: Row[] }).rows ?? []);
 }

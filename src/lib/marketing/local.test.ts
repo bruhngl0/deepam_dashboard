@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { campaignTail, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry } from './local';
+import { campaignName, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry } from './local';
 
 const mapping = guessMapping(['Name', 'Number', 'Source', 'Invoice', 'Amount']);
 describe('local marketing imports', () => {
@@ -56,9 +56,10 @@ describe('local marketing imports', () => {
 
 describe('campaign, store and date fields', () => {
   it('shows only the final segment of a structured campaign name', () => {
-    expect(campaignTail('Google | 0001 | 2026 | 09 | Storevisit')).toBe('Storevisit');
-    expect(campaignTail('Storevisit')).toBe('Storevisit');
-    expect(campaignTail('')).toBe('');
+    expect(campaignName('Google | 0001 | 2026 | 09 | Storevisit')).toBe('Storevisit');
+    expect(campaignName('Meta | 0010 | 2026 | 10 | Shubh Convention Centre (Blr) | Lead Gen')).toBe('Shubh Convention Centre (Blr) Lead Gen');
+    expect(campaignName('Storevisit')).toBe('Storevisit');
+    expect(campaignName('')).toBe('');
   });
   it('imports and normalizes the new fields and rejects invalid stores or dates', () => {
     const mapping = guessMapping(['Name', 'Number', 'Source', 'Campaign ID', 'Preferred Store', 'Date']);
@@ -107,5 +108,41 @@ describe('salesperson performance', () => {
     expect(salespersonPerformance(data, calls, ['Abhishek Thapa'])).toEqual([{
       salesperson: 'Abhishek Thapa', claimed: 1, called: 1, pending: 0, interested: 1, converted: 1, revenue: 4300,
     }]);
+  });
+});
+
+describe('conversionsByCampaign', () => {
+  it('counts converted leads per source and campaign, once per lead', async () => {
+    const { conversionsByCampaign, makeLead } = await import('./local');
+    const a = makeLead({ phone: '+919000000001', name: 'A', source: 'Meta ads', campaignId: 'Meta | 0001', acquiredAt: '2026-09-01T10:00:00' });
+    a.acquisitions.push({ source: 'Google ads', campaignId: 'Google | 0001', at: '2026-09-02T10:00:00', cost: null });
+    const b = makeLead({ phone: '+919000000002', name: 'B', source: 'Meta ads', campaignId: 'Meta | 0001', acquiredAt: '2026-09-01T10:00:00' });
+    const c = makeLead({ phone: '+919000000003', name: 'C', source: 'Meta ads', acquiredAt: '2026-09-01T10:00:00' });
+    const sale = (phone: string, invoice: string) => ({ phone, invoice, amount: 100, date: '2026-09-05T12:00:00', store: 'MG' });
+    const rows = conversionsByCampaign({ version: 2, demo: false, leads: [a, b, c], sales: [sale(a.phone, 'X1'), sale(a.phone, 'X2')] });
+    expect(rows).toEqual([
+      { source: 'Meta ads', campaign: 'Meta | 0001', leads: 2, converted: 1, rate: 50 },
+      { source: 'Google ads', campaign: 'Google | 0001', leads: 1, converted: 1, rate: 100 },
+      { source: 'Meta ads', campaign: '', leads: 1, converted: 0, rate: 0 },
+    ]);
+  });
+});
+
+describe('salesperson card labels', () => {
+  it('says how long ago, without a date', async () => {
+    const { timeAgo } = await import('./local');
+    expect(timeAgo('2026-10-10T16:48:00', '2026-10-10T17:00:00')).toBe('12 min ago');
+    expect(timeAgo('2026-10-10T15:00:00', '2026-10-10T17:00:30')).toBe('2 hr ago');
+    expect(timeAgo('2026-10-09T10:00:00', '2026-10-10T17:00:00')).toBe('1 day ago');
+    expect(timeAgo('2026-10-01', '2026-10-10T17:00:00')).toBe('9 days ago');
+    expect(timeAgo('2026-10-10T17:00:10', '2026-10-10T17:00:00')).toBe('just now');
+    expect(timeAgo('2026-10-10T19:00', '2026-10-10T17:00:00')).toBe('in 2 hr');
+  });
+  it('tidies lead-form answers', async () => {
+    const { formChoice } = await import('./local');
+    expect(formChoice('friday,_16_october')).toBe('Friday, 16 October');
+    expect(formChoice('2:30_pm_–_4:30_pm')).toBe('2:30 pm – 4:30 pm');
+    expect(formChoice('11_Am_–_1_Pm')).toBe('11 am – 1 pm');
+    expect(formChoice('')).toBe('');
   });
 });

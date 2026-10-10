@@ -1,64 +1,49 @@
 /**
- * Database clients.
+ * Database client.
  *
- * Two drivers, deliberately (D-75):
- *
- *   `db`     HTTP driver — one round trip per query, no connection pool to
- *            exhaust under serverless concurrency. Use for all reads.
- *
- *   `txDb()` WebSocket driver — the HTTP driver cannot run multi-statement
- *            transactions, and the import commit path must be all-or-nothing
- *            (D-60). Use only there, and always close the pool afterwards.
+ * One node-postgres pool per process, shared by reads and transactions
+ * (D-75). Production is AWS RDS; any PostgreSQL works locally. Connect with
+ * `sslmode=verify-full&sslrootcert=certs/rds-global-bundle.pem` for RDS —
+ * the bundle ships in the image, and the path is relative to the working
+ * directory (the repo root locally, /app in the container).
  */
 
-import { neon, neonConfig, Pool } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { drizzle as drizzlePool } from 'drizzle-orm/neon-serverless';
-import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
-import { Pool as PgPool } from 'pg';
-import ws from 'ws';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema';
-
-// Node has no global WebSocket before v22, and the pooled driver needs one.
-// Harmless on runtimes that provide it.
-if (typeof globalThis.WebSocket === 'undefined') {
-  neonConfig.webSocketConstructor = ws;
-}
 
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error(
-    'DATABASE_URL is not set. Copy .env.example to .env.local and add your Neon connection string.',
+    'DATABASE_URL is not set. Copy .env.example to .env.local and add a PostgreSQL connection string.',
   );
 }
 
-/** Read path. Safe to import from Server Components. */
-const useLocalPg = process.env.DATABASE_DRIVER === 'pg';
-const localPool = useLocalPg ? new PgPool({ connectionString }) : null;
+// Dev reloads re-evaluate this module; keep one pool rather than leaking one per reload.
+const globalForDb = globalThis as unknown as { dbPool?: Pool };
+const pool = globalForDb.dbPool ?? new Pool({ connectionString });
+if (!globalForDb.dbPool) {
+  // An idle client dropped by the server must not crash the process; the pool replaces it.
+  pool.on('error', (error) => console.error('[db pool]', error.message));
+  globalForDb.dbPool = pool;
+}
 
-/** DATABASE_DRIVER=pg exists for local/E2E PostgreSQL; production remains Neon HTTP. */
-export const db = (useLocalPg
-  ? drizzlePg(localPool!, { schema })
-  : drizzle(neon(connectionString), { schema })) as ReturnType<typeof drizzle<typeof schema>>;
+/** Safe to import from Server Components. */
+export const db = drizzle(pool, { schema });
 
 /**
- * Write path for transactional imports. Caller owns the pool lifecycle:
+ * Write path for transactional imports (D-60). `db.transaction()` checks out a
+ * dedicated client from the shared pool, so this is the same `db`; `pool.end`
+ * is kept as a no-op so callers' `finally` blocks stay correct without closing
+ * the pool everyone else is using.
  *
  *   const { db: tx, pool } = txDb();
  *   try { await tx.transaction(async (t) => { ... }); }
  *   finally { await pool.end(); }
  */
 export function txDb() {
-  if (useLocalPg) {
-    const pool = new PgPool({ connectionString });
-    return {
-      db: drizzlePg(pool, { schema }) as unknown as ReturnType<typeof drizzlePool<typeof schema>>,
-      pool: { end: () => pool.end() },
-    };
-  }
-  const pool = new Pool({ connectionString });
-  return { db: drizzlePool(pool, { schema }), pool };
+  return { db, pool: { end: async () => {} } };
 }
 
 export { schema };
