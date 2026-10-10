@@ -28,10 +28,10 @@ describe('temporary campaign routing', () => {
     });
   });
 
-  it('gives route owners only their groups and keeps everyone else out of active groups', () => {
-    expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ only: ['shubh-convention'] });
+  it('keeps Roopa to BLVD Club, gives Abhishek the pool with Shubh first, and keeps others out', () => {
     expect(claimRoutingFor('Roopa S', '2026-10-10')).toEqual({ only: ['blvd-club'] });
-    expect(claimRoutingFor('Kavya S', '2026-10-10')).toEqual({ exclude: ['shubh-convention', 'blvd-club'] });
-    expect(claimRoutingFor('Roopa S', '2026-10-16')).toEqual({ exclude: [] });
+    expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ exclude: ['blvd-club'], first: ['shubh-convention'] });
+    expect(claimRoutingFor('Kavya S', '2026-10-10')).toEqual({ exclude: ['shubh-convention', 'blvd-club'], first: [] });
+    expect(claimRoutingFor('Roopa S', '2026-10-16')).toEqual({ exclude: [], first: [] });
   });
 });

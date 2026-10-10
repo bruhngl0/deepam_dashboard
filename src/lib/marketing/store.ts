@@ -12,6 +12,9 @@ import { and, asc, count, eq, gt, sql, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import { marketingLeads, marketingSales } from '@/db/schema';
 import type { Dataset, Lead, Sale } from './local';
+import type { ClaimRouting } from './sheet-routing';
+
+export type { ClaimRouting };
 
 const INSERT_CHUNK = 500;
 const UPDATE_CONCURRENCY = 8;
@@ -21,9 +24,6 @@ const MAX_DOC_BYTES = 256 * 1024;
 export type LeadWrite = { lead: Lead; version: number };
 export type SaveResult = { versions: Record<string, number>; conflicts: string[]; inserted: number; updated: number; sales: number };
 
-/** Restricts claims by `claimGroup`: `only` these groups, or `exclude` them. */
-export type ClaimRouting = { only: string[] } | { exclude: string[] };
-
 export async function claimLeads(salesperson: string, claimedAt: string, limit = 10, routing: ClaimRouting = { exclude: [] }): Promise<string[]> {
   const group = sql`COALESCE(ml.doc->>'claimGroup', '')`;
   const groups = (list: string[]) => sql.join(list.map((g) => sql`${g}`), sql`, `);
@@ -32,6 +32,7 @@ export async function claimLeads(salesperson: string, claimedAt: string, limit =
     : routing.exclude.length
       ? sql`AND ${group} NOT IN (${groups(routing.exclude)})`
       : sql``;
+  const first = 'exclude' in routing && routing.first?.length ? sql`(${group} IN (${groups(routing.first)})) DESC, ` : sql``;
   const result = await db.execute(sql`
     WITH candidates AS (
       SELECT ml.id
@@ -45,7 +46,7 @@ export async function claimLeads(salesperson: string, claimedAt: string, limit =
         )
         AND NOT EXISTS (SELECT 1 FROM marketing_sales ms WHERE ms.phone = ml.phone)
         ${routingFilter}
-      ORDER BY ml.seq
+      ORDER BY ${first}ml.seq
       FOR UPDATE SKIP LOCKED
       LIMIT ${limit}
     )
