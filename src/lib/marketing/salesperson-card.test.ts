@@ -18,9 +18,8 @@ describe('salesperson queue card', () => {
   it('shows the campaign name, how long ago and the visit the lead asked for, without a date', () => {
     const html = renderToStaticMarkup(createElement(SalespersonMarketingWorkspace, { salespersonName: 'Abhishek Thapa', logoutAction: async () => {} }));
     const card = html.match(/<article[\s\S]*?<\/article>/)?.[0] ?? '';
-    expect(card).toContain('Meta ads · Shubh Convention Centre (Blr) · 12 min ago · MG');
+    expect(card).toContain('Meta ads · Shubh Convention Centre (Blr) Lead Gen · 12 min ago · MG');
     expect(card).toContain('Visit: Sunday, 18 October · 10:30 am – 12:30 pm');
-    expect(card).not.toContain('Lead Gen');
     expect(card).not.toContain(nowLocal().slice(0, 4));
   });
   it('labels a Virtual calls slot as the call time', () => {

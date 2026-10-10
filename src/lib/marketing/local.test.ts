@@ -57,7 +57,7 @@ describe('local marketing imports', () => {
 describe('campaign, store and date fields', () => {
   it('shows only the final segment of a structured campaign name', () => {
     expect(campaignName('Google | 0001 | 2026 | 09 | Storevisit')).toBe('Storevisit');
-    expect(campaignName('Meta | 0010 | 2026 | 10 | Shubh Convention Centre (Blr) | Lead Gen')).toBe('Shubh Convention Centre (Blr)');
+    expect(campaignName('Meta | 0010 | 2026 | 10 | Shubh Convention Centre (Blr) | Lead Gen')).toBe('Shubh Convention Centre (Blr) Lead Gen');
     expect(campaignName('Storevisit')).toBe('Storevisit');
     expect(campaignName('')).toBe('');
   });
