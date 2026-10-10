@@ -7,6 +7,8 @@ describe('temporary campaign routing', () => {
     expect(routeForTab('Shubh Convention Lead- Oct')?.salesperson).toBe('Abhishek Thapa');
     expect(routeForTab('SHUBH convention_lead Oct')?.group).toBe('shubh-convention');
     expect(routeForTab('BLVD Club (Blr) Lead- Oct')?.salesperson).toBe('Roopa S');
+    expect(routeForTab('Virtual calls - SEP.')?.salesperson).toBe('Sandhya');
+    expect(routeForTab('Virtual calls - Oct')?.group).toBe('virtual-calls');
     expect(routeForTab('Store lead campaign- Oct')).toBeUndefined();
   });
 
@@ -28,10 +30,12 @@ describe('temporary campaign routing', () => {
     });
   });
 
-  it('keeps Roopa to BLVD Club, gives Abhishek the pool with Shubh first, and keeps others out', () => {
+  it('keeps Roopa to BLVD Club, Sandhya to Virtual calls, gives Abhishek the pool with Shubh first, and keeps others out', () => {
     expect(claimRoutingFor('Roopa S', '2026-10-10')).toEqual({ only: ['blvd-club'] });
-    expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ exclude: ['blvd-club'], first: ['shubh-convention'] });
-    expect(claimRoutingFor('Kavya S', '2026-10-10')).toEqual({ exclude: ['shubh-convention', 'blvd-club'], first: [] });
-    expect(claimRoutingFor('Roopa S', '2026-10-16')).toEqual({ exclude: [], first: [] });
+    expect(claimRoutingFor('Sandhya', '2026-10-10')).toEqual({ only: ['virtual-calls'] });
+    expect(claimRoutingFor('Sandhya', '2027-06-01')).toEqual({ only: ['virtual-calls'] });
+    expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ exclude: ['blvd-club', 'virtual-calls'], first: ['shubh-convention'] });
+    expect(claimRoutingFor('Kavya S', '2026-10-10')).toEqual({ exclude: ['shubh-convention', 'blvd-club', 'virtual-calls'], first: [] });
+    expect(claimRoutingFor('Roopa S', '2026-10-16')).toEqual({ exclude: ['virtual-calls'], first: [] });
   });
 });

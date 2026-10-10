@@ -3,9 +3,9 @@ import { authenticateSalesperson, getSalesperson, isSalespersonLogin, SALESPEOPL
 
 describe('salespeople', () => {
   it('has unique routes and employee numbers for every salesperson', () => {
-    expect(SALESPEOPLE).toHaveLength(23);
-    expect(new Set(SALESPEOPLE.map(({ slug }) => slug)).size).toBe(23);
-    expect(new Set(SALESPEOPLE.map(({ employeeNumber }) => employeeNumber)).size).toBe(23);
+    expect(SALESPEOPLE).toHaveLength(24);
+    expect(new Set(SALESPEOPLE.map(({ slug }) => slug)).size).toBe(24);
+    expect(new Set(SALESPEOPLE.map(({ employeeNumber }) => employeeNumber)).size).toBe(24);
   });
 
   it('uses the employee number without an email extension and its matching password', () => {
@@ -20,6 +20,7 @@ describe('salespeople', () => {
     expect(authenticateSalesperson('DBYA0021', 'Ananta0021')?.name).toBe('Yasar Arafat');
     expect(authenticateSalesperson('DBYA0021@deepam.local', 'Ananta0021')).toBeUndefined();
     expect(authenticateSalesperson('DBYA0021', 'wrong')).toBeUndefined();
+    expect(authenticateSalesperson('DBYA0009', 'Ananta0009')?.name).toBe('Sandhya');
   });
 
   it('accepts the matching Ananta password for every employee', () => {

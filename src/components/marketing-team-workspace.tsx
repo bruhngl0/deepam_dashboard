@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { filterLeads, metrics, SOURCES, STORES, type Dataset, type Lead } from '@/lib/marketing/local';
-import { button, card, input, money, primary, useMarketing } from './marketing-shared';
+import { conversionsByCampaign, filterLeads, metrics, SOURCES, STORES, type Dataset, type Lead } from '@/lib/marketing/local';
+import { button, card, input, primary, useMarketing } from './marketing-shared';
 
 function dashboardStats(data: Dataset, leads: Lead[]) {
   const stats = metrics(data, leads);
@@ -11,12 +11,13 @@ function dashboardStats(data: Dataset, leads: Lead[]) {
     contacted: stats.contacted,
     interested: stats.interested,
     converted: stats.converted,
-    revenue: stats.revenue,
   };
 }
 
 export function MarketingTeamWorkspace() {
-  const { data, message } = useMarketing();
+  const { data, message, refresh } = useMarketing();
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState('');
   const [date, setDate] = useState('');
   const [store, setStore] = useState('');
   const [source, setSource] = useState('');
@@ -27,10 +28,22 @@ export function MarketingTeamWorkspace() {
   const leads = source ? baseLeads.filter(lead => lead.acquisitions.some(acquisition => acquisition.source === source)) : baseLeads;
   const stats = dashboardStats(data, leads);
   const sourceRows = availableSources.map(name => ({ name, stats: dashboardStats(data, baseLeads.filter(lead => lead.acquisitions.some(acquisition => acquisition.source === name))) }));
+  const campaigns = conversionsByCampaign(data, leads);
   const clear = () => { setDate(''); setStore(''); setSource(''); };
+  const syncFromCrm = async () => {
+    setSyncing(true); setSyncNote('');
+    try {
+      const r = await fetch('/api/marketing/crm-conversions', { method: 'POST' });
+      const body = await r.json().catch(() => ({})) as { billsAdded?: number; convertedLeads?: number; latestBill?: string | null; error?: string };
+      if (!r.ok) throw new Error(body.error ?? 'Could not sync from Deepam CRM. Try again.');
+      await refresh();
+      setSyncNote(`Synced from Deepam CRM: ${body.convertedLeads} converted leads${body.billsAdded ? ` (${body.billsAdded} new)` : ', nothing new'}${body.latestBill ? `. CRM records up to ${body.latestBill}.` : '.'}`);
+    } catch (error) { setSyncNote((error as Error).message); }
+    finally { setSyncing(false); }
+  };
 
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-    <header><p className="text-xs font-semibold uppercase tracking-widest text-accent">Marketing team</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Lead dashboard</h1><p className="mt-2 text-sm text-ink-2">Monitor the complete pipeline or open an individual dashboard for any source.</p></header>
+    <header><p className="text-xs font-semibold uppercase tracking-widest text-accent">Marketing team</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Lead dashboard</h1><p className="mt-2 text-sm text-ink-2">Monitor the complete pipeline or open an individual dashboard for any source.</p><div className="mt-4 flex flex-wrap items-center gap-3"><button className={primary} onClick={syncFromCrm} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync from Deepam CRM'}</button>{syncNote && <p role="status" className="text-sm text-ink-2">{syncNote}</p>}</div></header>
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
     <section aria-label="Marketing team filters" className={`${card} grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end`}>
       <label className="flex flex-col gap-1.5 text-sm text-ink-2">Date<input type="date" className={input} value={date} onChange={event => setDate(event.target.value)} /></label>
@@ -40,8 +53,9 @@ export function MarketingTeamWorkspace() {
     </section>
     <section aria-label="Source dashboards" className="space-y-3"><div className="flex items-center gap-3"><h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">Source dashboards</h2><div className="h-px flex-1 bg-line" /></div><div className="flex gap-2 overflow-x-auto pb-2"><button className={source ? button : primary} onClick={() => setSource('')}>All sources</button>{availableSources.map(value => <button key={value} className={`${source === value ? primary : button} whitespace-nowrap`} onClick={() => setSource(value)}>{value}</button>)}</div></section>
     <section className="space-y-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Dashboard</p><h2 className="mt-1 text-2xl font-semibold text-ink">{source || 'All sources'}</h2><p className="mt-1 text-sm text-ink-2">{date || 'All dates'} · {store || 'All stores'}</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{[
-      ['Total leads', stats.total], ['Claimed leads', stats.claimed], ['Contacted', stats.contacted], ['Interested', stats.interested], ['Converted', stats.converted], ['Lead revenue', money(stats.revenue)],
+      ['Total leads', stats.total], ['Claimed leads', stats.claimed], ['Contacted', stats.contacted], ['Interested', stats.interested], ['Converted', stats.converted], ['Conversion rate', `${stats.total ? (stats.converted / stats.total * 100).toFixed(1) : '0.0'}%`],
     ].map(([label, value]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p></div>)}</div></section>
-    {!source && <section className="overflow-hidden rounded-2xl border border-line bg-surface"><div className="p-4"><h2 className="text-lg font-semibold text-ink">All source dashboards</h2><p className="text-xs text-ink-muted">Select a row to open that source’s individual dashboard.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Source', 'Total leads', 'Claimed leads', 'Contacted', 'Interested', 'Converted', 'Lead revenue'].map(heading => <th key={heading} className="whitespace-nowrap px-4 py-3">{heading}</th>)}</tr></thead><tbody>{sourceRows.map(row => <tr key={row.name} className="cursor-pointer border-t border-line text-ink hover:bg-inset" onClick={() => setSource(row.name)}><td className="px-4 py-3 font-semibold text-accent">{row.name}</td><td className="px-4 py-3">{row.stats.total}</td><td className="px-4 py-3">{row.stats.claimed}</td><td className="px-4 py-3">{row.stats.contacted}</td><td className="px-4 py-3">{row.stats.interested}</td><td className="px-4 py-3">{row.stats.converted}</td><td className="px-4 py-3">{money(row.stats.revenue)}</td></tr>)}</tbody></table></div></section>}
+    {!source && <section className="overflow-hidden rounded-2xl border border-line bg-surface"><div className="p-4"><h2 className="text-lg font-semibold text-ink">All source dashboards</h2><p className="text-xs text-ink-muted">Select a row to open that source’s individual dashboard.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Source', 'Total leads', 'Claimed leads', 'Contacted', 'Interested', 'Converted'].map(heading => <th key={heading} className="whitespace-nowrap px-4 py-3">{heading}</th>)}</tr></thead><tbody>{sourceRows.map(row => <tr key={row.name} className="cursor-pointer border-t border-line text-ink hover:bg-inset" onClick={() => setSource(row.name)}><td className="px-4 py-3 font-semibold text-accent">{row.name}</td><td className="px-4 py-3">{row.stats.total}</td><td className="px-4 py-3">{row.stats.claimed}</td><td className="px-4 py-3">{row.stats.contacted}</td><td className="px-4 py-3">{row.stats.interested}</td><td className="px-4 py-3">{row.stats.converted}</td></tr>)}</tbody></table></div></section>}
+    <section className="overflow-hidden rounded-2xl border border-line bg-surface"><div className="p-4"><h2 className="text-lg font-semibold text-ink">Converted by campaign</h2><p className="text-xs text-ink-muted">Leads with a purchase in Deepam CRM on or after the lead date, by the campaign they came from. A lead from several campaigns counts in each.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Campaign', 'Source', 'Leads', 'Converted', 'Conversion rate'].map(heading => <th key={heading} className="whitespace-nowrap px-4 py-3">{heading}</th>)}</tr></thead><tbody>{campaigns.length ? campaigns.map(row => <tr key={`${row.source}|${row.campaign}`} className="border-t border-line text-ink"><td className="px-4 py-3 font-medium">{row.campaign || 'No campaign'}</td><td className="whitespace-nowrap px-4 py-3">{row.source}</td><td className="px-4 py-3">{row.leads}</td><td className="px-4 py-3 font-semibold">{row.converted}</td><td className="px-4 py-3">{row.rate.toFixed(1)}%</td></tr>) : <tr><td colSpan={5} className="px-4 py-6 text-center text-ink-muted">No leads match these filters.</td></tr>}</tbody></table></div></section>
   </main>;
 }

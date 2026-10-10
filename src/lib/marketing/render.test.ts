@@ -29,6 +29,7 @@ describe('marketing page rendering', () => {
   });
   it('renders the marketing team dashboard and per-source navigation', () => {
     const html = renderToStaticMarkup(createElement(MarketingTeamWorkspace));
-    for (const label of ['Marketing team', 'Total leads', 'Claimed leads', 'Contacted', 'Interested', 'Converted', 'Lead revenue', 'All source dashboards', 'Google ads', 'Meta ads']) expect(html).toContain(label);
+    for (const label of ['Marketing team', 'Total leads', 'Claimed leads', 'Contacted', 'Interested', 'Converted', 'Conversion rate', 'Converted by campaign', 'Sync from Deepam CRM', 'All source dashboards', 'Google ads', 'Meta ads']) expect(html).toContain(label);
+    expect(html).not.toContain('revenue');
   });
 });

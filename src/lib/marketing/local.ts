@@ -13,6 +13,8 @@ export type Lead = {
   claimedBy?: string; claimedAt?: string;
   claimGroup?: string; sheetTabs?: string[];
   acquisitions: Acquisition[]; status: Outcome | 'New'; intent: string; product: string; category: string; productLink: string;
+  /** When the lead said they would like to visit, from the sheet's lead form (e.g. "Friday, 16 October", "2:30 pm – 4:30 pm"). */
+  visitDay?: string; visitSlot?: string;
   interactions: Interaction[]; followups: Followup[];
 };
 export type Sale = { phone: string; invoice: string; amount: number | null; date: string; store: string };
@@ -33,8 +35,28 @@ export function normalizeSource(value: string): string {
   const aliases: Record<string, string> = { meta: 'Meta ads', facebook: 'Meta ads', facebookads: 'Meta ads', google: 'Google ads', instagram: 'Instagram DM', event: 'Events', walkin: 'Walkin' };
   return SOURCES.find(s => s.toLowerCase().replace(/[^a-z]/g, '') === key) ?? aliases[key] ?? '';
 }
-export function campaignTail(value: string): string {
-  return value.split('|').at(-1)?.trim() ?? '';
+/**
+ * The campaign's name from its ID: "Meta | 0010 | 2026 | 10 | Shubh Convention Centre (Blr) | Lead Gen"
+ * gives "Shubh Convention Centre (Blr)" (platform | number | year | month | name | …). An ID
+ * without that shape gives its last part.
+ */
+export function campaignName(value: string): string {
+  const parts = value.split('|').map(part => part.trim()).filter(Boolean);
+  return parts.length >= 5 && /^\d+$/.test(parts[1]) ? parts[4] : parts.at(-1) ?? '';
+}
+/** "friday,_16_october" → "Friday, 16 October"; "2:30_pm_–_4:30_pm" → "2:30 pm – 4:30 pm". */
+export function formChoice(value: unknown): string {
+  const text = String(value ?? '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  return /[a-z]/i.test(text) && !/\d:\d/.test(text) ? text.replace(/\b[a-z]/g, letter => letter.toUpperCase()) : text;
+}
+/** "12 min ago" for an IST wall-clock time; "in 2 hr" for a future one. */
+export function timeAgo(at: string, now = nowLocal()): string {
+  const stamp = (value: string) => Date.parse(`${value.length === 10 ? `${value}T00:00:00` : value.slice(0, 19)}+05:30`);
+  const minutes = Math.round((stamp(now) - stamp(at)) / 60000);
+  if (!Number.isFinite(minutes)) return '';
+  const size = Math.abs(minutes);
+  const amount = size < 1 ? '' : size < 60 ? `${size} min` : size < 1440 ? `${Math.floor(size / 60)} hr` : `${Math.floor(size / 1440)} day${size < 2880 ? '' : 's'}`;
+  return !amount ? 'just now' : minutes > 0 ? `${amount} ago` : `in ${amount}`;
 }
 export function parseLeadDate(value: unknown): string | null {
   if (value === undefined || value === null || value === '') return '';
@@ -253,4 +275,22 @@ export function callLog(datasets: Dataset[], stored: CallEntry[] = []): CallEntr
 /** Calls in a dataset that belong in the shared database (demo records are excluded). */
 export function callsForSync(d: Dataset) {
   return callLog([d]).filter(c => !c.id.startsWith('demo-')).map(c => ({ id: c.id, leadId: c.leadId, leadName: c.name, phone: c.phone, salesperson: c.salesperson, outcome: c.outcome || undefined, note: c.note, at: c.at.slice(0, 19) }));
+}
+
+export type CampaignConversion = { source: string; campaign: string; leads: number; converted: number; rate: number };
+/** Leads and converted leads per source and campaign. A lead from several campaigns counts once in each. */
+export function conversionsByCampaign(data: Dataset, leads = data.leads): CampaignConversion[] {
+  const converted = new Set(data.sales.map(sale => sale.phone));
+  const groups = new Map<string, { source: string; campaign: string; phones: Set<string> }>();
+  for (const lead of leads) for (const acquisition of lead.acquisitions) {
+    const campaign = acquisition.campaignId.trim();
+    const key = `${acquisition.source}|${campaign}`;
+    const group = groups.get(key) ?? { source: acquisition.source, campaign, phones: new Set<string>() };
+    group.phones.add(lead.phone);
+    groups.set(key, group);
+  }
+  return [...groups.values()].map(({ source, campaign, phones }) => {
+    const hits = [...phones].filter(phone => converted.has(phone)).length;
+    return { source, campaign, leads: phones.size, converted: hits, rate: phones.size ? hits / phones.size * 100 : 0 };
+  }).sort((a, b) => b.converted - a.converted || b.leads - a.leads);
 }

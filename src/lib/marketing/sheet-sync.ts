@@ -20,7 +20,7 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { settings } from '@/db/schema';
 import { normalizePhone } from '@/lib/phone';
-import { EMPTY, nowLocal, previewRows, SOURCES } from './local';
+import { EMPTY, formChoice, nowLocal, previewRows, SOURCES } from './local';
 import { readWorkbook, SheetError, type Workbook } from './google-sheets';
 import { routeActive, routeForTab, routeSheetLead } from './sheet-routing';
 import { CANONICAL, tabRows } from './sheet-rows';
@@ -139,13 +139,19 @@ async function sync(force: boolean): Promise<SyncOutcome> {
     const existing = new Map(data.leads.map((lead) => [lead.phone, lead]));
     const claimedAt = nowLocal();
     collected.rows.forEach((row, index) => {
+      const phone = normalizePhone(row.phone);
+      if (!phone.ok || phone.hadMultiple) return;
+      let lead = changed.get(phone.e164) ?? existing.get(phone.e164);
+      if (!lead) return;
+      // The lead form's preferred visit day and time, when the tab asks for them.
+      const visitDay = formChoice(row.visitDay); const visitSlot = formChoice(row.visitSlot);
+      if ((visitDay && visitDay !== lead.visitDay) || (visitSlot && visitSlot !== lead.visitSlot)) {
+        lead = { ...lead, visitDay: visitDay || lead.visitDay, visitSlot: visitSlot || lead.visitSlot };
+        changed.set(phone.e164, lead);
+      }
       const tab = collected.origin[index]?.tab ?? '';
       const route = routeForTab(tab);
       if (!route) return;
-      const phone = normalizePhone(row.phone);
-      if (!phone.ok || phone.hadMultiple) return;
-      const lead = changed.get(phone.e164) ?? existing.get(phone.e164);
-      if (!lead) return;
       const routed = routeSheetLead(lead, tab, route, claimedAt, routeActive(route, claimedAt.slice(0, 10)));
       if (JSON.stringify(routed) !== JSON.stringify(lead)) changed.set(phone.e164, routed);
     });
