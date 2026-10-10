@@ -28,9 +28,9 @@ describe('temporary campaign routing', () => {
     });
   });
 
-  it('gives route owners only their groups and keeps everyone else out of active groups', () => {
-    expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ only: ['shubh-convention'] });
-    expect(claimRoutingFor('Roopa S', '2026-10-10')).toEqual({ only: ['blvd-club'] });
+  it('lets route owners claim the general pool and keeps everyone out of other active groups', () => {
+    expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ exclude: ['blvd-club'] });
+    expect(claimRoutingFor('Roopa S', '2026-10-10')).toEqual({ exclude: ['shubh-convention'] });
     expect(claimRoutingFor('Kavya S', '2026-10-10')).toEqual({ exclude: ['shubh-convention', 'blvd-club'] });
     expect(claimRoutingFor('Roopa S', '2026-10-16')).toEqual({ exclude: [] });
   });
