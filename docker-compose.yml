@@ -1,0 +1,28 @@
+# Local development database. Production is AWS RDS (D-71); never point
+# .env.local at it. Postgres 18 to match RDS, so dumps restore cleanly.
+#
+#   docker compose up -d
+#   DATABASE_URL="postgresql://deepam_crm:deepam_crm@localhost:5435/deepam_crm"
+#
+# Port 5435 because 5432–5434 belong to the other apps' databases.
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: deepam_crm
+      POSTGRES_PASSWORD: deepam_crm
+      POSTGRES_DB: deepam_crm
+    ports:
+      - "5435:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/18, so mount the parent.
+      - deepam_crm_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deepam_crm -d deepam_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  deepam_crm_pgdata:
