@@ -53,15 +53,9 @@ export function routeSheetLead(lead: Lead, tab: string, route: SheetRoute, claim
   };
 }
 
-/**
- * Claim-group filter for one salesperson: the general pool plus their own
- * active groups, never another salesperson's active group. Campaign leads are
- * normally already assigned at sync, so a route owner still needs the pool.
- */
-export function claimRoutingFor(salesperson: string, today = todayIst(), routes = SHEET_ROUTES): { exclude: string[] } {
-  return {
-    exclude: routes
-      .filter((route) => route.salesperson !== salesperson && routeActive(route, today))
-      .map((route) => route.group),
-  };
+/** Claim-group filter for one salesperson: only their active groups, or none of anyone's. */
+export function claimRoutingFor(salesperson: string, today = todayIst(), routes = SHEET_ROUTES): { only: string[] } | { exclude: string[] } {
+  const active = routes.filter((route) => routeActive(route, today));
+  const own = active.filter((route) => route.salesperson === salesperson).map((route) => route.group);
+  return own.length ? { only: own } : { exclude: active.map((route) => route.group) };
 }
