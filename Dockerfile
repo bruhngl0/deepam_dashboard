@@ -60,6 +60,10 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Amazon RDS CA bundle, read by pg at connect time via DATABASE_URL's
+# `sslrootcert=certs/rds-global-bundle.pem` (relative to WORKDIR). Standalone
+# tracing cannot see a path that only appears in an env var, so copy it.
+COPY --from=builder /app/certs ./certs
 
 USER nextjs
 EXPOSE 3000

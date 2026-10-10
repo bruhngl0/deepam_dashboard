@@ -19,7 +19,7 @@ Code comments reference decision IDs — `// D-20: junk placeholder filter` — 
 
 ```bash
 npm install
-cp .env.example .env.local        # add your Neon connection string
+cp .env.example .env.local        # add your PostgreSQL connection string
 npm run db:migrate                # create schema + attribution view
 npm run db:seed                   # stores and campaigns
 npm run dev
