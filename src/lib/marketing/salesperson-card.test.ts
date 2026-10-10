@@ -23,4 +23,10 @@ describe('salesperson queue card', () => {
     expect(card).not.toContain('Lead Gen');
     expect(card).not.toContain(nowLocal().slice(0, 4));
   });
+  it('labels a Virtual calls slot as the call time', () => {
+    Object.assign(lead, { claimGroup: 'virtual-calls', visitDay: undefined, visitSlot: '11 am – 1 pm' });
+    const html = renderToStaticMarkup(createElement(SalespersonMarketingWorkspace, { salespersonName: 'Abhishek Thapa', logoutAction: async () => {} }));
+    expect(html).toContain('Call: 11 am – 1 pm');
+    expect(html).not.toContain('Visit:');
+  });
 });

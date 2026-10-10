@@ -47,7 +47,8 @@ export function campaignName(value: string): string {
 /** "friday,_16_october" → "Friday, 16 October"; "2:30_pm_–_4:30_pm" → "2:30 pm – 4:30 pm". */
 export function formChoice(value: unknown): string {
   const text = String(value ?? '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-  return /[a-z]/i.test(text) && !/\d:\d/.test(text) ? text.replace(/\b[a-z]/g, letter => letter.toUpperCase()) : text;
+  if (/\d\s*(am|pm)\b/i.test(text)) return text.replace(/\b(am|pm)\b/gi, half => half.toLowerCase());
+  return text.replace(/\b[a-z]/g, letter => letter.toUpperCase());
 }
 /** "12 min ago" for an IST wall-clock time; "in 2 hr" for a future one. */
 export function timeAgo(at: string, now = nowLocal()): string {

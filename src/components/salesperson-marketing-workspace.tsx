@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { callLog, campaignName, convertedLeads, filterLeads, hasLoggedCall, nowLocal, salespersonPerformance, STORES, timeAgo, type Lead } from '@/lib/marketing/local';
+import { VIRTUAL_CALLS_GROUP } from '@/lib/marketing/sheet-routing';
 import { button, CampaignTag, card, input, money, primary, useMarketing } from './marketing-shared';
 import { LeadActions } from './marketing-lead-actions';
 
 type SalesTab = 'My queue' | 'Follow-ups' | 'My performance';
 
-/** Name, number and badges, then source · campaign · how long ago · store, then the visit the lead asked for. */
+/** Name, number and badges, then source · campaign · how long ago · store, then when the lead asked to visit (or, for Virtual calls, to be called). */
 function LeadHeader({ lead }: { lead: Lead }) {
   const sources = [...new Set(lead.acquisitions.map(acquisition => acquisition.source))].join(', ');
   const campaigns = [...new Set(lead.acquisitions.map(acquisition => campaignName(acquisition.campaignId)).filter(Boolean))].join(', ');
@@ -15,7 +16,7 @@ function LeadHeader({ lead }: { lead: Lead }) {
     <div className="min-w-0">
       <h3 className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-ink">{lead.name}<a href={`tel:${lead.phone}`} className="text-xs font-normal text-accent">{lead.phone}</a></h3>
       <p className="mt-0.5 text-xs text-ink-muted">{[sources, campaigns || 'No campaign', timeAgo(lead.acquiredAt), lead.preferredStore].filter(Boolean).join(' · ')}</p>
-      {visit && <p className="mt-0.5 text-xs font-medium text-ink-2">Visit: {visit}</p>}
+      {visit && <p className="mt-0.5 text-xs font-medium text-ink-2">{lead.claimGroup === VIRTUAL_CALLS_GROUP ? 'Call' : 'Visit'}: {visit}</p>}
     </div>
     <div className="flex shrink-0 flex-wrap justify-end gap-1.5"><CampaignTag lead={lead} /><span className="rounded-full bg-inset px-2.5 py-1 text-[11px] font-medium text-ink-2">{lead.status}</span></div>
   </div>;

@@ -142,6 +142,7 @@ describe('salesperson card labels', () => {
     const { formChoice } = await import('./local');
     expect(formChoice('friday,_16_october')).toBe('Friday, 16 October');
     expect(formChoice('2:30_pm_–_4:30_pm')).toBe('2:30 pm – 4:30 pm');
+    expect(formChoice('11_Am_–_1_Pm')).toBe('11 am – 1 pm');
     expect(formChoice('')).toBe('');
   });
 });
