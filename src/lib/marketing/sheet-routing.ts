@@ -6,6 +6,8 @@ import type { Lead } from './local';
  */
 export type SheetRoute = {
   group: string;
+  /** Shown on the lead card. */
+  label: string;
   /** Matched against the tab name, ignoring case and punctuation. */
   tab: string;
   salesperson: string;
@@ -16,8 +18,8 @@ export type SheetRoute = {
 };
 
 export const SHEET_ROUTES: SheetRoute[] = [
-  { group: 'shubh-convention', tab: 'shubh convention', salesperson: 'Abhishek Thapa', untilEnv: 'SHUBH_CONVENTION_ROUTING_UNTIL', until: '2026-10-15' },
-  { group: 'blvd-club', tab: 'blvd club', salesperson: 'Roopa S', untilEnv: 'BLVD_CLUB_ROUTING_UNTIL', until: '2026-10-15' },
+  { group: 'shubh-convention', label: 'Shubh Convention', tab: 'shubh convention', salesperson: 'Abhishek Thapa', untilEnv: 'SHUBH_CONVENTION_ROUTING_UNTIL', until: '2026-10-15' },
+  { group: 'blvd-club', label: 'BLVD Club', tab: 'blvd club', salesperson: 'Roopa S', untilEnv: 'BLVD_CLUB_ROUTING_UNTIL', until: '2026-10-15' },
 ];
 
 const normalizedTab = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -25,6 +27,10 @@ const normalizedTab = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+
 export function routeForTab(tab: string, routes = SHEET_ROUTES): SheetRoute | undefined {
   const name = normalizedTab(tab);
   return routes.find((route) => name.includes(route.tab));
+}
+
+export function routeLabel(group: string | undefined, routes = SHEET_ROUTES): string | undefined {
+  return group ? routes.find((route) => route.group === group)?.label : undefined;
 }
 
 const todayIst = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' });
