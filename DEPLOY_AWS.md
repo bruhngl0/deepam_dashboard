@@ -243,12 +243,30 @@ Running both is fine: a sync that finds nothing new writes nothing.
    custom domain once attached) as an allowed origin. Without this, sign-in
    will fail cross-origin even with correct keys.
 2. **Run migrations against the real database** before first traffic:
-   `DATABASE_URL="<prod connection string>" npm run db:migrate` from your
-   machine (the container never runs migrations itself — same as this app
-   never auto-runs them locally).
+   open the admin tunnel below, then
+   `DATABASE_URL="<prod connection string, host localhost:5436, sslmode=verify-ca>" npm run db:migrate`
+   from your machine (the container never runs migrations itself — same as
+   this app never auto-runs them locally).
 3. **Custom domain** (optional):
    `aws apprunner associate-custom-domain --service-arn <arn> --domain-name crm.yourdomain.com`,
    then add the CNAME/validation records it returns to your DNS.
+
+## Admin access to the database
+
+RDS port 5432 accepts only the App Runner VPC connector's security group and
+the bastion's — no public IPs. The bastion `deepam-crm-db-bastion` is a
+t4g.nano in a private subnet with no public IP and no inbound rules; Session
+Manager reaches it over the NAT, and it forwards a local port to RDS. Needs
+the AWS CLI and `session-manager-plugin`.
+
+```bash
+scripts/db-tunnel.sh              # localhost:5436 -> RDS; starts the bastion if stopped
+psql "postgresql://deepam_admin@localhost:5436/deepam_crm?sslmode=verify-ca&sslrootcert=certs/rds-global-bundle.pem"
+```
+
+`verify-ca`, not `verify-full`: the certificate names the RDS host, which
+never matches `localhost`. Stop the bastion between uses to save its compute
+cost: `aws ec2 stop-instances --instance-ids <id>`.
 
 ## Verify locally before touching AWS
 
