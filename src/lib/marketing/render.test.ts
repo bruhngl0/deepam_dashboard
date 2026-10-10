@@ -5,6 +5,7 @@ import { demoData } from './local';
 import { MarketingWorkspace } from '@/components/marketing-workspace';
 import { MarketingProfile } from '@/components/marketing-profile';
 import { MarketingImport } from '@/components/marketing-import';
+import { MarketingTeamWorkspace } from '@/components/marketing-team-workspace';
 vi.mock('@/components/marketing-shared', async importOriginal => {
   const actual = await importOriginal<typeof import('@/components/marketing-shared')>();
   return { ...actual, useMarketing: () => ({ data: demoData(), save: () => true, message: '', setMessage: () => {}, refresh: async () => {} }) };
@@ -12,7 +13,9 @@ vi.mock('@/components/marketing-shared', async importOriginal => {
 describe('marketing page rendering', () => {
   it('renders dashboard metrics and navigation with demo data', () => {
     const html = renderToStaticMarkup(createElement(MarketingWorkspace));
-    for (const label of ['Calling queue', 'Follow-ups', 'Cost per acquisition', 'Converted customers', 'Store visits', 'Insights', 'Date-Time From']) expect(html).toContain(label);
+    for (const label of ['Queue', 'Follow-ups', 'Team performance', 'Campaigns', 'Cost per acquisition', 'Converted customers', 'Store visits', 'Date-Time From']) expect(html).toContain(label);
+    const navigation = html.match(/<nav[^>]*aria-label="Marketing sections"[\s\S]*?<\/nav>/)?.[0] ?? '';
+    for (const removed of ['>Converted<', '>Sales<', '>Insights<', '>Salespeople<', '>Import<']) expect(navigation).not.toContain(removed);
     expect(html).toContain('shared by every desk');
     expect(html).not.toContain('Clear local data');
   });
@@ -23,5 +26,9 @@ describe('marketing page rendering', () => {
   it('renders both local import entry points and supported source guidance', () => {
     const html = renderToStaticMarkup(createElement(MarketingImport, { data: demoData(), save: () => true }));
     for (const label of ['Live Google Sheets', 'Import leads', 'Import sales', 'Instagram DM', 'Influencer', 'Sources:']) expect(html).toContain(label);
+  });
+  it('renders the marketing team dashboard and per-source navigation', () => {
+    const html = renderToStaticMarkup(createElement(MarketingTeamWorkspace));
+    for (const label of ['Marketing team', 'Total leads', 'Claimed leads', 'Contacted', 'Interested', 'Converted', 'Lead revenue', 'All source dashboards', 'Google ads', 'Meta ads']) expect(html).toContain(label);
   });
 });

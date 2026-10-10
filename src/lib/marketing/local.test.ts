@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { convertedLeads, demoData, EMPTY, filterLeads, parseLeadDate, guessMapping, previewRows, readDataset } from './local';
+import { campaignTail, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry } from './local';
 
 const mapping = guessMapping(['Name', 'Number', 'Source', 'Invoice', 'Amount']);
 describe('local marketing imports', () => {
@@ -55,6 +55,11 @@ describe('local marketing imports', () => {
 });
 
 describe('campaign, store and date fields', () => {
+  it('shows only the final segment of a structured campaign name', () => {
+    expect(campaignTail('Google | 0001 | 2026 | 09 | Storevisit')).toBe('Storevisit');
+    expect(campaignTail('Storevisit')).toBe('Storevisit');
+    expect(campaignTail('')).toBe('');
+  });
   it('imports and normalizes the new fields and rejects invalid stores or dates', () => {
     const mapping = guessMapping(['Name', 'Number', 'Source', 'Campaign ID', 'Preferred Store', 'Date']);
     const row = { Name: 'Asha', Number: '9000123410', Source: 'Meta', 'Campaign ID': '00012', 'Preferred Store': 'Jayanagar', Date: '28/09/2026' };
@@ -81,5 +86,26 @@ describe('campaign, store and date fields', () => {
     expect(migrated.leads[0]).toMatchObject({ id: demo.leads[0].id, phone: demo.leads[0].phone, name: demo.leads[0].name });
     expect(migrated.leads[12]).toMatchObject({ campaignId: '', preferredStore: '', date: '' });
     expect(migrated.sales).toEqual(demo.sales);
+  });
+});
+
+describe('salesperson performance', () => {
+  it('identifies every lead with a logged call regardless of outcome', () => {
+    const leads = demoData().leads;
+    expect(hasLoggedCall(leads[0])).toBe(true);
+    expect(hasLoggedCall(leads[7])).toBe(false);
+  });
+
+  it('aggregates claimed leads, call attempts, outcomes, conversions, and revenue', () => {
+    const data = demoData();
+    const lead = data.leads[0];
+    lead.claimedBy = 'Abhishek Thapa';
+    const calls: CallEntry[] = [
+      { id: 'call-1', at: '2026-10-01T10:00:00', salesperson: 'Abhishek Thapa', outcome: 'No answer', note: '', leadId: lead.id, name: lead.name, phone: lead.phone },
+      { id: 'call-2', at: '2026-10-02T10:00:00', salesperson: 'Abhishek Thapa', outcome: 'Connected / interested', note: '', leadId: lead.id, name: lead.name, phone: lead.phone },
+    ];
+    expect(salespersonPerformance(data, calls, ['Abhishek Thapa'])).toEqual([{
+      salesperson: 'Abhishek Thapa', claimed: 1, called: 1, pending: 0, interested: 1, converted: 1, revenue: 4300,
+    }]);
   });
 });

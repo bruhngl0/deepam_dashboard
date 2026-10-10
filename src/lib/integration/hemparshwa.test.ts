@@ -23,7 +23,12 @@ describe('Hemparshwa sync plan', () => {
     expect(planSync([], [{ importId: 1, version: 'a' }, { importId: 2, version: 'b' }])).toEqual({ remove: [1, 2], fetch: [] });
   });
 
-  it('ignores data types whose rows are not served yet', () => {
+  it('copies the Customer Master as well as sales', () => {
+    expect(planSync([imp(1, 'a'), imp(2, 'a', 'customers')], []).fetch.map((i) => i.import_id)).toEqual([1, 2]);
+    expect(planSync([imp(1, 'a')], [{ importId: 1, version: 'a' }, { importId: 2, version: 'a' }]).remove).toEqual([2]);
+  });
+
+  it('ignores data types CRM keeps no copy of', () => {
     expect(planSync([imp(3, 'a', 'inventory')], [])).toEqual({ remove: [], fetch: [] });
   });
 });

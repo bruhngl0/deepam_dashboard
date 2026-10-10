@@ -7,6 +7,10 @@ export const input = 'w-full rounded-lg border border-line bg-surface px-3 py-2 
 export const card = 'rounded-2xl border border-line bg-surface p-5';
 export const money = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 export const dateLabel = (s: string) => s ? s.replace('T', ' ').slice(0, 16) : 'Not recorded';
+export const dayMonthYearLabel = (s: string) => {
+  const [year, month, day] = s.slice(0, 10).split('-');
+  return year && month && day ? `${day}-${month}-${year}` : 'Not recorded';
+};
 export function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="flex min-w-0 flex-col gap-1.5 text-sm text-ink-2">{label}{children}</label>; }
 const synced = new Set<string>();
 /** Pushes logged calls to the shared database. Idempotent server-side; failures are retried on the next load or call. */

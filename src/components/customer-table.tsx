@@ -1,10 +1,9 @@
 /**
- * Customer table — every master-sheet lead.
+ * Customer table — leads and existing customers in one registry.
  *
- * Server-paginated. Every row shows *all* of its channel touches, not just the
- * attributed one — a row reading only "Instagram" would hide that the same
- * person was also on the WhatsApp broadcast. 298 people appear on more than one
- * list, 227 of them on Instagram and WhatsApp both. (D-79)
+ * Server-paginated. Lead rows show *all* of their channel touches, not just the
+ * attributed one. Customers imported without a lead touch remain visible and
+ * are labelled "No lead record".
  *
  * Empty values render "Not provided" rather than a blank cell: 535 customers
  * have no city and most have no date of birth, and a blank cell reads as a bug
@@ -169,7 +168,10 @@ function Row({ row }: { row: CustomerRow }) {
               <DetailField label="Area" value={orNotProvided(row.area)} />
               <DetailField label="City" value={orNotProvided(row.city)} />
               <DetailField label="Date of birth" value={formatDate(row.dateOfBirth)} />
+              <DetailField label="Age" value={orNotProvided(row.age)} />
               <DetailField label="Anniversary" value={formatDate(row.anniversary)} />
+              <DetailField label="GST No" value={orNotProvided(row.gstNo)} />
+              <DetailField label="PAN No" value={orNotProvided(row.panNo)} />
 
               <DetailField
                 label="Campaigns"

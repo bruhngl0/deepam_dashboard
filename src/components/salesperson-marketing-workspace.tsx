@@ -1,49 +1,78 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { convertedLeads, filterLeads, nowLocal, type Lead } from '@/lib/marketing/local';
-import { button, card, dateLabel, input, primary, useMarketing } from './marketing-shared';
+import { callLog, campaignTail, convertedLeads, filterLeads, hasLoggedCall, nowLocal, salespersonPerformance, STORES, type Lead } from '@/lib/marketing/local';
+import { button, card, dateLabel, dayMonthYearLabel, input, money, primary, useMarketing } from './marketing-shared';
 import { LeadActions } from './marketing-lead-actions';
 
-type SalesTab = 'Calling queue' | 'Follow-ups';
+type SalesTab = 'My queue' | 'Follow-ups' | 'My performance';
 
-export function SalespersonMarketingWorkspace() {
-  const { data, save, message } = useMarketing();
-  const [tab, setTab] = useState<SalesTab>('Calling queue');
+export function SalespersonMarketingWorkspace({ salespersonName, logoutAction }: { salespersonName: string; logoutAction: () => Promise<void> }) {
+  const { data, save, message, refresh } = useMarketing();
+  const [tab, setTab] = useState<SalesTab>('My queue');
   const [search, setSearch] = useState('');
+  const [date, setDate] = useState('');
+  const [store, setStore] = useState('');
   const [page, setPage] = useState(0);
+  const [claiming, setClaiming] = useState(false);
+  const [claimMessage, setClaimMessage] = useState('');
   if (!data) return <p role="status" className="p-8 text-ink-2">{message || 'Loading calling workspace...'}</p>;
 
   const convertedPhones = new Set(convertedLeads(data).map(l => l.phone));
-  const queue = data.leads.filter(l => !convertedPhones.has(l.phone) && !['Connected / not interested', 'Wrong number'].includes(l.status));
-  const visible = filterLeads(queue, { from: '', to: '', store: '', source: '', search });
+  const claimedLeads = data.leads.filter(lead => lead.claimedBy === salespersonName);
+  const queue = claimedLeads.filter(l => !hasLoggedCall(l) && !convertedPhones.has(l.phone) && !['Connected / not interested', 'Wrong number'].includes(l.status));
+  const visible = filterLeads(queue, { from: date, to: date, store, source: '', search });
   const currentPage = Math.min(page, Math.max(0, Math.ceil(visible.length / 20) - 1));
   const now = nowLocal().slice(0, 16);
   const today = nowLocal().slice(0, 10);
-  const pending = data.leads.flatMap(lead => lead.followups.filter(f => !f.completedAt).map(f => ({ lead, followup: f }))).sort((a, b) => a.followup.due.localeCompare(b.followup.due));
+  const pending = claimedLeads.flatMap(lead => lead.followups.filter(f => !f.completedAt).map(f => ({ lead, followup: f }))).sort((a, b) => a.followup.due.localeCompare(b.followup.due));
+  const currentLead = queue[0];
+  const myFollowupsDue = pending.filter(({ followup }) => followup.due <= now).length;
+  const callsToday = data.leads.reduce((total, lead) => total + lead.interactions.filter(interaction => interaction.type === 'call' && interaction.at.startsWith(today) && (interaction.by === salespersonName || interaction.text.endsWith(`Logged by ${salespersonName}`))).length, 0);
+  const performance = salespersonPerformance(data, callLog([data]), [salespersonName])[0];
   const update = (lead: Lead) => save({ ...data, leads: data.leads.map(l => l.id === lead.id ? lead : l) });
+
+  async function claimTenLeads() {
+    setClaiming(true);
+    setClaimMessage('');
+    try {
+      const response = await fetch('/sales/api/claims', { method: 'POST' });
+      const result = await response.json() as { claimed?: number; error?: string };
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      await refresh();
+      setClaimMessage(result.claimed ? `${result.claimed} leads claimed and added to your queue.` : 'No unclaimed leads are currently available.');
+    } catch {
+      setClaimMessage('Unable to claim leads. Please try again.');
+    } finally {
+      setClaiming(false);
+    }
+  }
 
   function changeTab(next: SalesTab) {
     setTab(next);
     setPage(0);
     setSearch('');
+    setDate('');
+    setStore('');
   }
 
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Salesperson workspace</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Abishek calling desk</h1><p className="mt-2 text-sm text-ink-2">Calling queue and follow-ups only.</p></div><span className="rounded-full bg-inset px-3 py-2 text-xs text-ink-2">Shared records</span></header>
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Salesperson workspace</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">{salespersonName} calling desk</h1><p className="mt-2 text-sm text-ink-2">Calling queue and follow-ups only.</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-inset px-3 py-2 text-xs text-ink-2">Shared records</span><form action={logoutAction}><button className={button}>Sign out</button></form></div></header>
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
-    <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Salesperson sections">
-      {(['Calling queue', 'Follow-ups'] as const).map(t => <button key={t} className={tab === t ? primary : button} aria-current={tab === t ? 'page' : undefined} onClick={() => changeTab(t)}>{t}{t === 'Calling queue' ? ` (${queue.length})` : ` (${pending.length})`}</button>)}
-    </nav>
-    {tab === 'Calling queue' && <section className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-lg font-semibold text-ink">Calling queue</h2><p className="text-xs text-ink-muted">Logged calls turn green for quick tracking.</p></div><input className={`${input} sm:!w-80`} aria-label="Search leads" placeholder="Name, number, lead ID, campaign..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} /></div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Lead / contact', 'Sources / campaign', 'Date-Time', 'Preferred store', 'Call status', 'Actions', 'Log call'].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{visible.slice(currentPage * 20, currentPage * 20 + 20).map(l => <tr key={l.id} className="border-t border-line align-top"><td className="min-w-48 px-4 py-4"><span className="font-semibold text-ink">{l.name}</span><p className="mt-1 text-ink-2">{l.phone}</p><p className="text-xs text-ink-muted">{l.email || 'Email not recorded'}</p><p className="mt-1 max-w-48 break-all text-[10px] text-ink-muted">{l.id}</p></td><td className="min-w-40 px-4 py-4 text-ink">{[...new Set(l.acquisitions.map(a => a.source))].join(', ')}<p className="mt-1 text-xs text-ink-2">{[...new Set(l.acquisitions.map(a => a.campaignId).filter(Boolean))].join(', ') || 'No campaign'}</p></td><td className="whitespace-nowrap px-4 py-4 text-ink-2">{dateLabel(l.acquiredAt)}</td><td className="px-4 py-4 text-ink-2">{l.preferredStore || 'Not recorded'}</td><td className="px-4 py-4 text-ink-2">{l.interactions.some(i => i.type === 'call') ? 'Logged' : 'Pending call'}</td><td className="min-w-72 px-4 py-4"><LeadActions lead={l} update={update} /></td><td className="min-w-36 px-4 py-4"><LeadActions lead={l} update={update} variant="call-only" /></td></tr>)}</tbody></table></div>
+    <section aria-label="Lead assignment" className="space-y-3"><div className="flex items-center gap-3"><h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">Lead assignment</h2><div className="h-px flex-1 bg-line" /></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><div className={card}><p className="text-sm text-ink-2">Total leads</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{claimedLeads.length}</p></div><div className={card}><p className="text-sm text-ink-2">Current lead</p><p className="mt-3 text-xl font-semibold tracking-tight text-ink">{currentLead?.name ?? '—'}</p><p className="mt-2 text-xs text-ink-muted">{currentLead?.phone ?? 'No active lead'}</p></div><div className={card}><p className="text-sm text-ink-2">My follow-ups due</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{myFollowupsDue}</p></div><div className={card}><p className="text-sm text-ink-2">Calls today</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{callsToday}</p></div></div><div className="flex flex-wrap items-center gap-3"><button className={primary} disabled={claiming} onClick={claimTenLeads}>{claiming ? 'Claiming leads...' : 'Claim 10 leads'}</button>{claimMessage && <p role="status" className="text-sm text-ink-2">{claimMessage}</p>}</div></section>
+    <section aria-label="Salesperson navigation" className="space-y-3"><div className="flex items-center gap-3"><h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">Salesperson navigation</h2><div className="h-px flex-1 bg-line" /></div><nav className="grid grid-cols-3 gap-2" aria-label="Salesperson sections">
+      {(['My queue', 'Follow-ups', 'My performance'] as const).map(value => <button key={value} className={`${tab === value ? primary : button} min-h-11 px-2 text-xs sm:text-sm`} aria-current={tab === value ? 'page' : undefined} onClick={() => changeTab(value)}>{value}{value === 'My queue' ? ` (${queue.length})` : value === 'Follow-ups' ? ` (${pending.length})` : ''}</button>)}
+    </nav></section>
+    {tab === 'My queue' && <section className="overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="space-y-3 p-4"><div><h2 className="text-lg font-semibold text-ink">My queue</h2><p className="text-xs text-ink-muted">Only assigned leads without a logged call appear here.</p></div><div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"><input className={input} type="date" aria-label="Filter by date" value={date} onChange={event => { setDate(event.target.value); setPage(0); }} /><select className={input} aria-label="Filter by store" value={store} onChange={event => { setStore(event.target.value); setPage(0); }}><option value="">All stores</option>{STORES.map(value => <option key={value}>{value}</option>)}</select><input className={input} aria-label="Search leads" placeholder="Search name or number..." value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} /></div>{(date || store || search) && <button className={button} onClick={() => { setDate(''); setStore(''); setSearch(''); setPage(0); }}>Clear filters</button>}</div>
+      <div className="space-y-3 border-t border-line p-3 sm:p-4">{visible.slice(currentPage * 20, currentPage * 20 + 20).map(lead => <article key={lead.id} className="rounded-2xl border border-line bg-surface p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-base font-semibold text-ink">{lead.name}</h3><a href={`tel:${lead.phone}`} className="mt-1 block text-sm text-accent">{lead.phone}</a></div><span className="shrink-0 rounded-full bg-inset px-2.5 py-1 text-[11px] font-medium text-ink-2">{lead.status === 'New' ? 'New' : lead.status}</span></div><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted"><span>{[...new Set(lead.acquisitions.map(acquisition => acquisition.source))].join(', ')}</span><span>{[...new Set(lead.acquisitions.map(acquisition => campaignTail(acquisition.campaignId)).filter(Boolean))].join(', ') || 'No campaign'}</span><span>{dayMonthYearLabel(lead.acquiredAt)}</span><span>{lead.preferredStore || 'Store not recorded'}</span></div><div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-4"><div className="flex flex-wrap gap-2"><LeadActions lead={lead} update={update} salespersonName={salespersonName} salespersonView /></div><div className="ml-auto pl-4"><LeadActions lead={lead} update={update} variant="call-only" salespersonName={salespersonName} salespersonView /></div></div></article>)}
       {!visible.length && <p className="p-10 text-center text-sm text-ink-muted">No leads match this view.</p>}
-      <div className="flex items-center justify-between border-t border-line p-4 text-sm text-ink-2"><span>{visible.length} leads · Page {currentPage + 1} of {Math.max(1, Math.ceil(visible.length / 20))}</span><div className="flex gap-2"><button className={button} disabled={!currentPage} onClick={() => setPage(currentPage - 1)}>Previous</button><button className={button} disabled={(currentPage + 1) * 20 >= visible.length} onClick={() => setPage(currentPage + 1)}>Next</button></div></div>
+      </div><div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4 text-sm text-ink-2"><span>{visible.length} leads · Page {currentPage + 1} of {Math.max(1, Math.ceil(visible.length / 20))}</span><div className="flex gap-2"><button className={button} disabled={!currentPage} onClick={() => setPage(currentPage - 1)}>Previous</button><button className={button} disabled={(currentPage + 1) * 20 >= visible.length} onClick={() => setPage(currentPage + 1)}>Next</button></div></div>
     </section>}
     {tab === 'Follow-ups' && <div className="grid items-start gap-4 lg:grid-cols-3">{['Overdue', 'Today', 'Upcoming'].map(bucket => {
       const entries = pending.filter(p => bucket === 'Overdue' ? p.followup.due < now : bucket === 'Today' ? p.followup.due >= now && p.followup.due.startsWith(today) : p.followup.due.slice(0, 10) > today);
-      return <section key={bucket} className={card}><h2 className="text-lg font-semibold text-ink">{bucket} <span className="text-ink-muted">{entries.length}</span></h2><div className="mt-4 space-y-4">{entries.map(({ lead, followup: f }) => <div key={f.id} className="rounded-xl border border-line p-4"><Link href={`tel:${lead.phone}`} className="font-medium text-accent">{lead.name}</Link><p className="mt-1 text-xs text-ink-muted">{dateLabel(f.due)}</p><p className="my-3 text-sm text-ink-2">{f.note || 'Follow up with customer'}</p><LeadActions lead={lead} update={update} /><button className={`${button} mt-2`} onClick={() => update({ ...lead, followups: lead.followups.map(x => x.id === f.id ? { ...x, completedAt: nowLocal() } : x), interactions: [...lead.interactions, { id: crypto.randomUUID(), at: nowLocal(), type: 'followup', text: `Follow-up completed: ${f.note}` }] })}>Complete</button></div>)}{!entries.length && <p className="text-sm text-ink-muted">No follow-ups.</p>}</div></section>;
+      return <section key={bucket} className={card}><h2 className="text-lg font-semibold text-ink">{bucket} <span className="text-ink-muted">{entries.length}</span></h2><div className="mt-4 space-y-4">{entries.map(({ lead, followup: f }) => <div key={f.id} className="rounded-xl border border-line p-4"><Link href={`tel:${lead.phone}`} className="font-medium text-accent">{lead.name}</Link><p className="mt-1 text-xs text-ink-muted">{dateLabel(f.due)}</p><p className="my-3 text-sm text-ink-2">{f.note || 'Follow up with customer'}</p><LeadActions lead={lead} update={update} salespersonName={salespersonName} salespersonView /><button className={`${button} mt-2`} onClick={() => update({ ...lead, followups: lead.followups.map(x => x.id === f.id ? { ...x, completedAt: nowLocal() } : x), interactions: [...lead.interactions, { id: crypto.randomUUID(), at: nowLocal(), type: 'followup', text: `Follow-up completed: ${f.note}` }] })}>Complete</button></div>)}{!entries.length && <p className="text-sm text-ink-muted">No follow-ups.</p>}</div></section>;
     })}</div>}
+    {tab === 'My performance' && <section className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['Claimed', performance.claimed], ['Called', performance.called], ['Pending', performance.pending], ['Interested', performance.interested], ['Converted', performance.converted], ['Revenue', money(performance.revenue)]].map(([label, value]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p></div>)}</div></section>}
   </main>;
 }

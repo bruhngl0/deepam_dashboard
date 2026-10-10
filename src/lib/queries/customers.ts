@@ -1,5 +1,5 @@
 /**
- * Customer table query — every channel in the master sheet.
+ * Customer table query — the complete CRM customer registry.
  *
  * Server-side paginated and filtered — the browser never receives more than a
  * page. (D-78) Every filter composes; none silently clears another. (D-82)
@@ -7,11 +7,11 @@
  * Each row carries all of its channel touches, not just the attributed one —
  * that is the payoff of keeping `lead_touches` append-only. (D-40, D-79)
  *
- * Scope (D-86): only people with at least one lead touch are listed, so the 284
- * buyers who match no lead record do not appear here — they are counted in the
- * existing-customer tiles instead. The walk-in-derived columns went with that
- * channel. First touch is recomputed rather than read from
- * `customer_attribution`, for the reason set out in `dashboard.ts`.
+ * The table includes both marketing leads and customers imported from the
+ * loyalty/customer master. A lead touch is optional: customers without one
+ * retain a null primary channel and render as "No lead record". First touch is
+ * recomputed rather than read from `customer_attribution`, for the reason set
+ * out in `dashboard.ts`.
  *
  * `valueTier` is the one field on this row that is *not* scoped to leads —
  * it is the same business-wide ranking `dashboard.ts` computes for the
@@ -67,7 +67,10 @@ export interface CustomerRow {
   area: string | null;
   city: string | null;
   dateOfBirth: string | null;
+  age: string | null;
   anniversary: string | null;
+  gstNo: string | null;
+  panNo: string | null;
   storeName: string | null;
   lifecycle: string;
   lifecycleBasis: string | null;
@@ -101,17 +104,14 @@ const SORTS: Record<string, string> = {
 const IN_SCOPE = SCOPED_CHANNELS.map((c) => `'${c}'`).join(',');
 
 /**
- * Stands in for `customer_attribution`, narrowed to the in-scope channels and
- * exposed under the same `ca` alias so the sort expressions above still apply.
+ * Stands in for `customer_attribution`, exposed under the same `ca` alias so
+ * the sort expressions above still apply. Its population starts from every
+ * customer; lead and sale aggregates are optional attributes.
  *
- * Built fresh per call, like `dashboard.ts`'s `buildScoped` — `sale_agg`
- * matches on customer identity (phone) alone, not a `touched_at`-relative
- * window, for the reason documented there: these four channels carry no
- * real per-lead date, so `touched_at` is only ever an estimate defaulting to
- * whenever the import happened to run, and window-bounding against it
- * silently drops real conversions rather than measuring anything. Further
- * narrowed to `range` if one is given. `value_tier` stays lifetime
- * regardless, for the reason documented on `VALUE_TIER` in dashboard.ts.
+ * Built fresh per call, like `dashboard.ts`'s `buildScoped`. `sale_agg`
+ * matches on customer identity (normalised phone) alone and is narrowed to
+ * `range` if one is given. `value_tier` stays lifetime regardless, for the
+ * reason documented on `VALUE_TIER` in dashboard.ts.
  */
 function buildScopedCte(range: DateRange = {}) {
   return sql.raw(`
@@ -136,13 +136,12 @@ function buildScopedCte(range: DateRange = {}) {
     SELECT s.customer_id, COUNT(*) AS bill_count, SUM(s.bill_amount) AS total_sales,
            MIN(s.billed_at) AS first_sale_at
     FROM   sales s
-    JOIN   scoped_touch st ON st.customer_id = s.customer_id
     WHERE  s.customer_id IS NOT NULL${dateCondition('s', range)}
     GROUP  BY s.customer_id
   ),
   ${VALUE_TIER},
   ca AS (
-    SELECT st.customer_id,
+    SELECT c.id AS customer_id,
            st.channel AS primary_channel,
            st.touched_at AS first_touch_at,
            COALESCE(sa.bill_count, 0)::int      AS bill_count,
@@ -152,9 +151,10 @@ function buildScopedCte(range: DateRange = {}) {
            -- value_tier is business-wide (dashboard.ts), so it always matches:
            -- every id in scoped_touch also has a row in customer_attribution.
            vt.tier                              AS value_tier
-    FROM   scoped_touch st
-    LEFT   JOIN sale_agg sa ON sa.customer_id = st.customer_id
-    LEFT   JOIN value_tier vt ON vt.customer_id = st.customer_id
+    FROM   customers c
+    LEFT   JOIN scoped_touch st ON st.customer_id = c.id
+    LEFT   JOIN sale_agg sa ON sa.customer_id = c.id
+    LEFT   JOIN value_tier vt ON vt.customer_id = c.id
   )`);
 }
 
@@ -227,7 +227,9 @@ export async function getCustomers(filters: CustomerFilters): Promise<CustomerPa
     SELECT
       c.id, c.customer_code, c.phone_e164, c.full_name, c.email, c.area, c.city,
       c.date_of_birth::text AS date_of_birth,
+      c.age,
       c.anniversary::text AS anniversary,
+      c.gst_no, c.pan_no,
       c.lifecycle::text AS lifecycle,
       c.lifecycle_basis::text AS lifecycle_basis,
       ca.primary_channel::text AS primary_channel,
@@ -274,7 +276,10 @@ export async function getCustomers(filters: CustomerFilters): Promise<CustomerPa
       area: r.area ? String(r.area) : null,
       city: r.city ? String(r.city) : null,
       dateOfBirth: r.date_of_birth ? String(r.date_of_birth) : null,
+      age: r.age ? String(r.age) : null,
       anniversary: r.anniversary ? String(r.anniversary) : null,
+      gstNo: r.gst_no ? String(r.gst_no) : null,
+      panNo: r.pan_no ? String(r.pan_no) : null,
       storeName: r.store_name ? String(r.store_name) : null,
       lifecycle: String(r.lifecycle),
       lifecycleBasis: r.lifecycle_basis ? String(r.lifecycle_basis) : null,
@@ -299,12 +304,12 @@ export async function getCustomers(filters: CustomerFilters): Promise<CustomerPa
 
 /**
  * Every matching row, for CSV export — the same filters as `getCustomers`,
- * same `buildConditions`, no pagination. Capped well above the current 6,150
- * customers so today's export can never be silently truncated, but still
+ * same `buildConditions`, no pagination. Capped above the current customer
+ * master so today's export can never be silently truncated, but still
  * bounded rather than unconditionally unbounded — a filter mistake shouldn't
  * be able to turn into an unbounded query against a growing table.
  */
-const EXPORT_ROW_CAP = 50_000;
+const EXPORT_ROW_CAP = 250_000;
 
 export async function getCustomersForExport(
   filters: Omit<CustomerFilters, 'page' | 'pageSize'>,
@@ -318,7 +323,9 @@ export async function getCustomersForExport(
     SELECT
       c.id, c.customer_code, c.phone_e164, c.full_name, c.email, c.area, c.city,
       c.date_of_birth::text AS date_of_birth,
+      c.age,
       c.anniversary::text AS anniversary,
+      c.gst_no, c.pan_no,
       c.lifecycle::text AS lifecycle,
       c.lifecycle_basis::text AS lifecycle_basis,
       ca.primary_channel::text AS primary_channel,
@@ -364,7 +371,10 @@ export async function getCustomersForExport(
     area: r.area ? String(r.area) : null,
     city: r.city ? String(r.city) : null,
     dateOfBirth: r.date_of_birth ? String(r.date_of_birth) : null,
+    age: r.age ? String(r.age) : null,
     anniversary: r.anniversary ? String(r.anniversary) : null,
+    gstNo: r.gst_no ? String(r.gst_no) : null,
+    panNo: r.pan_no ? String(r.pan_no) : null,
     storeName: r.store_name ? String(r.store_name) : null,
     lifecycle: String(r.lifecycle),
     lifecycleBasis: r.lifecycle_basis ? String(r.lifecycle_basis) : null,

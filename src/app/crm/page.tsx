@@ -213,8 +213,7 @@ export default async function DashboardPage({
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-ink">Customers</h2>
             <p className="mt-1 text-sm text-ink-2">
-              Every person on a master-sheet lead list — {formatNumber(customers.total)} in this
-              view.
+              Leads and existing customers together — {formatNumber(customers.total)} in this view.
             </p>
           </div>
           <Suspense

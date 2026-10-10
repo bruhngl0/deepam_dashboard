@@ -3,29 +3,40 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { nowLocal, OUTCOMES, recordCall, safeProductLink, STORES, uid, type Lead, type Outcome } from '@/lib/marketing/local';
 import { button, card, Field, input, primary } from './marketing-shared';
-export function LeadActions({ lead, update, variant = 'full' }: { lead: Lead; update: (lead: Lead) => boolean; variant?: 'full' | 'call-only' }) {
+export function LeadActions({ lead, update, variant = 'full', salespersonName = 'Abishek', salespersonView = false }: { lead: Lead; update: (lead: Lead) => boolean; variant?: 'full' | 'call-only'; salespersonName?: string; salespersonView?: boolean }) {
   const [mode, setMode] = useState<'call' | 'note' | 'followup' | 'visit' | null>(null);
   const [callLogged, setCallLogged] = useState(lead.interactions.some(i => i.type === 'call'));
   const [createFollowup, setCreateFollowup] = useState(false);
+  const [followupChoice, setFollowupChoice] = useState('');
   const [error, setError] = useState('');
-  function start(next: typeof mode) { setMode(next); setError(''); setCreateFollowup(false); }
+  function start(next: typeof mode) { setMode(next); setError(''); setCreateFollowup(false); setFollowupChoice(''); }
   const whatsapp = `https://wa.me/${lead.phone.replace(/\D/g, '')}${safeProductLink(lead.productLink) ? `?text=${encodeURIComponent(`Hello ${lead.name}, here is the ${lead.product || 'product'} you asked about: ${lead.productLink}`)}` : ''}`;
   return <>
     <div className="flex flex-wrap gap-2">
       {variant === 'full' && <>
         <a href={`tel:${lead.phone}`} className={button}>Call</a>
         <a href={whatsapp} target="_blank" rel="noreferrer" className={button} onClick={() => update({ ...lead, interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'whatsapp', text: safeProductLink(lead.productLink) ? 'Opened WhatsApp with product link draft; sending is not confirmed.' : 'Opened WhatsApp; sending is not confirmed.' }] })}>WhatsApp</a>
-        {lead.email ? <a className={button} href={`mailto:${encodeURIComponent(lead.email)}`} onClick={() => update({ ...lead, interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'email', text: 'Opened email draft; sending is not confirmed.' }] })}>Email</a> : <Link className={button} href={`/marketing/leads/${lead.id}`}>Add email</Link>}
+        {!salespersonView && (lead.email ? <a className={button} href={`mailto:${encodeURIComponent(lead.email)}`} onClick={() => update({ ...lead, interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'email', text: 'Opened email draft; sending is not confirmed.' }] })}>Email</a> : <Link className={button} href={`/marketing/leads/${lead.id}`}>Add email</Link>)}
       </>}
       {variant === 'call-only' && <button className={callLogged ? 'rounded-xl border border-status-good/30 bg-status-good/10 px-3 py-2 text-xs font-medium text-status-good' : button} onClick={() => start('call')}>{callLogged ? 'Call logged' : 'Log call'}</button>}
-      {variant === 'full' && <button className={button} onClick={() => start('visit')}>Store visit</button>}
+      {variant === 'full' && !salespersonView && <button className={button} onClick={() => start('visit')}>Store visit</button>}
     </div>
     {mode && <div role="dialog" aria-modal="true" aria-label={`${mode} for ${lead.name}`} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4" onKeyDown={e => { if (e.key === 'Escape') setMode(null); }}>
       <form className={`${card} max-h-[90vh] w-full max-w-xl overflow-y-auto shadow-xl`} onSubmit={e => {
         e.preventDefault(); const f = new FormData(e.currentTarget); const get = (key: string) => String(f.get(key) ?? '').trim(); const at = nowLocal();
         try {
           let next = lead;
-          if (mode === 'call') next = recordCall(lead, { outcome: get('outcome') as Outcome, note: get('note'), intent: get('intent'), store: get('store'), product: get('product'), category: get('category'), productLink: '', due: '', salesperson: get('salesperson'), createFollowup }, at);
+          if (mode === 'call') {
+            let due = '';
+            if (createFollowup) {
+              const choice = get('followupChoice');
+              if (!choice) throw new Error('Choose when to follow up.');
+              const date = choice === 'tomorrow' ? addDays(at.slice(0, 10), 1) : choice === 'three-days' ? addDays(at.slice(0, 10), 3) : get('followupDate');
+              if (!date) throw new Error('Choose a follow-up date.');
+              due = `${date}T10:00`;
+            }
+            next = recordCall(lead, { outcome: get('outcome') as Outcome, note: get('note'), intent: lead.intent, store: get('store'), product: get('product'), category: get('category'), productLink: '', due, salesperson: get('salesperson'), createFollowup }, at);
+          }
           if (mode === 'note') { if (!get('note')) throw new Error('Enter a note.'); next = { ...lead, interactions: [...lead.interactions, { id: uid(), at, type: 'note', text: get('note') }] }; }
           if (mode === 'followup') {
             if (!get('due') || get('due') <= at.slice(0, 16)) throw new Error('Choose a future follow-up time.');
@@ -40,8 +51,8 @@ export function LeadActions({ lead, update, variant = 'full' }: { lead: Lead; up
         {mode === 'followup' && <Field label="Follow-up date and time (IST)"><input autoFocus required name="due" type="datetime-local" min={nowLocal().slice(0, 16)} className={input} /></Field>}
         {mode === 'visit' && <Field label="Visited store"><select name="store" required className={input} defaultValue={lead.preferredStore === 'Online' ? '' : lead.preferredStore}><option value="">Select store</option><option>MG</option><option>JAYNAGAR</option></select></Field>}
         <div className="mt-4"><Field label="Notes"><textarea autoFocus={mode === 'note'} name="note" required={mode === 'note'} rows={4} className={input} placeholder="What did the customer say? What should happen next?" /></Field></div>
-        {mode === 'call' && <div className="mt-4"><Field label="Logged by"><select name="salesperson" required className={input} defaultValue="Abishek"><option>Abishek</option></select></Field></div>}
-        {mode === 'call' && <button type="button" className={createFollowup ? 'mt-4 rounded-xl border border-status-good/30 bg-status-good/10 px-3 py-2 text-xs font-medium text-status-good' : `${button} mt-4`} onClick={() => setCreateFollowup(!createFollowup)}>{createFollowup ? 'Follow-up added' : 'Follow-up'}</button>}
+        {mode === 'call' && <div className="mt-4"><Field label="Logged by"><select name="salesperson" required className={input} defaultValue={salespersonName}><option>{salespersonName}</option></select></Field></div>}
+        {mode === 'call' && <><button type="button" className={createFollowup ? 'mt-4 rounded-xl border border-status-good/30 bg-status-good/10 px-3 py-2 text-xs font-medium text-status-good' : `${button} mt-4`} onClick={() => { setCreateFollowup(!createFollowup); setFollowupChoice(''); }}>{createFollowup ? 'Remove follow-up' : 'Follow-up'}</button>{createFollowup && <div className="mt-4 grid gap-3 sm:grid-cols-2"><Field label="Follow up"><select name="followupChoice" required className={input} value={followupChoice} onChange={event => setFollowupChoice(event.target.value)}><option value="">Choose when</option><option value="tomorrow">Tomorrow</option><option value="three-days">After three days</option><option value="date">Select a date</option></select></Field>{followupChoice === 'date' && <Field label="Follow-up date"><input name="followupDate" required type="date" min={addDays(nowLocal().slice(0, 10), 1)} className={input} /></Field>}</div>}</>}
         {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
         <button className={`${primary} mt-4`} type="submit">Save {mode === 'call' ? 'call outcome' : mode === 'visit' ? 'visit' : mode}</button>
       </form>
@@ -54,9 +65,14 @@ function CallFields({ lead }: { lead: Lead }) {
   const interested = outcome === 'Connected / interested';
   return <div className="space-y-4">
     <Field label="Call outcome"><select autoFocus name="outcome" className={input} value={outcome} onChange={e => setOutcome(e.target.value as Outcome)}>{OUTCOMES.map(o => <option key={o}>{o}</option>)}</select></Field>
-    <Field label={`Intent${interested ? ' *' : ''}`}><input name="intent" className={input} required={interested} defaultValue={lead.intent} placeholder="Occasion, need, budget, or purchase plan" /></Field>
     <Field label={`Preferred store${interested ? ' *' : ''}`}><select name="store" className={input} required={interested} value={store} onChange={e => setStore(e.target.value)}><option value="">Not decided</option>{STORES.map(s => <option key={s}>{s}</option>)}</select></Field>
     <div className="grid gap-3 sm:grid-cols-2"><Field label="Product"><input name="product" defaultValue={lead.product} className={input} required={interested && store === 'Online'} /></Field><Field label="Category"><input name="category" defaultValue={lead.category} className={input} required={interested && store === 'Online'} /></Field></div>
     <p className="text-xs text-ink-muted">Use the Follow-up button below to add this lead to the follow-up queue with the current IST time.</p>
   </div>;
+}
+
+function addDays(date: string, days: number) {
+  const [year, month, day] = date.split('-').map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day + days));
+  return result.toISOString().slice(0, 10);
 }

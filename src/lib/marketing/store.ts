@@ -21,6 +21,49 @@ const MAX_DOC_BYTES = 256 * 1024;
 export type LeadWrite = { lead: Lead; version: number };
 export type SaveResult = { versions: Record<string, number>; conflicts: string[]; inserted: number; updated: number; sales: number };
 
+/** Restricts claims by `claimGroup`: `only` these groups, or `exclude` them. */
+export type ClaimRouting = { only: string[] } | { exclude: string[] };
+
+export async function claimLeads(salesperson: string, claimedAt: string, limit = 10, routing: ClaimRouting = { exclude: [] }): Promise<string[]> {
+  const group = sql`COALESCE(ml.doc->>'claimGroup', '')`;
+  const groups = (list: string[]) => sql.join(list.map((g) => sql`${g}`), sql`, `);
+  const routingFilter = 'only' in routing
+    ? sql`AND ${group} IN (${groups(routing.only)})`
+    : routing.exclude.length
+      ? sql`AND ${group} NOT IN (${groups(routing.exclude)})`
+      : sql``;
+  const result = await db.execute(sql`
+    WITH candidates AS (
+      SELECT ml.id
+      FROM marketing_leads ml
+      WHERE COALESCE(ml.doc->>'claimedBy', '') = ''
+        AND COALESCE(ml.doc->>'status', 'New') NOT IN ('Connected / not interested', 'Wrong number')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(COALESCE(ml.doc->'interactions', '[]'::jsonb)) interaction
+          WHERE interaction->>'type' = 'call'
+        )
+        AND NOT EXISTS (SELECT 1 FROM marketing_sales ms WHERE ms.phone = ml.phone)
+        ${routingFilter}
+      ORDER BY ml.seq
+      FOR UPDATE SKIP LOCKED
+      LIMIT ${limit}
+    )
+    UPDATE marketing_leads ml
+    SET doc = jsonb_set(
+          jsonb_set(ml.doc, '{claimedBy}', to_jsonb(${salesperson}::text), true),
+          '{claimedAt}', to_jsonb(${claimedAt}::text), true
+        ),
+        version = ml.version + 1,
+        updated_at = now()
+    FROM candidates
+    WHERE ml.id = candidates.id
+    RETURNING ml.id
+  `) as unknown;
+  const rows = Array.isArray(result) ? result : (result as { rows?: { id: string }[] }).rows ?? [];
+  return (rows as { id: string }[]).map(row => row.id);
+}
+
 /** Changes whenever any lead or bill is added or edited: versions only ever grow. */
 export async function datasetStamp(): Promise<string> {
   const [[leads], [sales]] = await Promise.all([

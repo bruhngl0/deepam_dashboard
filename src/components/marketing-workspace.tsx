@@ -1,34 +1,39 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { commitPreview, convertedLeads, filterLeads, guessMapping, metrics, nowLocal, previewRows, SOURCES, STORES, uid, type Dataset, type Lead } from '@/lib/marketing/local';
+import { commitPreview, convertedLeads, filterLeads, guessMapping, hasLoggedCall, metrics, nowLocal, previewRows, SOURCES, STORES, uid, type Dataset, type Lead } from '@/lib/marketing/local';
 import { button, card, dateLabel, Field, input, money, primary, useMarketing } from './marketing-shared';
 import { MarketingSalespeople } from './marketing-salespeople';
 import { MarketingImport } from './marketing-import';
 import { LeadActions } from './marketing-lead-actions';
 
-type Tab = 'Overview' | 'All leads' | 'Calling queue' | 'Follow-ups' | 'Converted' | 'Sales' | 'Insights' | 'Salespeople' | 'Import';
-const tabs: Tab[] = ['Overview', 'All leads', 'Calling queue', 'Follow-ups', 'Converted', 'Sales', 'Insights', 'Salespeople', 'Import'];
+type Tab = 'Overview' | 'All leads' | 'Calling queue' | 'Follow-ups' | 'Team performance' | 'Campaigns' | 'Import';
+const tabs = [
+  { id: 'Overview', label: 'Overview' },
+  { id: 'All leads', label: 'All leads' },
+  { id: 'Calling queue', label: 'Queue' },
+  { id: 'Follow-ups', label: 'Follow-ups' },
+  { id: 'Team performance', label: 'Team performance' },
+  { id: 'Campaigns', label: 'Campaigns' },
+] as const satisfies readonly { id: Tab; label: string }[];
 export function MarketingWorkspace() {
   const { data, save, message, refresh } = useMarketing();
   const [tab, setTab] = useState<Tab>('Overview');
   const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [store, setStore] = useState(''); const [source, setSource] = useState(''); const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0); const [add, setAdd] = useState(false); const [salesView, setSalesView] = useState('all');
-  const [conversionView, setConversionView] = useState<'converted' | 'not-converted'>('converted');
+  const [page, setPage] = useState(0); const [add, setAdd] = useState(false);
   if (!data) return <p role="status" className="p-8 text-ink-2">{message || 'Loading marketing workspace…'}</p>;
   const scope = filterLeads(data.leads, { from, to, store, source, search: '' });
   const matched = convertedLeads(data); const convertedPhones = new Set(matched.map(l => l.phone));
-  const phones = new Set(scope.map(l => l.phone));
   const stats = metrics(data, scope);
-  const queue = scope.filter(l => !convertedPhones.has(l.phone) && !['Connected / not interested', 'Wrong number'].includes(l.status));
+  const queue = scope.filter(l => !hasLoggedCall(l) && !convertedPhones.has(l.phone) && !['Connected / not interested', 'Wrong number'].includes(l.status));
   const today = nowLocal().slice(0, 10); const now = nowLocal().slice(0, 16);
   const pending = scope.flatMap(lead => lead.followups.filter(f => !f.completedAt).map(f => ({ lead, followup: f }))).sort((a, b) => a.followup.due.localeCompare(b.followup.due));
   const overdue = pending.filter(p => p.followup.due < now);
-  const subset = tab === 'Calling queue' ? queue : tab === 'Converted' ? scope.filter(l => conversionView === 'converted' ? convertedPhones.has(l.phone) : !convertedPhones.has(l.phone)) : scope;
+  const subset = tab === 'Calling queue' ? queue : scope;
   const visible = filterLeads(subset, { from: '', to: '', store: '', source: '', search });
   const currentPage = Math.min(page, Math.max(0, Math.ceil(visible.length / 20) - 1));
   const update = (lead: Lead) => save({ ...data, leads: data.leads.map(l => l.id === lead.id ? lead : l) });
-  const showLeadActions = !['All leads', 'Converted'].includes(tab);
+  const showLeadActions = tab !== 'All leads';
   function changeTab(next: Tab) { setTab(next); setPage(0); setSearch(''); }
   const costNote = `${stats.costsKnown}/${stats.costsTotal} acquisition records have costs`;
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -45,7 +50,7 @@ export function MarketingWorkspace() {
       <p className="w-full text-xs text-ink-muted">Filters select leads by lead date and preferred store. Sales and purchases include their full imported history. All times IST.</p>
       {from && to && from > to && <p role="alert" className="text-sm text-red-600">From must be on or before To.</p>}
     </section>
-    <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Marketing sections">{tabs.map(t => t === 'Converted' ? <select key={t} aria-label="Conversion filter" className={tab === t ? primary : button} value={conversionView} onChange={e => { setConversionView(e.target.value as typeof conversionView); changeTab('Converted'); }}><option value="converted">Converted</option><option value="not-converted">Not converted</option></select> : <button key={t} className={tab === t ? primary : button} aria-current={tab === t ? 'page' : undefined} onClick={() => changeTab(t)}>{t}{t === 'Calling queue' ? ` (${queue.length})` : t === 'Follow-ups' ? ` (${pending.length})` : ''}</button>)}</nav>
+    <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Marketing sections">{tabs.map(({ id, label }) => <button key={id} className={tab === id ? primary : button} aria-current={tab === id ? 'page' : undefined} onClick={() => changeTab(id)}>{label}{id === 'Calling queue' ? ` (${queue.length})` : id === 'Follow-ups' ? ` (${pending.length})` : ''}</button>)}</nav>
     {tab === 'Overview' && <>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
         ['Total leads', String(stats.total), 'Unique phone numbers'], ['Contacted', String(stats.contacted), 'At least one connected call'], ['Interested', String(stats.interested), 'Latest call marked interested'], ['Store visits', String(stats.visits), 'Unique leads with recorded visits'], ['Converted customers', String(stats.converted), 'At least one matched bill'], ['Lead revenue', money(stats.revenue), `${stats.orders} matched bills`], ['Conversion rate', `${stats.conversion.toFixed(1)}%`, 'Converted ÷ unique leads'], ['Cost per acquisition', stats.cpa === null ? 'Not available' : money(stats.cpa), `${costNote}${stats.costsKnown < stats.costsTotal ? ' · partial' : ''}`],
@@ -53,8 +58,8 @@ export function MarketingWorkspace() {
       <div className="grid gap-5 lg:grid-cols-2"><section className={card}><h2 className="text-lg font-semibold text-ink">Your next conversations</h2><p className="mt-1 text-sm text-ink-2">{overdue.length} overdue · {pending.filter(p => p.followup.due.startsWith(today)).length} due today · {queue.length} active leads</p><div className="mt-5 space-y-3">{pending.slice(0, 4).map(({ lead, followup: f }) => <Link key={f.id} href={`/marketing/leads/${lead.id}`} className="block rounded-xl bg-inset p-3 text-sm text-ink"><p className="font-medium">{lead.name}</p><p className="mt-1 text-ink-2">{dateLabel(f.due)} · {f.note || 'Follow-up'}</p></Link>)}{!pending.length && <p className="text-sm text-ink-muted">No pending follow-ups.</p>}</div><button className={`${button} mt-4`} onClick={() => changeTab('Calling queue')}>Open calling queue</button></section>
       <section className={card}><h2 className="text-lg font-semibold text-ink">Acquisition to purchase</h2><div className="mt-5 space-y-5">{[['Leads', stats.total], ['Contacted', stats.contacted], ['Interested now', stats.interested], ['Visited store', stats.visits], ['Converted', stats.converted]].map(([label, value]) => <div key={label}><div className="mb-2 flex justify-between text-sm text-ink"><span>{label}</span><span>{value}</span></div><div className="h-2 rounded bg-inset"><div className="h-2 rounded bg-accent" style={{ width: `${stats.total ? Number(value) / stats.total * 100 : 0}%` }} /></div></div>)}</div><p className="mt-4 text-xs text-ink-muted">Milestones can overlap; a purchase does not require a recorded call or store visit.</p></section></div>
     </>}
-    {['All leads', 'Calling queue', 'Converted'].includes(tab) && <section className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-lg font-semibold text-ink">{tab === 'Converted' && conversionView === 'not-converted' ? 'Not converted' : tab}</h2><p className="text-xs text-ink-muted">{tab === 'Calling queue' ? 'New imported leads stay here; logged calls turn green for quick tracking.' : tab === 'Converted' ? 'Filtered by matched bill status.' : 'Open a name to see the complete customer profile.'}</p></div><input className={`${input} sm:!w-80`} aria-label="Search leads" placeholder="Name, number, lead ID, campaign…" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} /></div>
+    {['All leads', 'Calling queue'].includes(tab) && <section className="overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-lg font-semibold text-ink">{tab}</h2><p className="text-xs text-ink-muted">{tab === 'Calling queue' ? 'New imported leads stay here until their first call is logged.' : 'Open a name to see the complete customer profile.'}</p></div><input className={`${input} sm:!w-80`} aria-label="Search leads" placeholder="Name, number, lead ID, campaign…" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} /></div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Lead / contact', 'Sources / campaign', 'Date-Time', 'Preferred store', ...(tab === 'Calling queue' ? ['Call status'] : []), ...(showLeadActions ? ['Actions'] : []), ...(tab === 'Calling queue' ? ['Log call'] : [])].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{visible.slice(currentPage * 20, currentPage * 20 + 20).map(l => <tr key={l.id} className="border-t border-line align-top"><td className="min-w-48 px-4 py-4"><Link href={`/marketing/leads/${l.id}`} className="font-semibold text-accent hover:underline">{l.name}</Link><p className="mt-1 text-ink-2">{l.phone}</p><p className="text-xs text-ink-muted">{l.email || 'Email not recorded'}</p><p className="mt-1 max-w-48 break-all text-[10px] text-ink-muted">{l.id}</p></td><td className="min-w-40 px-4 py-4 text-ink">{[...new Set(l.acquisitions.map(a => a.source))].join(', ')}<p className="mt-1 text-xs text-ink-2">{[...new Set(l.acquisitions.map(a => a.campaignId).filter(Boolean))].join(', ') || 'No campaign'}</p></td><td className="whitespace-nowrap px-4 py-4 text-ink-2">{dateLabel(l.acquiredAt)}</td><td className="px-4 py-4 text-ink-2">{l.preferredStore || 'Not recorded'}</td>{tab === 'Calling queue' && <td className="px-4 py-4 text-ink-2">Pending call</td>}{showLeadActions && <td className="min-w-72 px-4 py-4"><LeadActions lead={l} update={update} /></td>}{tab === 'Calling queue' && <td className="min-w-36 px-4 py-4"><LeadActions lead={l} update={update} variant="call-only" /></td>}</tr>)}</tbody></table></div>
       {!visible.length && <p className="p-10 text-center text-sm text-ink-muted">No leads match this view.</p>}
       <div className="flex items-center justify-between border-t border-line p-4 text-sm text-ink-2"><span>{visible.length} leads · Page {currentPage + 1} of {Math.max(1, Math.ceil(visible.length / 20))}</span><div className="flex gap-2"><button className={button} disabled={!currentPage} onClick={() => setPage(currentPage - 1)}>Previous</button><button className={button} disabled={(currentPage + 1) * 20 >= visible.length} onClick={() => setPage(currentPage + 1)}>Next</button></div></div>
@@ -63,23 +68,24 @@ export function MarketingWorkspace() {
       const entries = pending.filter(p => bucket === 'Overdue' ? p.followup.due < now : bucket === 'Today' ? p.followup.due >= now && p.followup.due.startsWith(today) : p.followup.due.slice(0, 10) > today);
       return <section key={bucket} className={card}><h2 className="text-lg font-semibold text-ink">{bucket} <span className="text-ink-muted">{entries.length}</span></h2><div className="mt-4 space-y-4">{entries.map(({ lead, followup: f }) => <div key={f.id} className="rounded-xl border border-line p-4"><Link href={`/marketing/leads/${lead.id}`} className="font-medium text-accent">{lead.name}</Link><p className="mt-1 text-xs text-ink-muted">{dateLabel(f.due)}</p><p className="my-3 text-sm text-ink-2">{f.note || 'Follow up with customer'}</p><LeadActions lead={lead} update={update} /><button className={`${button} mt-2`} onClick={() => update({ ...lead, followups: lead.followups.map(x => x.id === f.id ? { ...x, completedAt: nowLocal() } : x), interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'followup', text: `Follow-up completed: ${f.note}` }] })}>Complete</button></div>)}{!entries.length && <p className="text-sm text-ink-muted">No follow-ups.</p>}</div></section>;
     })}</div>}
-    {tab === 'Sales' && <section className={card}><h2 className="text-xl font-semibold text-ink">Sales & conversion ledger</h2><p className="mt-2 text-sm text-ink-2">Bills link to lead profiles by phone. Unmatched bills remain here and match automatically when a lead arrives.</p><div className="my-4 flex flex-wrap gap-3"><select aria-label="Bill matching" className={`${input} !w-auto`} value={salesView} onChange={e => setSalesView(e.target.value)}><option value="all">All bills</option><option value="matched">Converted / matched bills</option><option value="unmatched">Unmatched bills</option></select><button className={button} onClick={() => changeTab('Import')}>Import sales</button></div>{(from || to || store || source) && <p className="mb-3 text-xs text-ink-muted">Lead filters are active; unmatched bills are excluded. Clear filters to see all bills.</p>}<SalesTable data={data} sales={data.sales.filter(s => (!(from || to || store || source) || phones.has(s.phone)) && (salesView === 'all' || (salesView === 'matched' ? convertedPhones.has(s.phone) : !convertedPhones.has(s.phone))))} /></section>}
-    {tab === 'Insights' && <Insights data={data} leads={scope} />}
-    {tab === 'Salespeople' && <MarketingSalespeople data={data} />}
+    {tab === 'Team performance' && <MarketingSalespeople data={data} />}
+    {tab === 'Campaigns' && <CampaignPerformance data={data} leads={scope} />}
     {tab === 'Import' && <MarketingImport data={data} save={save} refresh={refresh} />}
     <footer className="border-t border-line pt-5 text-xs text-ink-muted"><p>One lead ID per phone · Multiple acquisition sources · Shared database</p></footer>
   </main>;
 }
-function SalesTable({ data, sales }: { data: Dataset; sales: Dataset['sales'] }) {
-  return <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs text-ink-muted"><tr>{['Bill', 'Customer / phone', 'Purchase date', 'Store', 'Amount', 'Link'].map(h => <th className="p-3" key={h}>{h}</th>)}</tr></thead><tbody>{sales.map(s => { const lead = data.leads.find(l => l.phone === s.phone); return <tr key={s.invoice} className="border-t border-line text-ink"><td className="p-3">{s.invoice}</td><td className="p-3">{lead?.name ?? s.phone}</td><td className="p-3">{dateLabel(s.date)}</td><td className="p-3">{s.store || '—'}</td><td className="p-3">{s.amount === null ? 'Not supplied' : money(s.amount)}</td><td className="p-3">{lead ? <Link className="text-accent underline" href={`/marketing/leads/${lead.id}`}>Customer profile</Link> : 'Awaiting lead'}</td></tr>; })}</tbody></table>{!sales.length && <p className="p-8 text-center text-ink-muted">No bills match this view.</p>}</div>;
-}
-function Insights({ data, leads }: { data: Dataset; leads: Lead[] }) {
-  const groups = SOURCES.map(source => ({ source, stats: metrics(data, leads.filter(l => l.acquisitions[0]?.source === source)) }));
-  const best = [...groups].filter(g => g.stats.total).sort((a, b) => b.stats.revenue - a.stats.revenue)[0];
-  const noSales = leads.filter(l => !data.sales.some(s => s.phone === l.phone));
-  return <div className="space-y-5"><div className="grid gap-4 md:grid-cols-3"><section className={card}><p className="text-xs text-ink-muted">Highest attributed revenue</p><h2 className="mt-2 text-xl font-semibold text-ink">{best?.source ?? 'No leads yet'}</h2><p className="mt-2 text-sm text-ink-2">{best ? `${money(best.stats.revenue)} from ${best.stats.converted} converted customers` : 'Import leads and sales to compare sources.'}</p></section><section className={card}><p className="text-xs text-ink-muted">Interested, not yet converted</p><p className="mt-2 text-3xl font-semibold text-ink">{noSales.filter(l => l.status === 'Connected / interested').length}</p><p className="mt-2 text-sm text-ink-2">Review intent and schedule the next conversation.</p></section><section className={card}><p className="text-xs text-ink-muted">Contact data to complete</p><p className="mt-2 text-3xl font-semibold text-ink">{leads.filter(l => !l.email || !l.preferredStore).length}</p><p className="mt-2 text-sm text-ink-2">Leads missing email or a preferred store.</p></section></div>
-    <section className={card}><h2 className="text-xl font-semibold text-ink">Source performance</h2><p className="my-3 text-sm text-ink-2">First recorded source receives revenue attribution, so a lead with multiple sources counts once. CPA uses recorded acquisition costs ÷ converted customers; missing costs make it partial.</p><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs text-ink-muted"><tr>{['Source', 'Leads', 'Contacted', 'Converted', 'Conversion rate', 'Sales', 'CPA', 'Cost coverage'].map(h => <th className="p-3" key={h}>{h}</th>)}</tr></thead><tbody>{groups.map(({ source, stats: s }) => <tr key={source} className="border-t border-line text-ink"><td className="p-3">{source}</td><td className="p-3">{s.total}</td><td className="p-3">{s.contacted}</td><td className="p-3">{s.converted}</td><td className="p-3">{s.conversion.toFixed(1)}%</td><td className="p-3">{money(s.revenue)}</td><td className="p-3">{s.cpa === null ? '—' : money(s.cpa)}</td><td className="p-3">{s.costsKnown}/{s.costsTotal}</td></tr>)}</tbody></table></div></section>
-  </div>;
+function CampaignPerformance({ data, leads }: { data: Dataset; leads: Lead[] }) {
+  const campaigns = [...new Set(leads.flatMap(lead => lead.acquisitions.map(acquisition => acquisition.campaignId.trim()).filter(Boolean)))];
+  const rows = campaigns.map(campaign => {
+    const campaignLeads = leads.filter(lead => lead.acquisitions.some(acquisition => acquisition.campaignId.trim() === campaign));
+    const acquisitions = campaignLeads.flatMap(lead => lead.acquisitions.filter(acquisition => acquisition.campaignId.trim() === campaign));
+    const sources = [...new Set(acquisitions.map(acquisition => acquisition.source))];
+    const knownCosts = acquisitions.filter(acquisition => acquisition.cost !== null);
+    const totalSpend = knownCosts.reduce((total, acquisition) => total + (acquisition.cost ?? 0), 0);
+    return { campaign, sources, stats: metrics(data, campaignLeads), totalSpend, hasSpend: knownCosts.length > 0 };
+  }).sort((a, b) => b.stats.total - a.stats.total || a.campaign.localeCompare(b.campaign));
+
+  return <section className={card}><h2 className="text-xl font-semibold text-ink">Campaign performance</h2><p className="mt-2 text-sm text-ink-2">CPL is spend ÷ leads, CAC is spend ÷ converted customers, and ROAS is revenue ÷ spend. A dash means campaign cost data is unavailable.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Campaign ID', 'Source', 'Leads', 'Contacted', 'Interested', 'Converted', 'Revenue', 'Total spend', 'CPL', 'CAC', 'ROAS'].map(heading => <th className="whitespace-nowrap p-3" key={heading}>{heading}</th>)}</tr></thead><tbody>{rows.map(({ campaign, sources, stats, totalSpend, hasSpend }) => <tr key={campaign} className="border-t border-line text-ink"><td className="min-w-64 p-3 font-medium">{campaign}</td><td className="p-3 text-ink-2">{sources.join(', ') || '—'}</td><td className="p-3">{stats.total}</td><td className="p-3">{stats.contacted}</td><td className="p-3">{stats.interested}</td><td className="p-3">{stats.converted}</td><td className="p-3">{money(stats.revenue)}</td><td className="p-3">{hasSpend ? money(totalSpend) : '—'}</td><td className="p-3">{hasSpend && stats.total ? money(totalSpend / stats.total) : '—'}</td><td className="p-3">{hasSpend && stats.converted ? money(totalSpend / stats.converted) : '—'}</td><td className="p-3">{hasSpend && totalSpend > 0 ? `${(stats.revenue / totalSpend).toFixed(2)}×` : '—'}</td></tr>)}</tbody></table>{!rows.length && <p className="p-8 text-center text-ink-muted">No campaigns match the selected filters.</p>}</div></section>;
 }
 function AddLead({ data, save, close }: { data: Dataset; save: (d: Dataset) => boolean; close: () => void }) {
   const [error, setError] = useState('');

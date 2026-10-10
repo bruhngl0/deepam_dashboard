@@ -19,10 +19,13 @@ import { createHash } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { settings } from '@/db/schema';
-import { previewRows, SOURCES } from './local';
+import { normalizePhone } from '@/lib/phone';
+import { EMPTY, nowLocal, previewRows, SOURCES } from './local';
 import { readWorkbook, SheetError, type Workbook } from './google-sheets';
+import { routeActive, routeForTab, routeSheetLead } from './sheet-routing';
 import { CANONICAL, tabRows } from './sheet-rows';
 import { loadDataset, saveChanges } from './store';
+import { syncMarketingLeadsToCrm } from './crm-sync';
 
 const CONFIG_KEY = 'marketing_sheet_sync';
 const STATUS_KEY = 'marketing_sheet_sync_status';
@@ -37,6 +40,7 @@ export type TabSummary = { sheet: string; tab: string; rows: number };
 export type SyncStatus = {
   at: string; ok: boolean; error: string;
   rows: number; added: number; updated: number; duplicates: number; conflicts: number;
+  crmCustomers: number; crmTouches: number;
   tabs: TabSummary[]; invalidCount: number; invalid: { where: string; row: number; reason: string }[];
 };
 export type SyncOutcome = { state: 'off' | 'unchanged' | 'synced' | 'failed'; status: SyncStatus | null };
@@ -62,7 +66,7 @@ export function parseConfig(value: unknown): SheetConfig | null {
   return valid.length ? { sheets: valid.slice(0, MAX_SHEETS) } : null;
 }
 
-type Collected = { rows: Record<string, unknown>[]; origin: { where: string; row: number }[]; tabs: TabSummary[]; problems: SyncStatus['invalid'] };
+type Collected = { rows: Record<string, unknown>[]; origin: { where: string; tab: string; row: number }[]; tabs: TabSummary[]; problems: SyncStatus['invalid'] };
 const filled = (row: Record<string, unknown>) => Object.values(row).some((v) => String(v).trim() !== '');
 
 /** The lead tabs of one workbook as canonical rows, remembering which tab and sheet row each came from. */
@@ -76,7 +80,7 @@ export function collectRows(source: SheetSource, workbook: Workbook, into: Colle
     const count = tab.rows.filter(filled).length;
     if (!count) continue;
     into.tabs.push({ sheet, tab: name, rows: count });
-    tab.rows.forEach((row, i) => { into.rows.push(row); into.origin.push({ where: `${sheet} · ${name}`, row: tab.first + i }); });
+    tab.rows.forEach((row, i) => { into.rows.push(row); into.origin.push({ where: `${sheet} · ${name}`, tab: name, row: tab.first + i }); });
   }
   return into;
 }
@@ -118,7 +122,7 @@ async function sync(force: boolean): Promise<SyncOutcome> {
   const config = await getSheetConfig(force);
   if (!config) return { state: 'off', status: null };
   const at = new Date().toISOString();
-  const status: SyncStatus = { at, ok: true, error: '', rows: 0, added: 0, updated: 0, duplicates: 0, conflicts: 0, tabs: [], invalidCount: 0, invalid: [] };
+  const status: SyncStatus = { at, ok: true, error: '', rows: 0, added: 0, updated: 0, duplicates: 0, conflicts: 0, crmCustomers: 0, crmTouches: 0, tabs: [], invalidCount: 0, invalid: [] };
   try {
     const workbooks = await Promise.all(config.sheets.map((source) => readWorkbook(source.spreadsheetId).catch((error: unknown) => {
       throw error instanceof SheetError ? new SheetError(`${source.title || 'Google Sheet'}: ${error.message}`) : error;
@@ -131,12 +135,32 @@ async function sync(force: boolean): Promise<SyncOutcome> {
     if (!collected.tabs.length && !collected.problems.length) throw new Error('No lead tab found. A lead tab needs a row of headings that includes a contact number and a name.');
     const { data, versions } = await loadDataset();
     const preview = previewRows(collected.rows, 'leads', CANONICAL, data);
-    const saved = await saveChanges(preview.leads.map((lead) => ({ lead, version: versions[lead.id] ?? 0 })), []);
+    const changed = new Map(preview.leads.map((lead) => [lead.phone, lead]));
+    const existing = new Map(data.leads.map((lead) => [lead.phone, lead]));
+    const claimedAt = nowLocal();
+    collected.rows.forEach((row, index) => {
+      const tab = collected.origin[index]?.tab ?? '';
+      const route = routeForTab(tab);
+      if (!route) return;
+      const phone = normalizePhone(row.phone);
+      if (!phone.ok || phone.hadMultiple) return;
+      const lead = changed.get(phone.e164) ?? existing.get(phone.e164);
+      if (!lead) return;
+      const routed = routeSheetLead(lead, tab, route, claimedAt, routeActive(route, claimedAt.slice(0, 10)));
+      if (JSON.stringify(routed) !== JSON.stringify(lead)) changed.set(phone.e164, routed);
+    });
+    const saved = await saveChanges([...changed.values()].map((lead) => ({ lead, version: versions[lead.id] ?? 0 })), []);
+    // Build the complete valid population independently of Marketing
+    // Intelligence's change detection. If a prior CRM write failed after the
+    // marketing rows committed, the next run can still repair the CRM side.
+    const crmPopulation = previewRows(collected.rows, 'leads', CANONICAL, EMPTY).leads;
+    const crm = await syncMarketingLeadsToCrm(crmPopulation);
 
     // previewRows numbers rows as if they were one sheet with a header in row 1; map each back to its own tab and row.
     const invalid = [...collected.problems, ...preview.errors.map((e) => ({ ...collected.origin[e.row - 2], reason: e.reason }))];
     status.rows = collected.tabs.reduce((n, t) => n + t.rows, 0); status.tabs = collected.tabs;
     status.added = saved.inserted; status.updated = saved.updated; status.duplicates = preview.duplicates; status.conflicts = saved.conflicts.length;
+    status.crmCustomers = crm.customersUpserted; status.crmTouches = crm.touchesInserted;
     status.invalidCount = invalid.length; status.invalid = invalid.slice(0, MAX_REPORTED_ROWS);
     // A lead someone was editing at that moment is skipped; keep the hash unset so the next run retries it.
     state.hash = saved.conflicts.length ? null : hash;

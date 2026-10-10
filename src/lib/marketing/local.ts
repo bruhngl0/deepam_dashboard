@@ -10,6 +10,8 @@ export type Followup = { id: string; due: string; note: string; completedAt: str
 export type Lead = {
   id: string; phone: string; name: string; email: string; city: string;
   source: string; campaignId: string; preferredStore: string; date: string; acquiredAt: string;
+  claimedBy?: string; claimedAt?: string;
+  claimGroup?: string; sheetTabs?: string[];
   acquisitions: Acquisition[]; status: Outcome | 'New'; intent: string; product: string; category: string; productLink: string;
   interactions: Interaction[]; followups: Followup[];
 };
@@ -30,6 +32,9 @@ export function normalizeSource(value: string): string {
   const key = value.toLowerCase().replace(/[^a-z]/g, '');
   const aliases: Record<string, string> = { meta: 'Meta ads', facebook: 'Meta ads', facebookads: 'Meta ads', google: 'Google ads', instagram: 'Instagram DM', event: 'Events', walkin: 'Walkin' };
   return SOURCES.find(s => s.toLowerCase().replace(/[^a-z]/g, '') === key) ?? aliases[key] ?? '';
+}
+export function campaignTail(value: string): string {
+  return value.split('|').at(-1)?.trim() ?? '';
 }
 export function parseLeadDate(value: unknown): string | null {
   if (value === undefined || value === null || value === '') return '';
@@ -157,6 +162,10 @@ export function convertedLeads(data: Dataset) {
   for (const sale of data.sales) byPhone.set(sale.phone, [...(byPhone.get(sale.phone) ?? []), sale]);
   return data.leads.filter(l => byPhone.has(l.phone)).map(l => ({ ...l, sales: byPhone.get(l.phone)! }));
 }
+/** A lead leaves every calling queue as soon as its first call is logged. */
+export function hasLoggedCall(lead: Lead): boolean {
+  return lead.interactions.some(interaction => interaction.type === 'call');
+}
 export type LeadFilters = { from: string; to: string; store: string; source: string; search: string };
 export function filterLeads(leads: Lead[], filters: LeadFilters): Lead[] {
   return leads.filter(l => (!filters.store || l.preferredStore === filters.store) && (!filters.source || l.acquisitions.some(a => a.source === filters.source)) && (!filters.from || (!!l.date && l.date >= filters.from)) && (!filters.to || (!!l.date && l.date <= filters.to)) && `${l.id} ${l.name} ${l.phone} ${l.email} ${l.acquisitions.map(a => `${a.source} ${a.campaignId}`).join(' ')}`.toLowerCase().includes(filters.search.toLowerCase()));
@@ -172,11 +181,11 @@ export function metrics(data: Dataset, leads = data.leads) {
 export function recordCall(lead: Lead, input: { outcome: Outcome; note: string; intent: string; store: string; product: string; category: string; productLink: string; due: string; salesperson?: string; createFollowup?: boolean }, at = nowLocal()): Lead {
   if (!OUTCOMES.includes(input.outcome)) throw new Error('Choose a call outcome.');
   if (!input.salesperson?.trim()) throw new Error('Choose who logged the call.');
-  if (input.outcome === 'Connected / interested' && (!input.intent.trim() || !input.store)) throw new Error('Interested leads need an intent and preferred store.');
+  if (input.outcome === 'Connected / interested' && !input.store) throw new Error('Interested leads need a preferred store.');
   if (input.outcome === 'Connected / interested' && input.store === 'Online' && (!input.product.trim() || !input.category.trim())) throw new Error('Online interest needs a product and category.');
   if (input.due && (!parseDateTime(input.due) || input.due <= at.slice(0, 16))) throw new Error('Follow-up must be in the future.');
   const followups = lead.followups.map(f => f.completedAt ? f : { ...f, completedAt: at });
-  const due = input.createFollowup ? at.slice(0, 16) : input.due;
+  const due = input.due;
   if (due) followups.push({ id: uid(), due, note: input.note.trim() || input.outcome, completedAt: null });
   const note = input.note.trim() || input.outcome;
   return { ...lead, status: input.outcome, intent: input.intent.trim(), preferredStore: input.store, product: input.product.trim(), category: input.category.trim(), productLink: input.productLink.trim(), followups,
@@ -209,6 +218,26 @@ export function readDataset(raw: string): Dataset {
 }
 
 export type CallEntry = { id: string; at: string; salesperson: string; outcome: Outcome | ''; note: string; leadId: string; name: string; phone: string };
+export type SalespersonPerformance = { salesperson: string; claimed: number; called: number; pending: number; interested: number; converted: number; revenue: number };
+
+export function salespersonPerformance(data: Dataset, calls: CallEntry[], salespeople: string[]): SalespersonPerformance[] {
+  return salespeople.map(salesperson => {
+    const personCalls = calls.filter(call => call.salesperson === salesperson).sort((a, b) => b.at.localeCompare(a.at));
+    const calledIds = new Set(personCalls.map(call => call.leadId));
+    const claimedLeads = data.leads.filter(lead => lead.claimedBy === salesperson);
+    const claimedPhones = new Set(claimedLeads.map(lead => lead.phone));
+    const convertedPhones = new Set(data.sales.filter(sale => claimedPhones.has(sale.phone)).map(sale => sale.phone));
+    return {
+      salesperson,
+      claimed: claimedLeads.length,
+      called: claimedLeads.filter(lead => calledIds.has(lead.id)).length,
+      pending: claimedLeads.filter(lead => !calledIds.has(lead.id)).length,
+      interested: claimedLeads.filter(lead => lead.status === 'Connected / interested').length,
+      converted: convertedPhones.size,
+      revenue: data.sales.filter(sale => claimedPhones.has(sale.phone)).reduce((total, sale) => total + (sale.amount ?? 0), 0),
+    };
+  });
+}
 /** Every logged call across the given datasets, newest first. Older records only carry the name in the text, so fall back to that. */
 export function callLog(datasets: Dataset[], stored: CallEntry[] = []): CallEntry[] {
   const seen = new Set<string>(stored.map(c => c.id));

@@ -50,9 +50,9 @@ describe('marketing identity and acquisition', () => {
   });
 });
 describe('calling and follow-up workflow', () => {
-  it('requires intent and store for interested leads', () => {
+  it('requires a salesperson and store for interested leads', () => {
     expect(() => recordCall(lead(), { ...input, salesperson: '' })).toThrow('logged');
-    expect(() => recordCall(lead(), { ...input, intent: '' })).toThrow('intent');
+    expect(() => recordCall(lead(), { ...input, intent: '' })).not.toThrow();
     expect(() => recordCall(lead(), { ...input, store: '' })).toThrow('store');
   });
   it('requires product and category for online interest', () => {
@@ -62,15 +62,15 @@ describe('calling and follow-up workflow', () => {
     expect(next.category).toBe('Silk');
     expect(safeProductLink('javascript:alert(1)')).toBe(false);
   });
-  it('adds a current-time follow-up when requested and replaces previous pending follow-ups', () => {
+  it('adds a selected future follow-up and replaces previous pending follow-ups', () => {
     const original = lead();
     original.followups = [{ id: 'old', due: '2026-09-21T12:00', note: 'Call', completedAt: null }];
     const at = '2026-09-21T13:00:00';
     expect(() => recordCall(original, { ...input, outcome: 'Callback required', due: '2026-09-21T12:30' }, at)).toThrow('future');
-    const next = recordCall(original, { ...input, outcome: 'Callback required', createFollowup: true }, at);
+    const next = recordCall(original, { ...input, outcome: 'Callback required', due: '2026-09-24T10:00', createFollowup: true }, at);
     expect(next.followups.filter(f => !f.completedAt)).toHaveLength(1);
     expect(next.followups[0].completedAt).toBe(at);
-    expect(next.followups[1].due).toBe('2026-09-21T13:00');
+    expect(next.followups[1].due).toBe('2026-09-24T10:00');
     expect(next.interactions.at(-1)?.type).toBe('followup');
   });
   it('rejects invalid calendar or clock times and converts explicit offsets to IST', () => {

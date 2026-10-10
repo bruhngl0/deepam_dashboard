@@ -1,7 +1,8 @@
 /**
  * Builds CRM's bills, line items and customers from the copy of Hemparshwa's
  * sales lines (`hemparshwa_sales_lines`), so every screen keeps reading
- * `sales`, `sale_line_items` and `customers` as before.
+ * `sales`, `sale_line_items` and `customers` as before. The Customer Master
+ * Hemparshwa imports fills in the customers too (`projectHemparshwaCustomers`).
  *
  * The Barcode Wise export is the one sales source. For every store and day it
  * covers, CRM's bills are exactly the sales documents in it:
@@ -44,6 +45,92 @@ export interface ProjectionResult {
 
 const count = (result: { rows: unknown[] }) => Number((result.rows[0] as { n: number | string }).n);
 
+export interface CustomerProjectionResult {
+  /** Customer Master rows CRM can identify: one per valid Indian phone. */
+  customers: number;
+  added: number;
+  updated: number;
+  /** Rows whose number is not a valid Indian mobile; CRM has no identity for them. */
+  skipped: number;
+}
+
+/**
+ * Fills CRM's customers from the copy of Hemparshwa's Customer Master
+ * (`hemparshwa_customers`). A phone listed by more than one import takes its
+ * newest row.
+ *
+ * The master adds to a customer; it does not overwrite what a better source
+ * gave: city, date of birth, anniversary, email and store are filled only where
+ * CRM has none, and the name only where CRM has none of known origin (bills and
+ * forms keep theirs). GST and PAN numbers come from nowhere else, so the
+ * master's are taken. A customer new to CRM is first seen when the master was
+ * imported, and is no evidence of an earlier purchase: lifecycle is untouched.
+ */
+export async function projectHemparshwaCustomers(): Promise<CustomerProjectionResult> {
+  const { txDb } = await import('@/db');
+  const { db: tx, pool } = txDb();
+  try {
+    return await tx.transaction(async (t) => {
+      const phones = (await t.execute(sql`SELECT DISTINCT phone FROM hemparshwa_customers WHERE phone IS NOT NULL`)).rows as { phone: string }[];
+      const identities = phones.flatMap(({ phone }) => {
+        const p = normalizePhone(phone);
+        return p.ok ? [{ phone, e164: p.e164, national: p.national }] : [];
+      });
+      await t.execute(sql`CREATE TEMP TABLE hp_master_phone (phone text PRIMARY KEY, e164 text NOT NULL, national text NOT NULL) ON COMMIT DROP`);
+      await t.execute(sql`
+        INSERT INTO hp_master_phone SELECT x.phone, x.e164, x.national
+        FROM jsonb_to_recordset(${JSON.stringify(identities)}::jsonb) AS x(phone text, e164 text, national text)
+      `);
+
+      const written = await t.execute(sql`
+        INSERT INTO customers (phone_e164, phone_national, full_name, name_source, email, city, date_of_birth, age, anniversary,
+                               gst_no, pan_no, preferred_store_id, first_seen_at, last_seen_at)
+        SELECT DISTINCT ON (p.e164) p.e164, p.national, c.name, CASE WHEN c.name IS NOT NULL THEN 'existing' END, c.email, c.city,
+               c.birth_date, c.age, c.anniversary_date, c.gst_no, c.pan_no, st.id, i.imported_at, i.imported_at
+        FROM hemparshwa_customers c
+        JOIN hemparshwa_imports i ON i.import_id = c.import_id
+        JOIN hp_master_phone p ON p.phone = c.phone
+        LEFT JOIN stores st ON st.store_code = c.store_id
+        ORDER BY p.e164, c.import_id DESC, c.row_number DESC
+        ON CONFLICT (phone_e164) DO UPDATE SET
+          full_name = CASE WHEN name_trust_rank(customers.name_source) = 0 THEN COALESCE(EXCLUDED.full_name, customers.full_name) ELSE customers.full_name END,
+          name_source = CASE WHEN name_trust_rank(customers.name_source) = 0 AND EXCLUDED.full_name IS NOT NULL THEN EXCLUDED.name_source ELSE customers.name_source END,
+          email = COALESCE(customers.email, EXCLUDED.email),
+          city = COALESCE(customers.city, EXCLUDED.city),
+          date_of_birth = COALESCE(customers.date_of_birth, EXCLUDED.date_of_birth),
+          age = COALESCE(EXCLUDED.age, customers.age),
+          anniversary = COALESCE(customers.anniversary, EXCLUDED.anniversary),
+          gst_no = COALESCE(EXCLUDED.gst_no, customers.gst_no),
+          pan_no = COALESCE(EXCLUDED.pan_no, customers.pan_no),
+          preferred_store_id = COALESCE(customers.preferred_store_id, EXCLUDED.preferred_store_id),
+          updated_at = now()
+        -- Only a row the master has something for: a rebuild that changes nothing touches nothing.
+        WHERE (name_trust_rank(customers.name_source) = 0 AND EXCLUDED.full_name IS NOT NULL AND customers.full_name IS DISTINCT FROM EXCLUDED.full_name)
+           OR (customers.email IS NULL AND EXCLUDED.email IS NOT NULL)
+           OR (customers.city IS NULL AND EXCLUDED.city IS NOT NULL)
+           OR (customers.date_of_birth IS NULL AND EXCLUDED.date_of_birth IS NOT NULL)
+           OR (EXCLUDED.age IS NOT NULL AND customers.age IS DISTINCT FROM EXCLUDED.age)
+           OR (customers.anniversary IS NULL AND EXCLUDED.anniversary IS NOT NULL)
+           OR (EXCLUDED.gst_no IS NOT NULL AND customers.gst_no IS DISTINCT FROM EXCLUDED.gst_no)
+           OR (EXCLUDED.pan_no IS NOT NULL AND customers.pan_no IS DISTINCT FROM EXCLUDED.pan_no)
+           OR (customers.preferred_store_id IS NULL AND EXCLUDED.preferred_store_id IS NOT NULL)
+        RETURNING (xmax = 0) AS added
+      `);
+      const added = (written.rows as { added: boolean }[]).filter((r) => r.added).length;
+      return {
+        customers: count(await t.execute(sql`SELECT count(DISTINCT e164) AS n FROM hp_master_phone`)),
+        added,
+        updated: written.rows.length - added,
+        skipped: count(await t.execute(sql`
+          SELECT count(*) AS n FROM hemparshwa_customers c WHERE NOT EXISTS (SELECT 1 FROM hp_master_phone p WHERE p.phone = c.phone)
+        `)),
+      };
+    });
+  } finally {
+    await pool.end();
+  }
+}
+
 export async function projectHemparshwaSales(): Promise<ProjectionResult> {
   const { db, txDb } = await import('@/db');
   const { db: tx, pool } = txDb();
@@ -56,7 +143,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
         WITH made AS (
           INSERT INTO import_batches (source_type, source_kind, file_name, file_hash, file_url, status, rows_total, rows_ok, uploaded_by, committed_at)
           SELECT 'existing', 'sale', i.file_name, i.file_sha256, 'hemparshwa:' || i.import_id, 'committed', i.rows_imported, i.rows_synced, ${HEMPARSHWA_USER}, i.imported_at
-          FROM hemparshwa_imports i WHERE i.batch_id IS NULL
+          FROM hemparshwa_imports i WHERE i.batch_id IS NULL AND i.data_type = 'sales'
           RETURNING id, file_url
         )
         UPDATE hemparshwa_imports i SET batch_id = made.id FROM made WHERE made.file_url = 'hemparshwa:' || i.import_id

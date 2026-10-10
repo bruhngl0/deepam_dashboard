@@ -1,32 +1,37 @@
 import { cookies } from 'next/headers';
+import { getSalespersonByEmployeeNumber, type Salesperson } from './salespeople';
 
-export const ABISHEK_ROUTE = '/sales/abishek';
-export const ABISHEK_SESSION_COOKIE = 'sales_abishek_session';
+export const SALES_LOGIN_ROUTE = '/sales';
+export const SALES_WORKSPACE_ROUTE = '/sales/workspace';
+const SALES_SESSION_COOKIE = 'salesperson_session';
+const tokenFor = (salesperson: Salesperson) => `${salesperson.employeeNumber.toLowerCase()}-sales-session`;
 
-const email = () => process.env.SALES_ABISHEK_EMAIL ?? 'abishek@deepam.local';
-const password = () => process.env.SALES_ABISHEK_PASSWORD ?? 'abishek';
-const token = () => process.env.SALES_ABISHEK_SESSION_TOKEN ?? 'abishek-sales-session';
-
-export function abishekCredentials() {
-  return { email: email(), password: password() };
-}
-
-export function isAbishekLogin(inputEmail: string, inputPassword: string) {
-  return inputEmail.trim().toLowerCase() === email().toLowerCase() && inputPassword === password();
-}
-
-export async function isAbishekSession() {
+export async function getAuthenticatedSalesperson() {
   const cookieStore = await cookies();
-  return cookieStore.get(ABISHEK_SESSION_COOKIE)?.value === token();
+  const value = cookieStore.get(SALES_SESSION_COOKIE)?.value;
+  if (!value) return undefined;
+  const salesperson = getSalespersonByEmployeeNumber(value.split('-sales-session')[0]);
+  return salesperson && value === tokenFor(salesperson) ? salesperson : undefined;
 }
 
-export async function setAbishekSession() {
+export async function setSalespersonSession(salesperson: Salesperson) {
   const cookieStore = await cookies();
-  cookieStore.set(ABISHEK_SESSION_COOKIE, token(), {
+  cookieStore.set(SALES_SESSION_COOKIE, tokenFor(salesperson), {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    path: ABISHEK_ROUTE,
+    path: SALES_LOGIN_ROUTE,
     maxAge: 60 * 60 * 12,
+  });
+}
+
+export async function clearSalespersonSession() {
+  const cookieStore = await cookies();
+  cookieStore.set(SALES_SESSION_COOKIE, '', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: SALES_LOGIN_ROUTE,
+    maxAge: 0,
   });
 }

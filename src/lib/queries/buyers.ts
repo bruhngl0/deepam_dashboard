@@ -357,7 +357,11 @@ export interface BuyerProfile {
   email: string | null;
   city: string | null;
   dateOfBirth: string | null;
+  age: string | null;
   anniversary: string | null;
+  gstNo: string | null;
+  panNo: string | null;
+  registeredStore: string | null;
 
   bills: number;
   visits: number;
@@ -424,7 +428,8 @@ export async function getBuyerProfile(
 
   const [head] = await query(sql`
     ${cte}
-    SELECT c.id, c.customer_code, c.full_name, c.phone_e164, c.email, c.city, c.date_of_birth, c.anniversary,
+    SELECT c.id, c.customer_code, c.full_name, c.phone_e164, c.email, c.city, c.date_of_birth, c.age, c.anniversary,
+           c.gst_no, c.pan_no, pref.name AS registered_store,
            b.bills, b.visits, b.total_spend, b.units, b.discount,
            b.first_purchase, b.last_purchase,
            t.value_tier, t.spend_rank,
@@ -435,6 +440,7 @@ export async function getBuyerProfile(
     FROM   buyer_agg b
     JOIN   customers c ON c.id = b.customer_id
     JOIN   tiered   t ON t.customer_id = b.customer_id
+    LEFT   JOIN stores pref ON pref.id = c.preferred_store_id
     WHERE  b.customer_id = ${id}`);
 
   // No aggregate row means no bills in scope — either an unknown id or a
@@ -563,7 +569,11 @@ export async function getBuyerProfile(
     email: str(head.email),
     city: str(head.city),
     dateOfBirth: str(head.date_of_birth),
+    age: str(head.age),
     anniversary: str(head.anniversary),
+    gstNo: str(head.gst_no),
+    panNo: str(head.pan_no),
+    registeredStore: str(head.registered_store),
 
     bills,
     visits: visitCount,

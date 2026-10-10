@@ -244,6 +244,20 @@ export default async function BuyerProfilePage({
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
+        {/* ── Customer master ──────────────────────────────────────────── */}
+        <Finding eyebrow="Customer master" title="Registered customer details">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Registered branch" value={orNotProvided(p.registeredStore)} />
+            <Field label="City" value={orNotProvided(p.city)} />
+            <Field label="Email" value={orNotProvided(p.email)} />
+            <Field label="Date of birth" value={formatDate(p.dateOfBirth)} />
+            <Field label="Age" value={orNotProvided(p.age)} />
+            <Field label="Anniversary" value={formatDate(p.anniversary)} />
+            <Field label="GST No" value={orNotProvided(p.gstNo)} />
+            <Field label="PAN No" value={orNotProvided(p.panNo)} />
+          </div>
+        </Finding>
+
         {/* ── Where and with whom ─────────────────────────────────────── */}
         <Finding
           eyebrow="Branch and staff"
