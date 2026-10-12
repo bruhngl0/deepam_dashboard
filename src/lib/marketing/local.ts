@@ -243,21 +243,34 @@ export function readDataset(raw: string): Dataset {
 export type CallEntry = { id: string; at: string; salesperson: string; outcome: Outcome | ''; note: string; leadId: string; name: string; phone: string };
 export type SalespersonPerformance = { salesperson: string; claimed: number; called: number; pending: number; interested: number; converted: number; revenue: number };
 
-export function salespersonPerformance(data: Dataset, calls: CallEntry[], salespeople: string[]): SalespersonPerformance[] {
+/** An existing (exhibition) customer a salesperson has claimed; it lives outside the leads table. */
+export type ExistingClaim = { leadId: string; salesperson: string; phone: string; claimedAt: string };
+
+/**
+ * Claimed leads plus claimed existing customers. An existing customer counts as
+ * interested by their latest call's outcome, and as converted only by bills on
+ * or after the day they were claimed, since they bought before.
+ */
+export function salespersonPerformance(data: Dataset, calls: CallEntry[], salespeople: string[], existing: ExistingClaim[] = []): SalespersonPerformance[] {
   return salespeople.map(salesperson => {
     const personCalls = calls.filter(call => call.salesperson === salesperson).sort((a, b) => b.at.localeCompare(a.at));
     const calledIds = new Set(personCalls.map(call => call.leadId));
     const claimedLeads = data.leads.filter(lead => lead.claimedBy === salesperson);
     const claimedPhones = new Set(claimedLeads.map(lead => lead.phone));
-    const convertedPhones = new Set(data.sales.filter(sale => claimedPhones.has(sale.phone)).map(sale => sale.phone));
+    const leadSales = data.sales.filter(sale => claimedPhones.has(sale.phone));
+    const customers = existing.filter(claim => claim.salesperson.toLowerCase() === salesperson.toLowerCase());
+    const customerSales = data.sales.filter(sale => customers.some(claim => claim.phone === sale.phone && sale.date.slice(0, 10) >= claim.claimedAt.slice(0, 10)));
+    const sales = [...new Set([...leadSales, ...customerSales])];
+    const claimedIds = [...claimedLeads.map(lead => lead.id), ...customers.map(claim => claim.leadId)];
     return {
       salesperson,
-      claimed: claimedLeads.length,
-      called: claimedLeads.filter(lead => calledIds.has(lead.id)).length,
-      pending: claimedLeads.filter(lead => !calledIds.has(lead.id)).length,
-      interested: claimedLeads.filter(lead => lead.status === 'Connected / interested').length,
-      converted: convertedPhones.size,
-      revenue: data.sales.filter(sale => claimedPhones.has(sale.phone)).reduce((total, sale) => total + (sale.amount ?? 0), 0),
+      claimed: claimedIds.length,
+      called: claimedIds.filter(id => calledIds.has(id)).length,
+      pending: claimedIds.filter(id => !calledIds.has(id)).length,
+      interested: claimedLeads.filter(lead => lead.status === 'Connected / interested').length
+        + customers.filter(claim => personCalls.find(call => call.leadId === claim.leadId)?.outcome === 'Connected / interested').length,
+      converted: new Set(sales.map(sale => sale.phone)).size,
+      revenue: sales.reduce((total, sale) => total + (sale.amount ?? 0), 0),
     };
   });
 }

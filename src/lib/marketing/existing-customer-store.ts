@@ -96,6 +96,23 @@ function mapDeskRow(row: Record<string, unknown>): ExistingCustomerDeskRow {
   };
 }
 
+/** Every claimed existing customer, for the Team performance table. */
+export async function existingCustomerClaims(): Promise<{ leadId: string; salesperson: string; phone: string; claimedAt: string }[]> {
+  const result = await db.execute(sql`
+    SELECT ${leadIdSql} AS lead_id, contact.assigned_to, contact.phone, contact.claimed_at
+    FROM marketing_call_list_contacts contact
+    WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+      AND contact.assigned_to IS NOT NULL
+      AND contact.claimed_at IS NOT NULL
+  `);
+  return rowsOf<Record<string, unknown>>(result).map(row => ({
+    leadId: String(row.lead_id),
+    salesperson: String(row.assigned_to),
+    phone: String(row.phone),
+    claimedAt: String(row.claimed_at).replace(' ', 'T'),
+  }));
+}
+
 export async function claimExistingCustomers(salesperson: string, limit = 10): Promise<number[]> {
   const result = await db.execute(sql`
     WITH candidates AS (

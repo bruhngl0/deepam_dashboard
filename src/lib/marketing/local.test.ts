@@ -109,6 +109,21 @@ describe('salesperson performance', () => {
       salesperson: 'Abhishek Thapa', claimed: 1, called: 1, pending: 0, interested: 1, converted: 1, revenue: 4300,
     }]);
   });
+
+  it('counts claimed existing customers, converting only on bills from the claim day', () => {
+    const data = { ...EMPTY, sales: [
+      { phone: '+919000000001', invoice: 'OLD', amount: 900, date: '2026-09-01T12:00:00', store: 'MG' },
+      { phone: '+919000000001', invoice: 'NEW', amount: 500, date: '2026-10-12T12:00:00', store: 'MG' },
+    ] };
+    const existing = [1, 2, 3].map(n => ({ leadId: `existing-customer:${n}`, salesperson: 'srinivas g', phone: `+91900000000${n}`, claimedAt: '2026-10-12T09:00:00' }));
+    const calls: CallEntry[] = [
+      { id: 'c1', at: '2026-10-12T10:00:00', salesperson: 'Srinivas G', outcome: 'Connected / interested', note: '', leadId: 'existing-customer:1', name: 'A', phone: '+919000000001' },
+      { id: 'c2', at: '2026-10-12T11:00:00', salesperson: 'Srinivas G', outcome: 'No answer', note: '', leadId: 'existing-customer:2', name: 'B', phone: '+919000000002' },
+    ];
+    expect(salespersonPerformance(data, calls, ['Srinivas G'], existing)).toEqual([{
+      salesperson: 'Srinivas G', claimed: 3, called: 2, pending: 1, interested: 1, converted: 1, revenue: 500,
+    }]);
+  });
 });
 
 describe('conversionsByCampaign', () => {
