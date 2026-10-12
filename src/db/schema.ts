@@ -885,6 +885,45 @@ export const marketingCalls = pgTable(
   ],
 );
 
+/**
+ * Existing-customer calling lists are deliberately separate from marketing
+ * leads. They can be assigned to salespeople later without entering campaign,
+ * acquisition, conversion, or lead metrics.
+ */
+export const marketingCallListContacts = pgTable(
+  'marketing_call_list_contacts',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    listKey: text('list_key').notNull(),
+    listName: text('list_name').notNull(),
+    sourceCustomerId: text('source_customer_id'),
+    name: text('name').notNull(),
+    phone: text('phone').notNull(),
+    branch: text('branch').notNull().default(''),
+    city: text('city').notNull().default(''),
+    assignedTo: text('assigned_to'),
+    assignedAt: timestamp('assigned_at', { mode: 'string' }),
+    claimedAt: timestamp('claimed_at', { mode: 'string' }),
+    preferredStore: text('preferred_store'),
+    product: text('product'),
+    category: text('category'),
+    followupDue: timestamp('followup_due', { mode: 'string' }),
+    followupNote: text('followup_note'),
+    followupCompletedAt: timestamp('followup_completed_at', { mode: 'string' }),
+    sourceFile: text('source_file').notNull(),
+    sourceRow: integer('source_row').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('marketing_call_list_contacts_list_phone_uidx').on(t.listKey, t.phone),
+    index('marketing_call_list_contacts_list_assignment_idx').on(t.listKey, t.assignedTo),
+    index('marketing_call_list_contacts_claim_idx').on(t.listKey, t.assignedTo, t.claimedAt),
+    index('marketing_call_list_contacts_followup_idx').on(t.assignedTo, t.followupDue),
+    index('marketing_call_list_contacts_phone_idx').on(t.phone),
+  ],
+);
+
 // ── Marketing leads and bills ────────────────────────────────────────────────
 
 /**

@@ -13,7 +13,7 @@ vi.mock('@/components/marketing-shared', async importOriginal => {
 describe('marketing page rendering', () => {
   it('renders dashboard metrics and navigation with demo data', () => {
     const html = renderToStaticMarkup(createElement(MarketingWorkspace));
-    for (const label of ['Queue', 'Follow-ups', 'Team performance', 'Campaigns', 'Cost per acquisition', 'Converted customers', 'Store visits', 'Date-Time From']) expect(html).toContain(label);
+    for (const label of ['Queue', 'Existing customers', 'Existing customer call list', 'Existing customer', 'Follow-ups', 'Team performance', 'Campaigns', 'Cost per acquisition', 'Converted customers', 'Store visits', 'Date-Time From']) expect(html).toContain(label);
     const navigation = html.match(/<nav[^>]*aria-label="Marketing sections"[\s\S]*?<\/nav>/)?.[0] ?? '';
     for (const removed of ['>Converted<', '>Sales<', '>Insights<', '>Salespeople<', '>Import<']) expect(navigation).not.toContain(removed);
     expect(html).toContain('shared by every desk');
