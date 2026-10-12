@@ -18,7 +18,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-20 border-b border-line bg-page/90 backdrop-blur">
       <div className="mx-auto flex w-full max-w-[92rem] items-center gap-6 px-4 py-3 sm:px-6 lg:px-8">
         <Link
-          href="/"
+          href="https://nvc57svvmb.ap-south-1.awsapprunner.com/"
           className="group flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
         >
           <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-strong text-[13px] font-semibold text-white shadow-sm transition-transform group-hover:scale-105">
