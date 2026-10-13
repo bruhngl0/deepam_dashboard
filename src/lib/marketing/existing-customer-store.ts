@@ -96,6 +96,136 @@ function mapDeskRow(row: Record<string, unknown>): ExistingCustomerDeskRow {
   };
 }
 
+export type ExistingCustomerKpis = {
+  total: number; assigned: number; called: number; calls: number; pending: number; connected: number;
+  interested: number; followups: number; overdue: number; converted: number; revenue: number;
+};
+
+/**
+ * Headline figures for the whole exhibition calling list. Connected and
+ * Interested go by each customer's latest call. Converted follows Team
+ * performance: only bills on or after the day the customer was claimed count,
+ * since everyone on this list has bought before.
+ */
+export async function existingCustomerKpis(): Promise<ExistingCustomerKpis> {
+  const [callResult, saleResult] = await Promise.all([
+    db.execute(sql`
+      WITH calls AS (
+        SELECT call.lead_id, count(*)::int AS calls,
+               (array_agg(call.outcome ORDER BY call.called_at DESC))[1] AS outcome
+        FROM marketing_calls call
+        WHERE call.lead_id LIKE 'existing-customer:%'
+        GROUP BY call.lead_id
+      )
+      SELECT count(*)::int AS total,
+        count(contact.assigned_to)::int AS assigned,
+        count(calls.lead_id)::int AS called,
+        coalesce(sum(calls.calls), 0)::int AS calls,
+        count(*) FILTER (WHERE contact.assigned_to IS NOT NULL AND calls.lead_id IS NULL)::int AS pending,
+        count(*) FILTER (WHERE calls.outcome LIKE 'Connected%')::int AS connected,
+        count(*) FILTER (WHERE calls.outcome = 'Connected / interested')::int AS interested,
+        count(*) FILTER (WHERE contact.followup_due IS NOT NULL AND contact.followup_completed_at IS NULL)::int AS followups,
+        count(*) FILTER (WHERE contact.followup_due < (now() AT TIME ZONE 'Asia/Kolkata') AND contact.followup_completed_at IS NULL)::int AS overdue
+      FROM marketing_call_list_contacts contact
+      LEFT JOIN calls ON calls.lead_id = ${leadIdSql}
+      WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+    `),
+    db.execute(sql`
+      SELECT count(DISTINCT contact.id)::int AS converted, coalesce(sum(sale.amount), 0)::float AS revenue
+      FROM marketing_call_list_contacts contact
+      JOIN marketing_sales sale ON sale.phone = contact.phone
+        AND left(sale.sold_at, 10) >= to_char(contact.claimed_at, 'YYYY-MM-DD')
+      WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+        AND contact.claimed_at IS NOT NULL
+    `),
+  ]);
+  const row = { ...rowsOf<Record<string, unknown>>(callResult)[0], ...rowsOf<Record<string, unknown>>(saleResult)[0] };
+  const n = (key: keyof ExistingCustomerKpis) => Number(row[key] ?? 0);
+  return {
+    total: n('total'), assigned: n('assigned'), called: n('called'), calls: n('calls'), pending: n('pending'), connected: n('connected'),
+    interested: n('interested'), followups: n('followups'), overdue: n('overdue'), converted: n('converted'), revenue: n('revenue'),
+  };
+}
+
+export const EXISTING_CUSTOMER_VIEWS = ['all', 'called', 'pending', 'interested', 'followups', 'converted'] as const;
+export type ExistingCustomerView = (typeof EXISTING_CUSTOMER_VIEWS)[number];
+export type ExistingCustomerListRow = {
+  id: number; sourceCustomerId: string | null; name: string; phone: string; branch: string; city: string; assignedTo: string | null;
+  lastCalledAt: string | null; lastOutcome: string; lastNote: string; followupDue: string | null; followupNote: string; billed: number | null;
+};
+
+const PAGE_SIZE = 50;
+const isoSql = (column: string) => sql.raw(`to_char(${column}, 'YYYY-MM-DD"T"HH24:MI:SS')`);
+
+/**
+ * One page of the exhibition calling list, narrowed to the customers behind a
+ * KPI card. Each view uses the same rule as its figure in `existingCustomerKpis`.
+ */
+export async function existingCustomerPage(view: ExistingCustomerView, search: string, page: number): Promise<{ filtered: number; pageSize: number; rows: ExistingCustomerListRow[] }> {
+  const like = `%${search}%`;
+  const where = sql.join([
+    sql`contact.list_key = ${EXHIBITION_LIST_KEY}`,
+    ...(search ? [sql`(contact.name ILIKE ${like} OR contact.phone ILIKE ${`%${search.replace(/\s/g, '')}%`} OR contact.source_customer_id ILIKE ${like} OR contact.branch ILIKE ${like} OR contact.assigned_to ILIKE ${like})`] : []),
+    ...(view === 'called' ? [sql`calls.lead_id IS NOT NULL`] : []),
+    ...(view === 'pending' ? [sql`contact.assigned_to IS NOT NULL AND calls.lead_id IS NULL`] : []),
+    ...(view === 'interested' ? [sql`calls.outcome = 'Connected / interested'`] : []),
+    ...(view === 'followups' ? [sql`contact.followup_due IS NOT NULL AND contact.followup_completed_at IS NULL`] : []),
+    ...(view === 'converted' ? [sql`bills.contact_id IS NOT NULL`] : []),
+  ], sql` AND `);
+  const order = view === 'called' || view === 'interested' ? sql`calls.called_at DESC, contact.id` : view === 'followups' ? sql`contact.followup_due, contact.id` : sql`contact.id`;
+  const source = sql`
+    WITH calls AS (
+      SELECT call.lead_id, max(call.called_at) AS called_at,
+             (array_agg(call.outcome ORDER BY call.called_at DESC))[1] AS outcome,
+             (array_agg(call.note ORDER BY call.called_at DESC))[1] AS note
+      FROM marketing_calls call
+      WHERE call.lead_id LIKE 'existing-customer:%'
+      GROUP BY call.lead_id
+    ), bills AS (
+      SELECT contact.id AS contact_id, sum(sale.amount)::float AS amount
+      FROM marketing_call_list_contacts contact
+      JOIN marketing_sales sale ON sale.phone = contact.phone
+        AND left(sale.sold_at, 10) >= to_char(contact.claimed_at, 'YYYY-MM-DD')
+      WHERE contact.list_key = ${EXHIBITION_LIST_KEY} AND contact.claimed_at IS NOT NULL
+      GROUP BY contact.id
+    )`;
+  const from = sql`
+    FROM marketing_call_list_contacts contact
+    LEFT JOIN calls ON calls.lead_id = ${leadIdSql}
+    LEFT JOIN bills ON bills.contact_id = contact.id
+    WHERE ${where}`;
+  const [countResult, rowResult] = await Promise.all([
+    db.execute(sql`${source} SELECT count(*)::int AS filtered ${from}`),
+    db.execute(sql`${source}
+      SELECT contact.id, contact.source_customer_id, contact.name, contact.phone, contact.branch, contact.city, contact.assigned_to,
+             ${isoSql('calls.called_at')} AS last_called_at, calls.outcome AS last_outcome, calls.note AS last_note,
+             ${isoSql('contact.followup_due')} AS followup_due, contact.followup_note, contact.followup_completed_at IS NULL AS followup_open,
+             bills.amount AS billed
+      ${from}
+      ORDER BY ${order}
+      LIMIT ${PAGE_SIZE} OFFSET ${page * PAGE_SIZE}`),
+  ]);
+  return {
+    filtered: Number(rowsOf<{ filtered: number }>(countResult)[0]?.filtered ?? 0),
+    pageSize: PAGE_SIZE,
+    rows: rowsOf<Record<string, unknown>>(rowResult).map(row => ({
+      id: Number(row.id),
+      sourceCustomerId: row.source_customer_id ? String(row.source_customer_id) : null,
+      name: String(row.name),
+      phone: String(row.phone),
+      branch: String(row.branch ?? ''),
+      city: String(row.city ?? ''),
+      assignedTo: row.assigned_to ? String(row.assigned_to) : null,
+      lastCalledAt: row.last_called_at ? String(row.last_called_at) : null,
+      lastOutcome: String(row.last_outcome ?? ''),
+      lastNote: String(row.last_note ?? ''),
+      followupDue: row.followup_due && row.followup_open ? String(row.followup_due) : null,
+      followupNote: String(row.followup_note ?? ''),
+      billed: row.billed === null || row.billed === undefined ? null : Number(row.billed),
+    })),
+  };
+}
+
 /** Every claimed existing customer, for the Team performance table. */
 export async function existingCustomerClaims(): Promise<{ leadId: string; salesperson: string; phone: string; claimedAt: string }[]> {
   const result = await db.execute(sql`
