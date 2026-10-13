@@ -252,31 +252,53 @@ export type ExistingClaim = { leadId: string; salesperson: string; phone: string
  * Claimed leads plus claimed existing customers. An existing customer counts as
  * interested by their latest call's outcome, and as converted only by bills on
  * or after the day they were claimed, since they bought before.
+ *
+ * `calls` may be narrowed by the page's filters. Claimed and Pending describe
+ * the salesperson's list as it stands today, so Pending is worked out from
+ * `range.allCalls`. With a date range, Called, Interested, Converted and
+ * Revenue cover only calls and bills dated inside it.
  */
-export function salespersonPerformance(data: Dataset, calls: CallEntry[], salespeople: string[], existing: ExistingClaim[] = []): SalespersonPerformance[] {
+export function salespersonPerformance(data: Dataset, calls: CallEntry[], salespeople: string[], existing: ExistingClaim[] = [], range: { from?: string; to?: string; allCalls?: CallEntry[] } = {}): SalespersonPerformance[] {
+  const dated = !!(range.from || range.to);
+  const inRange = (at: string) => (!range.from || at.slice(0, 10) >= range.from) && (!range.to || at.slice(0, 10) <= range.to);
   return salespeople.map(salesperson => {
     const personCalls = calls.filter(call => call.salesperson === salesperson).sort((a, b) => b.at.localeCompare(a.at));
     const calledIds = new Set(personCalls.map(call => call.leadId));
+    const everCalledIds = new Set((range.allCalls ?? calls).filter(call => call.salesperson === salesperson).map(call => call.leadId));
+    const interestedInCalls = (id: string) => personCalls.find(call => call.leadId === id)?.outcome === 'Connected / interested';
     const claimedLeads = data.leads.filter(lead => lead.claimedBy === salesperson);
     const claimedPhones = new Set(claimedLeads.map(lead => lead.phone));
     const leadSales = data.sales.filter(sale => claimedPhones.has(sale.phone));
     const customers = existing.filter(claim => claim.salesperson.toLowerCase() === salesperson.toLowerCase());
     const customerSales = data.sales.filter(sale => customers.some(claim => claim.phone === sale.phone && sale.date.slice(0, 10) >= claim.claimedAt.slice(0, 10)));
-    const sales = [...new Set([...leadSales, ...customerSales])];
+    const sales = [...new Set([...leadSales, ...customerSales])].filter(sale => inRange(sale.date));
     const claimedIds = [...claimedLeads.map(lead => lead.id), ...customers.map(claim => claim.leadId)];
     return {
       salesperson,
       claimed: claimedIds.length,
       called: claimedIds.filter(id => calledIds.has(id)).length,
-      pending: claimedIds.filter(id => !calledIds.has(id)).length,
-      interested: claimedLeads.filter(lead => lead.status === 'Connected / interested').length
-        + customers.filter(claim => personCalls.find(call => call.leadId === claim.leadId)?.outcome === 'Connected / interested').length,
+      pending: claimedIds.filter(id => !everCalledIds.has(id)).length,
+      interested: (dated ? claimedLeads.filter(lead => interestedInCalls(lead.id)).length : claimedLeads.filter(lead => lead.status === 'Connected / interested').length)
+        + customers.filter(claim => interestedInCalls(claim.leadId)).length,
       converted: new Set(sales.map(sale => sale.phone)).size,
       revenue: sales.reduce((total, sale) => total + (sale.amount ?? 0), 0),
     };
   });
 }
-/** Every logged call across the given datasets, newest first. Older records only carry the name in the text, so fall back to that. */
+
+export type CalledCustomer = { leadId: string; name: string; phone: string; calls: number; lastAt: string; outcome: Outcome | ''; note: string };
+
+/** Everyone a salesperson has called, one row each, showing their latest call; most recently called first. */
+export function calledCustomers(calls: CallEntry[], salesperson: string): CalledCustomer[] {
+  const byCustomer = new Map<string, CalledCustomer>();
+  for (const call of calls.filter(call => call.salesperson === salesperson).sort((a, b) => b.at.localeCompare(a.at))) {
+    const seen = byCustomer.get(call.leadId);
+    if (seen) seen.calls++;
+    else byCustomer.set(call.leadId, { leadId: call.leadId, name: call.name, phone: call.phone, calls: 1, lastAt: call.at, outcome: call.outcome, note: call.note });
+  }
+  return [...byCustomer.values()];
+}
+
 export function callLog(datasets: Dataset[], stored: CallEntry[] = []): CallEntry[] {
   const seen = new Set<string>(stored.map(c => c.id));
   const entries: CallEntry[] = [...stored];

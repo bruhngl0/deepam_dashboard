@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { campaignName, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry } from './local';
+import { calledCustomers, campaignName, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry } from './local';
 
 const mapping = guessMapping(['Name', 'Number', 'Source', 'Invoice', 'Amount']);
 describe('local marketing imports', () => {
@@ -123,6 +123,33 @@ describe('salesperson performance', () => {
     expect(salespersonPerformance(data, calls, ['Srinivas G'], existing)).toEqual([{
       salesperson: 'Srinivas G', claimed: 3, called: 2, pending: 1, interested: 1, converted: 1, revenue: 500,
     }]);
+  });
+});
+
+describe('salesperson performance in a date range', () => {
+  it('keeps Claimed and Pending as they stand and counts the rest inside the range', () => {
+    const data = { ...EMPTY, sales: [
+      { phone: '+919000000001', invoice: 'IN', amount: 500, date: '2026-10-12T12:00:00', store: 'MG' },
+      { phone: '+919000000002', invoice: 'OUT', amount: 700, date: '2026-10-13T12:00:00', store: 'MG' },
+    ] };
+    const existing = [1, 2, 3].map(n => ({ leadId: `existing-customer:${n}`, salesperson: 'Srinivas G', phone: `+91900000000${n}`, claimedAt: '2026-10-10T09:00:00' }));
+    const call = (id: string, at: string, n: number, outcome: CallEntry['outcome']): CallEntry => ({ id, at, salesperson: 'Srinivas G', outcome, note: '', leadId: `existing-customer:${n}`, name: 'A', phone: `+91900000000${n}` });
+    const allCalls = [call('c1', '2026-10-12T10:00:00', 1, 'Connected / interested'), call('c2', '2026-10-13T11:00:00', 2, 'Connected / interested')];
+    const range = { from: '2026-10-12', to: '2026-10-12', allCalls };
+    expect(salespersonPerformance(data, allCalls.slice(0, 1), ['Srinivas G'], existing, range)).toEqual([{
+      salesperson: 'Srinivas G', claimed: 3, called: 1, pending: 1, interested: 1, converted: 1, revenue: 500,
+    }]);
+  });
+});
+
+describe('called customers', () => {
+  it('lists each customer a salesperson called once, latest call first', () => {
+    const call = (id: string, at: string, salesperson: string, leadId: string, outcome: CallEntry['outcome']): CallEntry => ({ id, at, salesperson, outcome, note: `note ${id}`, leadId, name: `Customer ${leadId}`, phone: `+9190000000${leadId}` });
+    const calls = [call('1', '2026-10-10T10:00', 'Asha', '01', 'No answer'), call('2', '2026-10-12T11:00', 'Asha', '01', 'Connected / interested'), call('3', '2026-10-11T09:00', 'Asha', '02', 'Wrong number'), call('4', '2026-10-13T09:00', 'Ravi', '03', 'No answer')];
+    expect(calledCustomers(calls, 'Asha')).toEqual([
+      { leadId: '01', name: 'Customer 01', phone: '+919000000001', calls: 2, lastAt: '2026-10-12T11:00', outcome: 'Connected / interested', note: 'note 2' },
+      { leadId: '02', name: 'Customer 02', phone: '+919000000002', calls: 1, lastAt: '2026-10-11T09:00', outcome: 'Wrong number', note: 'note 3' },
+    ]);
   });
 });
 
