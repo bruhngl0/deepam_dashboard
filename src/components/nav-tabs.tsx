@@ -29,7 +29,6 @@ const CRM_TABS = [
   { href: '/crm/buyers', label: 'Buyers' },
   { href: '/crm/insights', label: 'Insights' },
   { href: '/crm/analysis', label: 'Analysis' },
-  { href: '/crm/store-visits', label: 'Walk-ins' },
   { href: '/crm/import', label: 'Import' },
 ] as const;
 
