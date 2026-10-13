@@ -11,6 +11,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { VIRTUAL_CALLS_GROUP } from './sheet-routing';
 import { LEADS_FROM } from './store';
+import { EXHB_TAG } from './sheet-routing';
 
 export type CrmConversionSync = { billsAdded: number; convertedLeads: number; latestBill: string | null };
 
@@ -40,7 +41,7 @@ export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
   const [summary] = rowsOf<{ converted: number; latest: string | null }>(await db.execute(sql`
     SELECT
       (SELECT count(DISTINCT ml.phone)::int FROM marketing_leads ml JOIN marketing_sales ms ON ms.phone = ml.phone
-        WHERE ml.doc->>'date' >= ${LEADS_FROM} OR ml.doc->>'claimGroup' = ${VIRTUAL_CALLS_GROUP}) AS converted,
+        WHERE ml.doc->>'date' >= ${LEADS_FROM} OR ml.doc->>'claimGroup' = ${VIRTUAL_CALLS_GROUP} OR jsonb_exists(ml.doc->'tags', ${EXHB_TAG})) AS converted,
       (SELECT to_char(max(billed_at) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') FROM sales) AS latest
   `));
   return { billsAdded: added.length, convertedLeads: Number(summary?.converted ?? 0), latestBill: summary?.latest ?? null };

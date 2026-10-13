@@ -25,6 +25,9 @@ export type SheetRoute = {
 /** Virtual calls leads are shown whatever their date (see LEADS_FROM in ./store). */
 export const VIRTUAL_CALLS_GROUP = 'virtual-calls';
 
+/** Tag on leads that registered a visit on the public exhibition form at `/exhb`; shown whatever their date, like Virtual calls. */
+export const EXHB_TAG = 'exhb';
+
 export const SHEET_ROUTES: SheetRoute[] = [
   { group: 'shubh-convention', label: 'Shubh Convention', tab: 'shubh convention', salesperson: 'Abhishek Thapa', exclusive: false, untilEnv: 'SHUBH_CONVENTION_ROUTING_UNTIL', until: '2026-10-15' },
   { group: 'blvd-club', label: 'BLVD Club', tab: 'blvd club', salesperson: 'Margaret Prema', exclusive: true, untilEnv: 'BLVD_CLUB_ROUTING_UNTIL', until: '2026-10-15' },

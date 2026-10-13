@@ -12,7 +12,7 @@ import { and, asc, count, eq, gt, sql, sum, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
 import { marketingLeads, marketingSales } from '@/db/schema';
 import type { Dataset, Lead, Sale } from './local';
-import { VIRTUAL_CALLS_GROUP, type ClaimRouting } from './sheet-routing';
+import { EXHB_TAG, VIRTUAL_CALLS_GROUP, type ClaimRouting } from './sheet-routing';
 
 export type { ClaimRouting };
 
@@ -23,12 +23,12 @@ const MAX_DOC_BYTES = 256 * 1024;
 
 /**
  * Marketing Intelligence shows and hands out only leads dated on or after this
- * day, plus Virtual calls leads of any date; older leads stay in the table (the
- * Google Sheet sync still merges against them) but are hidden from every page and
- * calling queue.
+ * day, plus Virtual calls leads and exhibition form registrations of any date;
+ * older leads stay in the table (the Google Sheet sync still merges against
+ * them) but are hidden from every page and calling queue.
  */
 export const LEADS_FROM = '2026-10-01';
-const shownWhere = (doc: SQL) => sql`(${doc}->>'date' >= ${LEADS_FROM} OR ${doc}->>'claimGroup' = ${VIRTUAL_CALLS_GROUP})`;
+const shownWhere = (doc: SQL) => sql`(${doc}->>'date' >= ${LEADS_FROM} OR ${doc}->>'claimGroup' = ${VIRTUAL_CALLS_GROUP} OR jsonb_exists(${doc}->'tags', ${EXHB_TAG}))`;
 const shown = shownWhere(sql`ml.doc`);
 
 export type LeadWrite = { lead: Lead; version: number };
@@ -187,4 +187,19 @@ export async function saveChanges(leads: LeadWrite[], sales: Sale[]): Promise<Sa
     result.sales += done.length;
   }
   return result;
+}
+
+/**
+ * Creates or edits the lead for one phone from the server, outside any browser
+ * session. `build` gets the stored lead (or null) and may run more than once:
+ * the write is retried when another writer gets in first.
+ */
+export async function upsertLeadByPhone(phone: string, build: (existing: Lead | null) => Lead): Promise<Lead> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const [row] = await db.select({ doc: marketingLeads.doc, version: marketingLeads.version }).from(marketingLeads).where(eq(marketingLeads.phone, phone)).limit(1);
+    const lead = build(row ? row.doc as Lead : null);
+    const saved = await saveChanges([{ lead, version: row?.version ?? 0 }], []);
+    if (!saved.conflicts.length) return lead;
+  }
+  throw new Error(`Lead for ${phone} kept changing; gave up after 5 attempts.`);
 }

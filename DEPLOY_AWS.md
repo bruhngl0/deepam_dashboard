@@ -244,7 +244,8 @@ Running both is fine: a sync that finds nothing new writes nothing.
    will fail cross-origin even with correct keys.
 2. **Run migrations against the real database** before first traffic:
    open the admin tunnel below, then
-   `DATABASE_URL="<prod connection string, host localhost:5436, sslmode=verify-ca>" npm run db:migrate`
+   `DATABASE_URL="<prod connection string, host localhost:5436, uselibpqcompat=true&sslmode=verify-ca>" npm run db:migrate`
+   (`uselibpqcompat=true` because node-postgres otherwise treats `verify-ca` as `verify-full` and fails silently)
    from your machine (the container never runs migrations itself — same as
    this app never auto-runs them locally).
 3. **Custom domain** (optional):

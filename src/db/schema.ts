@@ -924,6 +924,26 @@ export const marketingCallListContacts = pgTable(
   ],
 );
 
+/**
+ * Visit registrations from the public exhibition form at `/exhb`. Anyone with
+ * the link can submit, so `contact` is kept exactly as typed and `phone` is
+ * filled only when it normalizes to an Indian mobile number.
+ */
+export const exhibitionRsvps = pgTable(
+  'exhibition_rsvps',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    fullName: text('full_name').notNull(),
+    contact: text('contact').notNull(),
+    phone: text('phone'),
+    visitDate: date('visit_date'),
+    visitTime: text('visit_time'),
+    partySize: integer('party_size'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('exhibition_rsvps_visit_idx').on(t.visitDate, t.visitTime)],
+);
+
 // ── Marketing leads and bills ────────────────────────────────────────────────
 
 /**

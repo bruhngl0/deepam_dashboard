@@ -12,6 +12,8 @@ export type Lead = {
   source: string; campaignId: string; preferredStore: string; date: string; acquiredAt: string;
   claimedBy?: string; claimedAt?: string;
   claimGroup?: string; sheetTabs?: string[];
+  /** Short labels shown on the lead card next to the campaign tag, e.g. 'exhb' for the exhibition visit form. */
+  tags?: string[];
   acquisitions: Acquisition[]; status: Outcome | 'New'; intent: string; product: string; category: string; productLink: string;
   /** When the lead said they would like to visit, from the sheet's lead form (e.g. "Friday, 16 October", "2:30 pm – 4:30 pm"). */
   visitDay?: string; visitSlot?: string;

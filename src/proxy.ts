@@ -21,6 +21,8 @@ const gate: GateConfig = {
     if (under(pathname, '/api/health', '/api/integration', '/api/marketing/sheet-sync/cron')) return null;
     // Salespeople sign in to their own profiles there instead.
     if (under(pathname, '/sales')) return null;
+    // The public exhibition visit form, shared with customers.
+    if (under(pathname, '/exhb')) return null;
     if (under(pathname, '/flow')) return overview;
     if (under(pathname, '/crm')) return customer;
     if (under(pathname, '/marketing', '/marketing-team')) return marketing;

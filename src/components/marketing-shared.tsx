@@ -14,10 +14,10 @@ export const dayMonthYearLabel = (s: string) => {
 };
 export const dayMonthYearTimeLabel = (s: string) => s.length >= 16 ? `${dayMonthYearLabel(s)} ${s.slice(11, 16)}` : dayMonthYearLabel(s);
 
-/** Shubh Convention / BLVD Club style tag for a routed campaign lead; nothing otherwise. */
+/** Shubh Convention / BLVD Club style tag for a routed campaign lead, then the lead's own tags (EXHB); nothing otherwise. */
 export function CampaignTag({ lead }: { lead: Lead }) {
-  const label = routeLabel(lead.claimGroup);
-  return label ? <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-medium text-accent">{label}</span> : null;
+  const labels = [routeLabel(lead.claimGroup), ...(lead.tags ?? []).map(tag => tag.toUpperCase())].filter(Boolean);
+  return <>{labels.map(label => <span key={label} className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-medium text-accent">{label}</span>)}</>;
 }
 
 /** Source · campaign · date-time · store line shown under a lead everywhere it is listed. */
