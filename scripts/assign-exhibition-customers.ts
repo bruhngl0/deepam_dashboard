@@ -4,7 +4,6 @@ import { EXHIBITION_LIST_KEY } from '../src/lib/marketing/existing-customer-impo
 
 const MG_ROAD_SALESPEOPLE = [
   'Krishna V N',
-  'Margaret Prema',
   'Mary Josephine',
   'Padma H',
   'Pramila N V',
