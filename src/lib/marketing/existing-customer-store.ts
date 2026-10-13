@@ -100,55 +100,10 @@ export type ExistingCustomerKpis = {
   total: number; assigned: number; called: number; calls: number; pending: number; connected: number;
   interested: number; followups: number; overdue: number; converted: number; revenue: number;
 };
-
-/**
- * Headline figures for the whole exhibition calling list. Connected and
- * Interested go by each customer's latest call. Converted follows Team
- * performance: only bills on or after the day the customer was claimed count,
- * since everyone on this list has bought before.
- */
-export async function existingCustomerKpis(): Promise<ExistingCustomerKpis> {
-  const [callResult, saleResult] = await Promise.all([
-    db.execute(sql`
-      WITH calls AS (
-        SELECT call.lead_id, count(*)::int AS calls,
-               (array_agg(call.outcome ORDER BY call.called_at DESC))[1] AS outcome
-        FROM marketing_calls call
-        WHERE call.lead_id LIKE 'existing-customer:%'
-        GROUP BY call.lead_id
-      )
-      SELECT count(*)::int AS total,
-        count(contact.assigned_to)::int AS assigned,
-        count(calls.lead_id)::int AS called,
-        coalesce(sum(calls.calls), 0)::int AS calls,
-        count(*) FILTER (WHERE contact.assigned_to IS NOT NULL AND calls.lead_id IS NULL)::int AS pending,
-        count(*) FILTER (WHERE calls.outcome LIKE 'Connected%')::int AS connected,
-        count(*) FILTER (WHERE calls.outcome = 'Connected / interested')::int AS interested,
-        count(*) FILTER (WHERE contact.followup_due IS NOT NULL AND contact.followup_completed_at IS NULL)::int AS followups,
-        count(*) FILTER (WHERE contact.followup_due < (now() AT TIME ZONE 'Asia/Kolkata') AND contact.followup_completed_at IS NULL)::int AS overdue
-      FROM marketing_call_list_contacts contact
-      LEFT JOIN calls ON calls.lead_id = ${leadIdSql}
-      WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
-    `),
-    db.execute(sql`
-      SELECT count(DISTINCT contact.id)::int AS converted, coalesce(sum(sale.amount), 0)::float AS revenue
-      FROM marketing_call_list_contacts contact
-      JOIN marketing_sales sale ON sale.phone = contact.phone
-        AND left(sale.sold_at, 10) >= to_char(contact.claimed_at, 'YYYY-MM-DD')
-      WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
-        AND contact.claimed_at IS NOT NULL
-    `),
-  ]);
-  const row = { ...rowsOf<Record<string, unknown>>(callResult)[0], ...rowsOf<Record<string, unknown>>(saleResult)[0] };
-  const n = (key: keyof ExistingCustomerKpis) => Number(row[key] ?? 0);
-  return {
-    total: n('total'), assigned: n('assigned'), called: n('called'), calls: n('calls'), pending: n('pending'), connected: n('connected'),
-    interested: n('interested'), followups: n('followups'), overdue: n('overdue'), converted: n('converted'), revenue: n('revenue'),
-  };
-}
-
 export const EXISTING_CUSTOMER_VIEWS = ['all', 'called', 'pending', 'interested', 'followups', 'converted'] as const;
 export type ExistingCustomerView = (typeof EXISTING_CUSTOMER_VIEWS)[number];
+/** `from` and `to` are IST days (YYYY-MM-DD); `store` is a branch name from the list. Empty means no limit. */
+export type ExistingCustomerFilters = { from?: string; to?: string; store?: string };
 export type ExistingCustomerListRow = {
   id: number; sourceCustomerId: string | null; name: string; phone: string; branch: string; city: string; assignedTo: string | null;
   lastCalledAt: string | null; lastOutcome: string; lastNote: string; followupDue: string | null; followupNote: string; billed: number | null;
@@ -158,26 +113,30 @@ const PAGE_SIZE = 50;
 const isoSql = (column: string) => sql.raw(`to_char(${column}, 'YYYY-MM-DD"T"HH24:MI:SS')`);
 
 /**
- * One page of the exhibition calling list, narrowed to the customers behind a
- * KPI card. Each view uses the same rule as its figure in `existingCustomerKpis`.
+ * The calling list joined to each customer's calls and bills, shared by the
+ * KPI cards and the lists behind them so the two always agree.
+ *
+ * The list size and Pending describe the list as it stands, so they ignore the
+ * dates. Called, Interested and Converted count calls and bills dated inside
+ * the period, and Follow-ups due counts open follow-ups falling due in it.
+ * Connected and Interested go by the latest call in the period. Converted
+ * follows Team performance: only bills on or after the day the customer was
+ * claimed count, since everyone on this list has bought before.
  */
-export async function existingCustomerPage(view: ExistingCustomerView, search: string, page: number): Promise<{ filtered: number; pageSize: number; rows: ExistingCustomerListRow[] }> {
-  const like = `%${search}%`;
-  const where = sql.join([
-    sql`contact.list_key = ${EXHIBITION_LIST_KEY}`,
-    ...(search ? [sql`(contact.name ILIKE ${like} OR contact.phone ILIKE ${`%${search.replace(/\s/g, '')}%`} OR contact.source_customer_id ILIKE ${like} OR contact.branch ILIKE ${like} OR contact.assigned_to ILIKE ${like})`] : []),
-    ...(view === 'called' ? [sql`calls.lead_id IS NOT NULL`] : []),
-    ...(view === 'pending' ? [sql`contact.assigned_to IS NOT NULL AND calls.lead_id IS NULL`] : []),
-    ...(view === 'interested' ? [sql`calls.outcome = 'Connected / interested'`] : []),
-    ...(view === 'followups' ? [sql`contact.followup_due IS NOT NULL AND contact.followup_completed_at IS NULL`] : []),
-    ...(view === 'converted' ? [sql`bills.contact_id IS NOT NULL`] : []),
-  ], sql` AND `);
-  const order = view === 'called' || view === 'interested' ? sql`calls.called_at DESC, contact.id` : view === 'followups' ? sql`contact.followup_due, contact.id` : sql`contact.id`;
+function listQuery(filters: ExistingCustomerFilters) {
+  const from = filters.from || null, to = filters.to || null;
+  const within = (column: string) => sql`(${from}::date IS NULL OR ${sql.raw(column)} >= ${from}::date) AND (${to}::date IS NULL OR ${sql.raw(column)} < ${to}::date + 1)`;
+  const called = within('call.called_at');
   const source = sql`
     WITH calls AS (
-      SELECT call.lead_id, max(call.called_at) AS called_at,
-             (array_agg(call.outcome ORDER BY call.called_at DESC))[1] AS outcome,
-             (array_agg(call.note ORDER BY call.called_at DESC))[1] AS note
+      SELECT call.lead_id,
+             max(call.called_at) AS last_at,
+             (array_agg(call.outcome ORDER BY call.called_at DESC))[1] AS last_outcome,
+             (array_agg(call.note ORDER BY call.called_at DESC))[1] AS last_note,
+             count(*) FILTER (WHERE ${called})::int AS calls,
+             max(call.called_at) FILTER (WHERE ${called}) AS called_at,
+             (array_agg(call.outcome ORDER BY call.called_at DESC) FILTER (WHERE ${called}))[1] AS outcome,
+             (array_agg(call.note ORDER BY call.called_at DESC) FILTER (WHERE ${called}))[1] AS note
       FROM marketing_calls call
       WHERE call.lead_id LIKE 'existing-customer:%'
       GROUP BY call.lead_id
@@ -186,22 +145,81 @@ export async function existingCustomerPage(view: ExistingCustomerView, search: s
       FROM marketing_call_list_contacts contact
       JOIN marketing_sales sale ON sale.phone = contact.phone
         AND left(sale.sold_at, 10) >= to_char(contact.claimed_at, 'YYYY-MM-DD')
+        AND (${from}::text IS NULL OR left(sale.sold_at, 10) >= ${from})
+        AND (${to}::text IS NULL OR left(sale.sold_at, 10) <= ${to})
       WHERE contact.list_key = ${EXHIBITION_LIST_KEY} AND contact.claimed_at IS NOT NULL
       GROUP BY contact.id
     )`;
-  const from = sql`
+  const joined = sql`
     FROM marketing_call_list_contacts contact
     LEFT JOIN calls ON calls.lead_id = ${leadIdSql}
     LEFT JOIN bills ON bills.contact_id = contact.id
-    WHERE ${where}`;
+    WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+      AND (${filters.store || null}::text IS NULL OR contact.branch = ${filters.store || null})`;
+  const is: Record<Exclude<ExistingCustomerView, 'all'>, ReturnType<typeof sql>> = {
+    called: sql`calls.calls > 0`,
+    pending: sql`contact.assigned_to IS NOT NULL AND calls.lead_id IS NULL`,
+    interested: sql`calls.outcome = 'Connected / interested'`,
+    followups: sql`contact.followup_due IS NOT NULL AND contact.followup_completed_at IS NULL AND ${within('contact.followup_due')}`,
+    converted: sql`bills.contact_id IS NOT NULL`,
+  };
+  return { source, joined, is };
+}
+
+/** Headline figures for the exhibition calling list. */
+export async function existingCustomerKpis(filters: ExistingCustomerFilters = {}): Promise<ExistingCustomerKpis> {
+  const { source, joined, is } = listQuery(filters);
+  const result = await db.execute(sql`${source}
+    SELECT count(*)::int AS total,
+      count(contact.assigned_to)::int AS assigned,
+      count(*) FILTER (WHERE ${is.called})::int AS called,
+      coalesce(sum(calls.calls), 0)::int AS calls,
+      count(*) FILTER (WHERE ${is.pending})::int AS pending,
+      count(*) FILTER (WHERE calls.outcome LIKE 'Connected%')::int AS connected,
+      count(*) FILTER (WHERE ${is.interested})::int AS interested,
+      count(*) FILTER (WHERE ${is.followups})::int AS followups,
+      count(*) FILTER (WHERE ${is.followups} AND contact.followup_due < (now() AT TIME ZONE 'Asia/Kolkata'))::int AS overdue,
+      count(bills.contact_id)::int AS converted,
+      coalesce(sum(bills.amount), 0)::float AS revenue
+    ${joined}`);
+  const row = rowsOf<Record<string, unknown>>(result)[0] ?? {};
+  const n = (key: keyof ExistingCustomerKpis) => Number(row[key] ?? 0);
+  return {
+    total: n('total'), assigned: n('assigned'), called: n('called'), calls: n('calls'), pending: n('pending'), connected: n('connected'),
+    interested: n('interested'), followups: n('followups'), overdue: n('overdue'), converted: n('converted'), revenue: n('revenue'),
+  };
+}
+
+/** The stores customers on the list belong to, for the store filter. */
+export async function existingCustomerStores(): Promise<string[]> {
+  const result = await db.execute(sql`
+    SELECT DISTINCT contact.branch FROM marketing_call_list_contacts contact
+    WHERE contact.list_key = ${EXHIBITION_LIST_KEY} AND contact.branch <> '' ORDER BY contact.branch`);
+  return rowsOf<{ branch: string }>(result).map(row => String(row.branch));
+}
+
+/** One page of the calling list, narrowed to the customers behind a KPI card. */
+export async function existingCustomerPage(view: ExistingCustomerView, search: string, page: number, filters: ExistingCustomerFilters = {}): Promise<{ filtered: number; pageSize: number; rows: ExistingCustomerListRow[] }> {
+  const { source, joined, is } = listQuery(filters);
+  const like = `%${search}%`;
+  const where = sql.join([
+    joined,
+    ...(search ? [sql`(contact.name ILIKE ${like} OR contact.phone ILIKE ${`%${search.replace(/\s/g, '')}%`} OR contact.source_customer_id ILIKE ${like} OR contact.branch ILIKE ${like} OR contact.assigned_to ILIKE ${like})`] : []),
+    ...(view === 'all' ? [] : [is[view]]),
+  ], sql` AND `);
+  // The called and interested lists are about calls in the period; the others show the customer's latest call of all.
+  const inPeriod = view === 'called' || view === 'interested';
+  const order = inPeriod ? sql`calls.called_at DESC, contact.id` : view === 'followups' ? sql`contact.followup_due, contact.id` : sql`contact.id`;
   const [countResult, rowResult] = await Promise.all([
-    db.execute(sql`${source} SELECT count(*)::int AS filtered ${from}`),
+    db.execute(sql`${source} SELECT count(*)::int AS filtered ${where}`),
     db.execute(sql`${source}
       SELECT contact.id, contact.source_customer_id, contact.name, contact.phone, contact.branch, contact.city, contact.assigned_to,
-             ${isoSql('calls.called_at')} AS last_called_at, calls.outcome AS last_outcome, calls.note AS last_note,
+             ${isoSql(inPeriod ? 'calls.called_at' : 'calls.last_at')} AS last_called_at,
+             ${sql.raw(inPeriod ? 'calls.outcome' : 'calls.last_outcome')} AS last_outcome,
+             ${sql.raw(inPeriod ? 'calls.note' : 'calls.last_note')} AS last_note,
              ${isoSql('contact.followup_due')} AS followup_due, contact.followup_note, contact.followup_completed_at IS NULL AS followup_open,
              bills.amount AS billed
-      ${from}
+      ${where}
       ORDER BY ${order}
       LIMIT ${PAGE_SIZE} OFFSET ${page * PAGE_SIZE}`),
   ]);

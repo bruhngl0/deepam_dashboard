@@ -1,9 +1,11 @@
 import { requireApiUser } from '@/lib/auth';
 import { EXHIBITION_LIST_KEY, EXHIBITION_LIST_NAME } from '@/lib/marketing/existing-customer-import';
-import { EXISTING_CUSTOMER_VIEWS, existingCustomerKpis, existingCustomerPage, type ExistingCustomerView } from '@/lib/marketing/existing-customer-store';
+import { EXISTING_CUSTOMER_VIEWS, existingCustomerKpis, existingCustomerPage, existingCustomerStores, type ExistingCustomerView } from '@/lib/marketing/existing-customer-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(request: Request) {
   const auth = await requireApiUser();
@@ -14,7 +16,10 @@ export async function GET(request: Request) {
   const view = (params.get('view') ?? 'all') as ExistingCustomerView;
   if (!Number.isSafeInteger(page) || page < 0) return Response.json({ error: 'Invalid page.' }, { status: 400 });
   if (!EXISTING_CUSTOMER_VIEWS.includes(view)) return Response.json({ error: 'Invalid view.' }, { status: 400 });
-  const [kpis, list] = await Promise.all([existingCustomerKpis(), existingCustomerPage(view, search, page)]);
+  const day = (key: string) => (params.get(key) ?? '').trim();
+  const filters = { from: day('from'), to: day('to'), store: (params.get('store') ?? '').trim().slice(0, 100) };
+  if ([filters.from, filters.to].some(value => value && !DAY.test(value))) return Response.json({ error: 'Invalid date.' }, { status: 400 });
+  const [kpis, list, stores] = await Promise.all([existingCustomerKpis(filters), existingCustomerPage(view, search, page, filters), existingCustomerStores()]);
   return Response.json({
     listKey: EXHIBITION_LIST_KEY,
     listName: EXHIBITION_LIST_NAME,
@@ -22,6 +27,7 @@ export async function GET(request: Request) {
     assigned: kpis.assigned,
     unassigned: kpis.total - kpis.assigned,
     kpis,
+    stores,
     view,
     filtered: list.filtered,
     page,
