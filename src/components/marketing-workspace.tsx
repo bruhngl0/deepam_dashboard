@@ -7,14 +7,16 @@ import { MarketingSalespeople } from './marketing-salespeople';
 import { MarketingImport } from './marketing-import';
 import { LeadActions } from './marketing-lead-actions';
 import { ExistingCustomerCallCard, ExistingCustomerCallList } from './existing-customer-call-list';
+import { MarketingConverted } from './marketing-converted';
 
-type Tab = 'Overview' | 'All leads' | 'Existing customers' | 'Calling queue' | 'Follow-ups' | 'Team performance' | 'Campaigns' | 'Import';
+type Tab = 'Overview' | 'All leads' | 'Existing customers' | 'Calling queue' | 'Follow-ups' | 'Converted' | 'Team performance' | 'Campaigns' | 'Import';
 const tabs = [
   { id: 'Overview', label: 'Overview' },
   { id: 'All leads', label: 'All leads' },
   { id: 'Existing customers', label: 'Existing customers' },
   { id: 'Calling queue', label: 'Queue' },
   { id: 'Follow-ups', label: 'Follow-ups' },
+  { id: 'Converted', label: 'Converted' },
   { id: 'Team performance', label: 'Team performance' },
   { id: 'Campaigns', label: 'Campaigns' },
 ] as const satisfies readonly { id: Tab; label: string }[];
@@ -52,7 +54,7 @@ export function MarketingWorkspace() {
       <p className="w-full text-xs text-ink-muted">Filters select leads by lead date and preferred store. Sales and purchases include their full imported history. All times IST.</p>
       {from && to && from > to && <p role="alert" className="text-sm text-red-600">From must be on or before To.</p>}
     </section>
-    <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Marketing sections">{tabs.map(({ id, label }) => <button key={id} className={tab === id ? primary : button} aria-current={tab === id ? 'page' : undefined} onClick={() => changeTab(id)}>{label}{id === 'Calling queue' ? ` (${queue.length})` : id === 'Follow-ups' ? ` (${pending.length})` : ''}</button>)}</nav>
+    <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Marketing sections">{tabs.map(({ id, label }) => <button key={id} className={tab === id ? primary : button} aria-current={tab === id ? 'page' : undefined} onClick={() => changeTab(id)}>{label}{id === 'Calling queue' ? ` (${queue.length})` : id === 'Follow-ups' ? ` (${pending.length})` : id === 'Converted' ? ` (${stats.converted})` : ''}</button>)}</nav>
     {tab === 'Overview' && <>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
         ['Total leads', String(stats.total), 'Unique phone numbers'], ['Contacted', String(stats.contacted), 'At least one connected call'], ['Interested', String(stats.interested), 'Latest call marked interested'], ['Store visits', String(stats.visits), 'Unique leads with recorded visits'], ['Converted customers', String(stats.converted), 'At least one matched bill'], ['Lead revenue', money(stats.revenue), `${stats.orders} matched bills`], ['Conversion rate', `${stats.conversion.toFixed(1)}%`, 'Converted ÷ unique leads'], ['Cost per acquisition', stats.cpa === null ? 'Not available' : money(stats.cpa), `${costNote}${stats.costsKnown < stats.costsTotal ? ' · partial' : ''}`],
@@ -72,6 +74,7 @@ export function MarketingWorkspace() {
       const entries = pending.filter(p => bucket === 'Overdue' ? p.followup.due < now : bucket === 'Today' ? p.followup.due >= now && p.followup.due.startsWith(today) : p.followup.due.slice(0, 10) > today);
       return <section key={bucket} className={card}><h2 className="text-lg font-semibold text-ink">{bucket} <span className="text-ink-muted">{entries.length}</span></h2><div className="mt-4 space-y-4">{entries.map(({ lead, followup: f }) => <div key={f.id} className="rounded-xl border border-line p-4"><Link href={`/marketing/leads/${lead.id}`} className="font-medium text-accent">{lead.name}</Link><p className="mt-1 text-xs text-ink-muted">{dateLabel(f.due)}</p><p className="my-3 text-sm text-ink-2">{f.note || 'Follow up with customer'}</p><LeadActions lead={lead} update={update} /><button className={`${button} mt-2`} onClick={() => update({ ...lead, followups: lead.followups.map(x => x.id === f.id ? { ...x, completedAt: nowLocal() } : x), interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'followup', text: `Follow-up completed: ${f.note}` }] })}>Complete</button></div>)}{!entries.length && <p className="text-sm text-ink-muted">No follow-ups.</p>}</div></section>;
     })}</div>}
+    {tab === 'Converted' && <MarketingConverted data={data} leads={scope} search={search} page={page} onSearch={setSearch} onPage={setPage} />}
     {tab === 'Team performance' && <MarketingSalespeople data={data} />}
     {tab === 'Campaigns' && <CampaignPerformance data={data} leads={scope} />}
     {tab === 'Import' && <MarketingImport data={data} save={save} refresh={refresh} />}

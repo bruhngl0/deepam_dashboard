@@ -6,6 +6,7 @@ import { MarketingWorkspace } from '@/components/marketing-workspace';
 import { MarketingProfile } from '@/components/marketing-profile';
 import { MarketingImport } from '@/components/marketing-import';
 import { MarketingTeamWorkspace } from '@/components/marketing-team-workspace';
+import { MarketingConverted } from '@/components/marketing-converted';
 vi.mock('@/components/marketing-shared', async importOriginal => {
   const actual = await importOriginal<typeof import('@/components/marketing-shared')>();
   return { ...actual, useMarketing: () => ({ data: demoData(), save: () => true, message: '', setMessage: () => {}, refresh: async () => {} }) };
@@ -13,11 +14,17 @@ vi.mock('@/components/marketing-shared', async importOriginal => {
 describe('marketing page rendering', () => {
   it('renders dashboard metrics and navigation with demo data', () => {
     const html = renderToStaticMarkup(createElement(MarketingWorkspace));
-    for (const label of ['Queue', 'Existing customers', 'Existing customer call list', 'Existing customer', 'Follow-ups', 'Team performance', 'Campaigns', 'Cost per acquisition', 'Converted customers', 'Store visits', 'Date-Time From']) expect(html).toContain(label);
+    for (const label of ['Queue', 'Existing customers', 'Existing customer call list', 'Existing customer', 'Follow-ups', 'Converted', 'Team performance', 'Campaigns', 'Cost per acquisition', 'Converted customers', 'Store visits', 'Date-Time From']) expect(html).toContain(label);
     const navigation = html.match(/<nav[^>]*aria-label="Marketing sections"[\s\S]*?<\/nav>/)?.[0] ?? '';
-    for (const removed of ['>Converted<', '>Sales<', '>Insights<', '>Salespeople<', '>Import<']) expect(navigation).not.toContain(removed);
+    for (const removed of ['>Sales<', '>Insights<', '>Salespeople<', '>Import<']) expect(navigation).not.toContain(removed);
     expect(html).toContain('shared by every desk');
     expect(html).not.toContain('Clear local data');
+  });
+  it('renders converted customer KPIs, sources and profile links', () => {
+    const data = demoData();
+    const html = renderToStaticMarkup(createElement(MarketingConverted, { data, leads: data.leads, search: '', page: 0, onSearch: () => {}, onPage: () => {} }));
+    for (const label of ['Converted customer profiles', 'Conversion rate', 'Revenue', 'Average order value', 'Repeat customers', 'Top source', 'Source / campaign', 'View profile']) expect(html).toContain(label);
+    expect(html).toContain('/marketing/leads/LD-DEMO-0001');
   });
   it('renders customer acquisition, action links and purchase timeline', () => {
     const html = renderToStaticMarkup(createElement(MarketingProfile, { leadId: 'LD-DEMO-0001' }));
