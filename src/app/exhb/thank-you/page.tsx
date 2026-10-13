@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
+import { btn, heading } from '../styles';
 
 export const metadata: Metadata = {
   title: 'Thank you · Celebrations of Deepam',
@@ -8,16 +10,13 @@ export const metadata: Metadata = {
 const MAP_LINK = 'https://maps.app.goo.gl/eabDBEZHVUNxALJi8';
 
 export default function ExhibitionThankYouPage() {
-  return <main className="[font-family:Helvetica,'Helvetica_Neue',Arial,sans-serif] flex flex-1 items-center bg-white px-5 py-16 text-center text-[#232323]">
-    <div className="mx-auto w-full max-w-xl">
-      <p className="text-3xl tracking-[0.12em] text-[#7f1835]">DEEPAM</p>
-      <p className="mt-0.5 text-xs tracking-[0.2em] text-[#7f1835]">by ananta</p>
-      <h1 className="mt-10 text-4xl font-semibold tracking-wide">Thank you</h1>
-      <p className="mt-4 text-base leading-relaxed text-[#5c5c5c]">Your visit is registered. We look forward to welcoming you at Celebrations of Deepam.</p>
-      <p className="mt-8 border-y border-black/15 py-5 text-sm uppercase leading-relaxed tracking-[0.12em] text-[#5c5c5c]">
-        <strong className="font-semibold text-[#232323]">16 – 18 October</strong><br />Shubh Convention Centre, JP Nagar, Bengaluru
-      </p>
-      <a href={MAP_LINK} target="_blank" rel="noopener noreferrer" className="mt-8 inline-flex items-center justify-center rounded-full border border-[#7f1835] px-6 py-3 text-sm font-medium uppercase tracking-[0.18em] text-[#7f1835] hover:bg-[#7f1835] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7f1835]">Get directions</a>
+  return <main className="px-4 pb-14 pt-9 sm:px-[30px] md:pb-20 md:pt-14">
+    <div className="mx-auto max-w-[720px] text-center">
+      <Image src="/deepam-logo.png" alt="Deepam by Ananta" width={310} height={119} unoptimized priority className="mx-auto mb-6 h-auto w-[190px]" />
+      <h1 className={`${heading} mb-3`}><strong className="font-bold">Thank you</strong></h1>
+      <p className="mb-[1em]">Your visit is registered. We look forward to welcoming you at Celebrations of Deepam.</p>
+      <p className="mb-[1.5em]">Shubh Convention Centre, JP Nagar, Bengaluru · 16 – 18 October</p>
+      <a href={MAP_LINK} target="_blank" rel="noopener noreferrer" className={btn}>Get directions</a>
     </div>
   </main>;
 }
