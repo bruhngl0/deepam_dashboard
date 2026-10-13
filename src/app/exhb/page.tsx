@@ -1,11 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
-import { db } from '@/db';
-import { exhibitionRsvps } from '@/db/schema';
-import { withExhibitionRsvp } from '@/lib/marketing/exhibition-rsvp';
-import { upsertLeadByPhone } from '@/lib/marketing/store';
-import { normalizePhone } from '@/lib/phone';
+import { DAYS, SLOTS, registerVisit } from './register';
 import { btn } from './styles';
 
 export const metadata: Metadata = {
@@ -15,47 +11,13 @@ export const metadata: Metadata = {
 
 const MAP_LINK = 'https://maps.app.goo.gl/eabDBEZHVUNxALJi8';
 const THANK_YOU_ROUTE = '/exhb/thank-you';
-const DAYS = [
-  { value: '2026-10-16', label: 'Friday, 16 October' },
-  { value: '2026-10-17', label: 'Saturday, 17 October' },
-  { value: '2026-10-18', label: 'Sunday, 18 October' },
-];
-const SLOTS = ['10:30 am – 12:30 pm', '12:30 pm – 2:30 pm', '2:30 pm – 4:30 pm', '4:30 pm – 7 pm'];
-
 const label = 'mb-2 block font-semibold leading-[1.4em]';
 const input = 'block min-h-[calc(20.8px+1.6em+2px)] w-full appearance-none rounded-none border border-[#bfbfbf] bg-white px-5 py-[0.8em] text-base font-light leading-none text-black hover:border-[#737373] focus:border-black focus:outline-none md:leading-[1.3]';
 const required = <span aria-hidden="true" className="text-[#a12b2b]">*</span>;
 
 async function register(formData: FormData) {
   'use server';
-  const text = (key: string, max: number) => String(formData.get(key) ?? '').trim().slice(0, max);
-  // Hidden from people; a filled value means a bot, which gets the same thank-you and no row.
-  if (text('website', 200)) redirect(THANK_YOU_ROUTE);
-
-  const fullName = text('fullName', 120);
-  const contact = text('contact', 40);
-  if (!fullName || contact.replace(/\D/g, '').length < 10) redirect('/exhb?error=1');
-
-  const phone = normalizePhone(contact);
-  const day = DAYS.find((option) => option.value === text('visitDate', 10));
-  const slot = SLOTS.find((option) => option === text('visitTime', 30)) ?? '';
-  const people = Number.parseInt(text('partySize', 3), 10);
-  const partySize = people >= 1 && people <= 50 ? people : null;
-  await db.insert(exhibitionRsvps).values({
-    fullName,
-    contact,
-    phone: phone.ok ? phone.e164 : null,
-    visitDate: day?.value ?? null,
-    visitTime: slot || null,
-    partySize,
-  });
-
-  // The registration is already saved; a failure here must not cost the visitor their thank-you.
-  if (phone.ok) {
-    const rsvp = { phone: phone.e164, name: fullName, visitDay: day?.label ?? '', visitSlot: slot, partySize };
-    await upsertLeadByPhone(phone.e164, (existing) => withExhibitionRsvp(existing, rsvp))
-      .catch((error) => console.error('[exhb] follow-up not created', error));
-  }
+  if ((await registerVisit((key) => formData.get(key))) === 'invalid') redirect('/exhb?error=1');
   redirect(THANK_YOU_ROUTE);
 }
 
