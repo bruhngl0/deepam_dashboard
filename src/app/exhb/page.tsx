@@ -69,8 +69,8 @@ export default async function ExhibitionPage({ searchParams }: { searchParams: P
 
         <div className="mt-8 grid grid-cols-2 gap-4 border-y border-black/15 py-6 text-left">
           <div>
-            <p className="text-2xl font-semibold tracking-wide">SHUBH</p>
-            <p className="mt-1 text-sm uppercase leading-snug tracking-[0.12em] text-[#5c5c5c]">Convention Centre, JP Nagar, Bengaluru</p>
+            <p className="text-sm uppercase leading-snug tracking-[0.12em] text-[#5c5c5c]">Shubh</p>
+            <p className="text-sm uppercase leading-snug tracking-[0.12em] text-[#5c5c5c]">Convention Centre, JP Nagar, Bengaluru</p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-semibold tracking-wide">16 – 18</p>
