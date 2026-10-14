@@ -246,7 +246,21 @@ export type CallEntry = { id: string; at: string; salesperson: string; outcome: 
 export type SalespersonPerformance = { salesperson: string; claimed: number; called: number; pending: number; interested: number; converted: number; revenue: number };
 
 /** An existing (exhibition) customer a salesperson has claimed; it lives outside the leads table. */
-export type ExistingClaim = { leadId: string; salesperson: string; phone: string; claimedAt: string };
+export type ExistingClaim = { leadId: string; salesperson: string; phone: string; claimedAt: string; followupDue?: string | null };
+
+/** What a called record came from: "Existing customer", the lead's campaign names, else its sources. */
+export function callSourceLabel(leadId: string, lead: Lead | undefined): string {
+  if (leadId.startsWith('existing-customer:')) return 'Existing customer';
+  if (!lead) return 'Unknown';
+  const campaigns = [...new Set(lead.acquisitions.map(acquisition => campaignName(acquisition.campaignId)).filter(Boolean))];
+  return campaigns.join(', ') || [...new Set(lead.acquisitions.map(acquisition => acquisition.source))].join(', ') || 'No campaign';
+}
+
+/** The earliest open follow-up on a called record, from the lead or the existing-customer claim. */
+export function openFollowupDue(leadId: string, lead: Lead | undefined, existing: ExistingClaim[]): string | null {
+  if (leadId.startsWith('existing-customer:')) return existing.find(claim => claim.leadId === leadId)?.followupDue ?? null;
+  return lead?.followups.filter(followup => !followup.completedAt).map(followup => followup.due).sort()[0] ?? null;
+}
 
 /**
  * Claimed leads plus claimed existing customers. An existing customer counts as

@@ -245,9 +245,10 @@ export async function existingCustomerPage(view: ExistingCustomerView, search: s
 }
 
 /** Every claimed existing customer, for the Team performance table. */
-export async function existingCustomerClaims(): Promise<{ leadId: string; salesperson: string; phone: string; claimedAt: string }[]> {
+export async function existingCustomerClaims(): Promise<{ leadId: string; salesperson: string; phone: string; claimedAt: string; followupDue: string | null }[]> {
   const result = await db.execute(sql`
-    SELECT ${leadIdSql} AS lead_id, contact.assigned_to, contact.phone, contact.claimed_at
+    SELECT ${leadIdSql} AS lead_id, contact.assigned_to, contact.phone, contact.claimed_at,
+           CASE WHEN contact.followup_completed_at IS NULL THEN ${isoSql('contact.followup_due')} END AS followup_due
     FROM marketing_call_list_contacts contact
     WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
       AND contact.assigned_to IS NOT NULL
@@ -258,6 +259,7 @@ export async function existingCustomerClaims(): Promise<{ leadId: string; salesp
     salesperson: String(row.assigned_to),
     phone: String(row.phone),
     claimedAt: String(row.claimed_at).replace(' ', 'T'),
+    followupDue: row.followup_due ? String(row.followup_due) : null,
   }));
 }
 

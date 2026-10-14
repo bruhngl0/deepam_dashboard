@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calledCustomers, campaignName, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry } from './local';
+import { calledCustomers, callSourceLabel, campaignName, makeLead, openFollowupDue, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry } from './local';
 
 const mapping = guessMapping(['Name', 'Number', 'Source', 'Invoice', 'Amount']);
 describe('local marketing imports', () => {
@@ -186,5 +186,22 @@ describe('salesperson card labels', () => {
     expect(formChoice('2:30_pm_–_4:30_pm')).toBe('2:30 pm – 4:30 pm');
     expect(formChoice('11_Am_–_1_Pm')).toBe('11 am – 1 pm');
     expect(formChoice('')).toBe('');
+  });
+});
+
+describe('called record labels', () => {
+  const lead = makeLead({ phone: '+919000123410', name: 'Asha', source: 'Meta ads', campaignId: 'Meta | 0010 | 2026 | 10 | Shubh Convention Centre Exhibition' });
+  lead.followups.push({ id: 'f2', due: '2026-10-16T11:00', note: '', completedAt: null }, { id: 'f1', due: '2026-10-15T11:00', note: '', completedAt: '2026-10-14T10:00' });
+
+  it('names the campaign, or says the record is an existing customer', () => {
+    expect(callSourceLabel(lead.id, lead)).toBe('Shubh Convention Centre Exhibition');
+    expect(callSourceLabel('existing-customer:7', undefined)).toBe('Existing customer');
+    expect(callSourceLabel(lead.id, makeLead({ phone: '+919000123411', name: 'Bina', source: 'Walk-in' }))).toBe('Walk-in');
+  });
+
+  it('finds the open follow-up on a lead or an existing-customer claim', () => {
+    expect(openFollowupDue(lead.id, lead, [])).toBe('2026-10-16T11:00');
+    expect(openFollowupDue('existing-customer:7', undefined, [{ leadId: 'existing-customer:7', salesperson: 'A', phone: '', claimedAt: '', followupDue: '2026-10-17T12:00:00' }])).toBe('2026-10-17T12:00:00');
+    expect(openFollowupDue('existing-customer:8', undefined, [])).toBeNull();
   });
 });
