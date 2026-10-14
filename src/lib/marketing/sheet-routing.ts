@@ -30,7 +30,7 @@ export const EXHB_TAG = 'exhb';
 
 export const SHEET_ROUTES: SheetRoute[] = [
   { group: 'shubh-convention', label: 'Shubh Convention', tab: 'shubh convention', salesperson: 'Abhishek Thapa', exclusive: false, untilEnv: 'SHUBH_CONVENTION_ROUTING_UNTIL', until: '2026-10-18' },
-  { group: 'blvd-club', label: 'BLVD Club', tab: 'blvd club', salesperson: 'Margaret Prema', exclusive: true, untilEnv: 'BLVD_CLUB_ROUTING_UNTIL', until: '2026-10-15' },
+  { group: 'blvd-club', label: 'BLVD Club', tab: 'blvd club', salesperson: 'Margaret Prema', exclusive: true, untilEnv: 'BLVD_CLUB_ROUTING_UNTIL', until: '2026-10-18' },
   // Standing route, not a campaign window: every "Virtual calls" tab goes to Sandhya and nobody else.
   { group: VIRTUAL_CALLS_GROUP, label: 'Virtual calls', tab: 'virtual calls', salesperson: 'Sandhya', exclusive: true, untilEnv: 'VIRTUAL_CALLS_ROUTING_UNTIL', until: '2099-12-31' },
 ];
