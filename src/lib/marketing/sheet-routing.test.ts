@@ -14,8 +14,8 @@ describe('temporary campaign routing', () => {
 
   it('is active through the configured end date and stops the next day', () => {
     const route = routeForTab('Shubh Convention Lead- Oct')!;
-    expect(routeActive(route, '2026-10-15')).toBe(true);
-    expect(routeActive(route, '2026-10-16')).toBe(false);
+    expect(routeActive(route, '2026-10-18')).toBe(true);
+    expect(routeActive(route, '2026-10-19')).toBe(false);
   });
 
   it('tags and assigns campaign leads to the route salesperson while active', () => {
@@ -36,6 +36,7 @@ describe('temporary campaign routing', () => {
     expect(claimRoutingFor('Sandhya', '2027-06-01')).toEqual({ only: ['virtual-calls'] });
     expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ exclude: ['blvd-club', 'virtual-calls'], first: ['shubh-convention'] });
     expect(claimRoutingFor('Kavya S', '2026-10-10')).toEqual({ exclude: ['shubh-convention', 'blvd-club', 'virtual-calls'], first: [] });
-    expect(claimRoutingFor('Margaret Prema', '2026-10-16')).toEqual({ exclude: ['virtual-calls'], first: [] });
+    expect(claimRoutingFor('Margaret Prema', '2026-10-16')).toEqual({ exclude: ['shubh-convention', 'virtual-calls'], first: [] });
+    expect(claimRoutingFor('Margaret Prema', '2026-10-19')).toEqual({ exclude: ['virtual-calls'], first: [] });
   });
 });
