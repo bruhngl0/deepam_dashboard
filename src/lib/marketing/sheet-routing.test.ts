@@ -6,7 +6,7 @@ describe('temporary campaign routing', () => {
   it('matches the live worksheet names without depending on case or punctuation', () => {
     expect(routeForTab('Shubh Convention Lead- Oct')?.salesperson).toBe('Abhishek Thapa');
     expect(routeForTab('SHUBH convention_lead Oct')?.group).toBe('shubh-convention');
-    expect(routeForTab('BLVD Club (Blr) Lead- Oct')?.salesperson).toBe('Margaret Prema');
+    expect(routeForTab('BLVD Club (Blr) Lead- Oct')?.salesperson).toBe('Roopa S');
     expect(routeForTab('Virtual calls - SEP.')?.salesperson).toBe('Sandhya');
     expect(routeForTab('Virtual calls - Oct')?.group).toBe('virtual-calls');
     expect(routeForTab('The Residency (Chennai) Lead- Oct')?.salesperson).toBe('Chennai');
@@ -24,7 +24,7 @@ describe('temporary campaign routing', () => {
     const route = routeForTab('BLVD Club (Blr) Lead- Oct')!;
     const routed = routeSheetLead(lead, 'BLVD Club (Blr) Lead- Oct', route, '2026-10-10T13:00:00', true);
     expect(routed).toMatchObject({
-      claimedBy: 'Margaret Prema',
+      claimedBy: 'Roopa S',
       claimedAt: '2026-10-10T13:00:00',
       claimGroup: 'blvd-club',
       sheetTabs: ['BLVD Club (Blr) Lead- Oct'],
@@ -32,13 +32,13 @@ describe('temporary campaign routing', () => {
   });
 
   it('keeps Margaret to BLVD Club, Sandhya to Virtual calls, gives Abhishek the pool with Shubh first, and keeps others out', () => {
-    expect(claimRoutingFor('Margaret Prema', '2026-10-10')).toEqual({ only: ['blvd-club'] });
+    expect(claimRoutingFor('Roopa S', '2026-10-10')).toEqual({ only: ['blvd-club'] });
     expect(claimRoutingFor('Sandhya', '2026-10-10')).toEqual({ only: ['virtual-calls'] });
     expect(claimRoutingFor('Sandhya', '2027-06-01')).toEqual({ only: ['virtual-calls'] });
     expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ exclude: ['blvd-club', 'virtual-calls', 'chennai'], first: ['shubh-convention'] });
     expect(claimRoutingFor('Kavya S', '2026-10-10')).toEqual({ exclude: ['shubh-convention', 'blvd-club', 'virtual-calls', 'chennai'], first: [] });
     expect(claimRoutingFor('Chennai', '2026-10-14')).toEqual({ only: ['chennai'] });
-    expect(claimRoutingFor('Margaret Prema', '2026-10-18')).toEqual({ only: ['blvd-club'] });
-    expect(claimRoutingFor('Margaret Prema', '2026-10-19')).toEqual({ exclude: ['virtual-calls', 'chennai'], first: [] });
+    expect(claimRoutingFor('Roopa S', '2026-10-18')).toEqual({ only: ['blvd-club'] });
+    expect(claimRoutingFor('Roopa S', '2026-10-19')).toEqual({ exclude: ['virtual-calls', 'chennai'], first: [] });
   });
 });
