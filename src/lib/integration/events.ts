@@ -25,6 +25,7 @@ export function parseWalktrackEvent(input: unknown): WalktrackEvent | null {
 export function canonicalStoreCode(value: unknown): string | null {
   if (value === 'MG_ROAD') return 'MG_ROAD';
   if (value === 'JAYNAGAR' || value === 'JAYANAGAR') return 'JAYANAGAR';
+  if (value === 'SHUBH_CONVENTION' || value === 'BLVD_COLLECTION') return value;
   return null;
 }
 

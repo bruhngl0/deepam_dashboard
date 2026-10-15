@@ -4,6 +4,9 @@ import { canonicalStoreCode, parseWalktrackEvent, possibleCustomerCode, possible
 describe('integration event boundary', () => {
   it('canonicalizes the WalkTrack Jayanagar spelling', () => {
     expect(canonicalStoreCode('JAYNAGAR')).toBe('JAYANAGAR');
+    expect(canonicalStoreCode('SHUBH_CONVENTION')).toBe('SHUBH_CONVENTION');
+    expect(canonicalStoreCode('BLVD_COLLECTION')).toBe('BLVD_COLLECTION');
+    expect(canonicalStoreCode('ONLINE')).toBeNull();
   });
 
   it('accepts Indian national and E.164 phone references', () => {

@@ -99,7 +99,7 @@ export const outreachListEnum = pgEnum('outreach_list', ['reactivation', 'second
 export const stores = pgTable('stores', {
   id: serial('id').primaryKey(),
   code: text('code').notNull().unique(), // 'MG_ROAD' | 'JAYANAGAR'
-  /** Store ID, same in every app (STR-001 MG Road, STR-002 Jayanagar, STR-003 Online). Assigned by trigger. */
+  /** Store ID, same in every app (STR-001 MG Road, STR-002 Jayanagar, STR-003 Online, STR-004 Shubh Convention, STR-005 BLVD Collection). Assigned by trigger. */
   storeCode: text('store_code').unique(),
   name: text('name').notNull(),
   voucherPrefix: text('voucher_prefix').unique(), // 'BK01-' | 'BK02-'

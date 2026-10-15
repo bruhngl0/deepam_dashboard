@@ -31,6 +31,8 @@ const STORES = [
   { code: 'MG_ROAD', storeCode: 'STR-001', name: 'MG Road', voucherPrefix: 'BK01-' },
   { code: 'JAYANAGAR', storeCode: 'STR-002', name: 'Jayanagar', voucherPrefix: 'BK02-' },
   { code: 'ONLINE', storeCode: 'STR-003', name: 'Online', voucherPrefix: 'BK03-' },
+  { code: 'SHUBH_CONVENTION', storeCode: 'STR-004', name: 'Shubh Convention', voucherPrefix: 'BK004-' },
+  { code: 'BLVD_COLLECTION', storeCode: 'STR-005', name: 'BLVD Collection', voucherPrefix: 'BK005-' },
 ];
 
 /**

@@ -169,6 +169,13 @@
       "when": 1792047600000,
       "tag": "0023_exhibition_rsvps",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792134000000,
+      "tag": "0024_shubh_convention_blvd_collection_stores",
+      "breakpoints": true
     }
   ]
 }
