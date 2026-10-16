@@ -1,7 +1,7 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { marketingCallListContacts, marketingCalls } from '@/db/schema';
-import { EXHIBITION_LIST_KEY } from './existing-customer-import';
+import { CALL_LIST_KEYS, EXHIBITION_LIST_KEY, type CallListKey } from './existing-customer-import';
 
 export type ExistingCustomerDeskRow = {
   id: number;
@@ -25,6 +25,8 @@ function rowsOf<T>(result: unknown): T[] {
 }
 
 const leadIdSql = sql`'existing-customer:' || contact.id::text`;
+/** A salesperson's desk spans every calling list; the lists themselves are viewed one at a time. */
+const anyCallList = sql`contact.list_key IN (${sql.join(CALL_LIST_KEYS.map(key => sql`${key}`), sql`, `)})`;
 
 export async function existingCustomerDesk(salesperson: string) {
   const [summaryResult, queueResult, followupResult] = await Promise.all([
@@ -40,7 +42,7 @@ export async function existingCustomerDesk(salesperson: string) {
           SELECT 1 FROM marketing_calls call WHERE call.lead_id = ${leadIdSql}
         ))::int AS called
       FROM marketing_call_list_contacts contact
-      WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+      WHERE ${anyCallList}
         AND lower(contact.assigned_to) = lower(${salesperson})
     `),
     db.execute(sql`
@@ -48,7 +50,7 @@ export async function existingCustomerDesk(salesperson: string) {
              contact.source_customer_id, contact.claimed_at, contact.preferred_store,
              contact.product, contact.category, contact.followup_due, contact.followup_note
       FROM marketing_call_list_contacts contact
-      WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+      WHERE ${anyCallList}
         AND lower(contact.assigned_to) = lower(${salesperson})
         AND contact.claimed_at IS NOT NULL
         AND NOT EXISTS (
@@ -61,7 +63,7 @@ export async function existingCustomerDesk(salesperson: string) {
              contact.source_customer_id, contact.claimed_at, contact.preferred_store,
              contact.product, contact.category, contact.followup_due, contact.followup_note
       FROM marketing_call_list_contacts contact
-      WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+      WHERE ${anyCallList}
         AND lower(contact.assigned_to) = lower(${salesperson})
         AND contact.followup_due IS NOT NULL
         AND contact.followup_completed_at IS NULL
@@ -123,7 +125,7 @@ const isoSql = (column: string) => sql.raw(`to_char(${column}, 'YYYY-MM-DD"T"HH2
  * follows Team performance: only bills on or after the day the customer was
  * claimed count, since everyone on this list has bought before.
  */
-function listQuery(filters: ExistingCustomerFilters) {
+function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
   const from = filters.from || null, to = filters.to || null;
   const within = (column: string) => sql`(${from}::date IS NULL OR ${sql.raw(column)} >= ${from}::date) AND (${to}::date IS NULL OR ${sql.raw(column)} < ${to}::date + 1)`;
   const called = within('call.called_at');
@@ -147,14 +149,14 @@ function listQuery(filters: ExistingCustomerFilters) {
         AND left(sale.sold_at, 10) >= to_char(contact.claimed_at, 'YYYY-MM-DD')
         AND (${from}::text IS NULL OR left(sale.sold_at, 10) >= ${from})
         AND (${to}::text IS NULL OR left(sale.sold_at, 10) <= ${to})
-      WHERE contact.list_key = ${EXHIBITION_LIST_KEY} AND contact.claimed_at IS NOT NULL
+      WHERE contact.list_key = ${listKey} AND contact.claimed_at IS NOT NULL
       GROUP BY contact.id
     )`;
   const joined = sql`
     FROM marketing_call_list_contacts contact
     LEFT JOIN calls ON calls.lead_id = ${leadIdSql}
     LEFT JOIN bills ON bills.contact_id = contact.id
-    WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+    WHERE contact.list_key = ${listKey}
       AND (${filters.store || null}::text IS NULL OR contact.branch = ${filters.store || null})`;
   const is: Record<Exclude<ExistingCustomerView, 'all'>, ReturnType<typeof sql>> = {
     called: sql`calls.calls > 0`,
@@ -166,9 +168,9 @@ function listQuery(filters: ExistingCustomerFilters) {
   return { source, joined, is };
 }
 
-/** Headline figures for the exhibition calling list. */
-export async function existingCustomerKpis(filters: ExistingCustomerFilters = {}): Promise<ExistingCustomerKpis> {
-  const { source, joined, is } = listQuery(filters);
+/** Headline figures for one calling list. */
+export async function existingCustomerKpis(filters: ExistingCustomerFilters = {}, listKey: CallListKey = EXHIBITION_LIST_KEY): Promise<ExistingCustomerKpis> {
+  const { source, joined, is } = listQuery(filters, listKey);
   const result = await db.execute(sql`${source}
     SELECT count(*)::int AS total,
       count(contact.assigned_to)::int AS assigned,
@@ -191,16 +193,16 @@ export async function existingCustomerKpis(filters: ExistingCustomerFilters = {}
 }
 
 /** The stores customers on the list belong to, for the store filter. */
-export async function existingCustomerStores(): Promise<string[]> {
+export async function existingCustomerStores(listKey: CallListKey = EXHIBITION_LIST_KEY): Promise<string[]> {
   const result = await db.execute(sql`
     SELECT DISTINCT contact.branch FROM marketing_call_list_contacts contact
-    WHERE contact.list_key = ${EXHIBITION_LIST_KEY} AND contact.branch <> '' ORDER BY contact.branch`);
+    WHERE contact.list_key = ${listKey} AND contact.branch <> '' ORDER BY contact.branch`);
   return rowsOf<{ branch: string }>(result).map(row => String(row.branch));
 }
 
 /** One page of the calling list, narrowed to the customers behind a KPI card. */
-export async function existingCustomerPage(view: ExistingCustomerView, search: string, page: number, filters: ExistingCustomerFilters = {}): Promise<{ filtered: number; pageSize: number; rows: ExistingCustomerListRow[] }> {
-  const { source, joined, is } = listQuery(filters);
+export async function existingCustomerPage(view: ExistingCustomerView, search: string, page: number, filters: ExistingCustomerFilters = {}, listKey: CallListKey = EXHIBITION_LIST_KEY): Promise<{ filtered: number; pageSize: number; rows: ExistingCustomerListRow[] }> {
+  const { source, joined, is } = listQuery(filters, listKey);
   const like = `%${search}%`;
   const where = sql.join([
     joined,
@@ -250,7 +252,7 @@ export async function existingCustomerClaims(): Promise<{ leadId: string; salesp
     SELECT ${leadIdSql} AS lead_id, contact.assigned_to, contact.phone, contact.claimed_at,
            CASE WHEN contact.followup_completed_at IS NULL THEN ${isoSql('contact.followup_due')} END AS followup_due
     FROM marketing_call_list_contacts contact
-    WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+    WHERE ${anyCallList}
       AND contact.assigned_to IS NOT NULL
       AND contact.claimed_at IS NOT NULL
   `);
@@ -268,7 +270,7 @@ export async function claimExistingCustomers(salesperson: string, limit = 10): P
     WITH candidates AS (
       SELECT contact.id
       FROM marketing_call_list_contacts contact
-      WHERE contact.list_key = ${EXHIBITION_LIST_KEY}
+      WHERE ${anyCallList}
         AND lower(contact.assigned_to) = lower(${salesperson})
         AND contact.claimed_at IS NULL
         AND NOT EXISTS (
@@ -291,7 +293,7 @@ export async function claimExistingCustomers(salesperson: string, limit = 10): P
 export async function logExistingCustomerCall(input: { id: number; salesperson: string; outcome: string; note: string; calledAt: string; preferredStore: string; product: string; category: string; followupDue: string | null }) {
   const [contact] = await db.select().from(marketingCallListContacts).where(and(
     eq(marketingCallListContacts.id, input.id),
-    eq(marketingCallListContacts.listKey, EXHIBITION_LIST_KEY),
+    inArray(marketingCallListContacts.listKey, [...CALL_LIST_KEYS]),
   )).limit(1);
   if (!contact) return false;
   const activeFollowup = contact.followupDue && !contact.followupCompletedAt;
@@ -321,7 +323,7 @@ export async function logExistingCustomerCall(input: { id: number; salesperson: 
 export async function completeExistingCustomerFollowup(id: number, salesperson: string) {
   const [row] = await db.update(marketingCallListContacts).set({ followupCompletedAt: sql`now()`, updatedAt: sql`now()` }).where(and(
     eq(marketingCallListContacts.id, id),
-    eq(marketingCallListContacts.listKey, EXHIBITION_LIST_KEY),
+    inArray(marketingCallListContacts.listKey, [...CALL_LIST_KEYS]),
     sql`lower(${marketingCallListContacts.assignedTo}) = lower(${salesperson})`,
     sql`${marketingCallListContacts.followupDue} IS NOT NULL`,
     sql`${marketingCallListContacts.followupCompletedAt} IS NULL`,

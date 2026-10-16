@@ -6,10 +6,17 @@ import { button, card, dayMonthYearTimeLabel, Field, input, money, primary } fro
 
 type Response = { listName: string; total: number; assigned: number; unassigned: number; kpis: ExistingCustomerKpis; stores: string[]; filtered: number; page: number; pageSize: number; rows: ExistingCustomerListRow[] };
 
-async function load(page = 0, search = '', view: ExistingCustomerView = 'all', filters: ExistingCustomerFilters = {}): Promise<Response> {
-  const query = new URLSearchParams({ page: String(page), view, search, from: filters.from ?? '', to: filters.to ?? '', store: filters.store ?? '' });
+export type CallList = 'exhibition' | 'online';
+
+const LIST_TEXT: Record<CallList, { eyebrow: string; title: string; blurb: string; loadError: string }> = {
+  exhibition: { eyebrow: 'Existing customers', title: 'Exhibition customer calls', blurb: 'MG Road customers are assigned for calling. This list stays outside lead, campaign, and conversion figures.', loadError: 'Could not load the exhibition customer list.' },
+  online: { eyebrow: 'Online customers', title: 'Online customer calls', blurb: 'Shopify customers who were new to the CRM. Customers already in the CRM stay existing customers and are not repeated here.', loadError: 'Could not load the online customer list.' },
+};
+
+async function load(page = 0, search = '', view: ExistingCustomerView = 'all', filters: ExistingCustomerFilters = {}, list: CallList = 'exhibition'): Promise<Response> {
+  const query = new URLSearchParams({ page: String(page), view, search, from: filters.from ?? '', to: filters.to ?? '', store: filters.store ?? '', list });
   const response = await fetch(`/api/marketing/existing-customers?${query}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error('Could not load the exhibition customer list.');
+  if (!response.ok) throw new Error(LIST_TEXT[list].loadError);
   return await response.json() as Response;
 }
 
@@ -26,7 +33,8 @@ export function ExistingCustomerCallCard({ open }: { open: () => void }) {
 
 const VIEW_TITLES: Record<ExistingCustomerView, string> = { all: 'All customers', called: 'Customers called', pending: 'Pending calls', interested: 'Interested customers', followups: 'Follow-ups due', converted: 'Converted customers' };
 
-export function ExistingCustomerCallList() {
+export function ExistingCustomerCallList({ list = 'exhibition' }: { list?: CallList }) {
+  const text = LIST_TEXT[list];
   const [data, setData] = useState<Response | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -37,15 +45,15 @@ export function ExistingCustomerCallList() {
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
-    const timer = setTimeout(() => void load(page, search, view, { from, to, store }).then(value => { if (active) { setData(value); setError(''); } }).catch(e => { if (active) setError((e as Error).message); }), 150);
+    const timer = setTimeout(() => void load(page, search, view, { from, to, store }, list).then(value => { if (active) { setData(value); setError(''); } }).catch(e => { if (active) setError((e as Error).message); }), 150);
     return () => { active = false; clearTimeout(timer); };
-  }, [page, search, view, from, to, store]);
+  }, [page, search, view, from, to, store, list]);
   const open = (next: ExistingCustomerView) => { setView(next); setPage(0); };
   const extra = view === 'followups' ? 'Follow-up due' : view === 'converted' ? 'Billed' : '';
   return <section className="overflow-hidden rounded-2xl border border-line bg-surface">
     <div className="flex flex-wrap items-end justify-between gap-4 p-5">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Existing customers</p><h2 className="mt-1 text-xl font-semibold text-ink">Exhibition customer calls</h2><p className="mt-1 text-sm text-ink-2">MG Road customers are assigned for calling. This list stays outside lead, campaign, and conversion figures.</p></div>
-      <input className={`${input} sm:!w-80`} aria-label="Search existing customers" placeholder="Name, phone, salesperson, store…" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} />
+      <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">{text.eyebrow}</p><h2 className="mt-1 text-xl font-semibold text-ink">{text.title}</h2><p className="mt-1 text-sm text-ink-2">{text.blurb}</p></div>
+      <input className={`${input} sm:!w-80`} aria-label={`Search ${text.eyebrow.toLowerCase()}`} placeholder="Name, phone, salesperson, store…" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} />
     </div>
     <div className="flex flex-wrap items-end gap-3 border-t border-line px-5 py-4">
       <Field label="From"><input type="date" className={input} max={to || undefined} value={from} onChange={event => { setFrom(event.target.value); setPage(0); }} /></Field>

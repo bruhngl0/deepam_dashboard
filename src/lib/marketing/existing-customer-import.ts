@@ -3,6 +3,12 @@ import { normalizePhone, REJECT_CODE } from '@/lib/phone';
 
 export const EXHIBITION_LIST_KEY = 'exhibition-customers';
 export const EXHIBITION_LIST_NAME = 'Exhibition customer calls';
+/** Shopify buyers and sign-ups new to the CRM (scripts/import-shopify-customers.ts). */
+export const ONLINE_LIST_KEY = 'online-customers';
+export const ONLINE_LIST_NAME = 'Online customer calls';
+/** Every calling list a salesperson can be assigned customers from. */
+export const CALL_LIST_KEYS = [EXHIBITION_LIST_KEY, ONLINE_LIST_KEY] as const;
+export type CallListKey = (typeof CALL_LIST_KEYS)[number];
 
 export type ExistingCustomerCallContact = {
   sourceRow: number;

@@ -9,11 +9,12 @@ import { LeadActions } from './marketing-lead-actions';
 import { ExistingCustomerCallCard, ExistingCustomerCallList } from './existing-customer-call-list';
 import { MarketingConverted } from './marketing-converted';
 
-type Tab = 'Overview' | 'All leads' | 'Existing customers' | 'Calling queue' | 'Follow-ups' | 'Converted' | 'Team performance' | 'Campaigns' | 'Import';
+type Tab = 'Overview' | 'All leads' | 'Existing customers' | 'Online customers' | 'Calling queue' | 'Follow-ups' | 'Converted' | 'Team performance' | 'Campaigns' | 'Import';
 const tabs = [
   { id: 'Overview', label: 'Overview' },
   { id: 'All leads', label: 'All leads' },
   { id: 'Existing customers', label: 'Existing customers' },
+  { id: 'Online customers', label: 'Online customers' },
   { id: 'Calling queue', label: 'Queue' },
   { id: 'Follow-ups', label: 'Follow-ups' },
   { id: 'Converted', label: 'Converted' },
@@ -64,6 +65,7 @@ export function MarketingWorkspace() {
       <div className="grid gap-5 lg:grid-cols-2"><ExistingCustomerCallCard open={() => changeTab('Existing customers')} /></div>
     </>}
     {tab === 'Existing customers' && <ExistingCustomerCallList />}
+    {tab === 'Online customers' && <ExistingCustomerCallList key="online" list="online" />}
     {['All leads', 'Calling queue'].includes(tab) && <section className="overflow-hidden rounded-2xl border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-lg font-semibold text-ink">{tab}</h2><p className="text-xs text-ink-muted">{tab === 'Calling queue' ? 'New imported leads stay here until their first call is logged.' : 'Open a name to see the complete customer profile.'}</p></div><input className={`${input} sm:!w-80`} aria-label="Search leads" placeholder="Name, number, lead ID, campaign…" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} /></div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Lead / contact', 'Sources / campaign', 'Date-Time', 'Preferred store', ...(tab === 'Calling queue' ? ['Call status'] : []), ...(showLeadActions ? ['Actions'] : []), ...(tab === 'Calling queue' ? ['Log call'] : [])].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{visible.slice(currentPage * 20, currentPage * 20 + 20).map(l => <tr key={l.id} className="border-t border-line align-top"><td className="min-w-48 px-4 py-4"><Link href={`/marketing/leads/${l.id}`} className="font-semibold text-accent hover:underline">{l.name}</Link><p className="mt-1 text-ink-2">{l.phone}</p><p className="text-xs text-ink-muted">{l.email || 'Email not recorded'}</p><p className="mt-1 max-w-48 break-all text-[10px] text-ink-muted">{l.id}</p></td><td className="min-w-40 px-4 py-4 text-ink">{[...new Set(l.acquisitions.map(a => a.source))].join(', ')}<p className="mt-1 text-xs text-ink-2">{[...new Set(l.acquisitions.map(a => a.campaignId).filter(Boolean))].join(', ') || 'No campaign'}</p>{(l.claimGroup || l.tags?.length) ? <div className="mt-2 flex flex-wrap gap-1.5"><CampaignTag lead={l} /></div> : null}</td><td className="whitespace-nowrap px-4 py-4 text-ink-2">{dateLabel(l.acquiredAt)}</td><td className="px-4 py-4 text-ink-2">{l.preferredStore || 'Not recorded'}</td>{tab === 'Calling queue' && <td className="px-4 py-4 text-ink-2">Pending call</td>}{showLeadActions && <td className="min-w-72 px-4 py-4"><LeadActions lead={l} update={update} /></td>}{tab === 'Calling queue' && <td className="min-w-36 px-4 py-4"><LeadActions lead={l} update={update} variant="call-only" /></td>}</tr>)}</tbody></table></div>
