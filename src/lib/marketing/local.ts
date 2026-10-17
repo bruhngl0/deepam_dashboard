@@ -1,6 +1,6 @@
 import { normalizePhone } from '@/lib/phone';
 
-export const SOURCES = ['Meta ads', 'Google ads', 'Website', 'WhatsApp', 'Instagram DM', 'Influencer', 'Events', 'Referral', 'Walkin'] as const;
+export const SOURCES = ['Meta ads', 'Google ads', 'Website', 'WhatsApp', 'Instagram DM', 'Influencer', 'Events', 'Referral', 'Walkin', 'AdOnMo'] as const;
 export const STORES = ['MG', 'JAYNAGAR', 'Online', 'Exhibition'] as const;
 export const OUTCOMES = ['Connected / interested', 'Connected / follow-up required', 'Connected / not interested', 'No answer', 'Callback required', 'Wrong number'] as const;
 export type Outcome = typeof OUTCOMES[number];

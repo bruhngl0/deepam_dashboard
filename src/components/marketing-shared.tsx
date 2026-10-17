@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { callsForSync, campaignName, type Dataset, type Lead, type Sale } from '@/lib/marketing/local';
-import { routeLabel } from '@/lib/marketing/sheet-routing';
+import { routeLabel, TAG_LABELS } from '@/lib/marketing/sheet-routing';
 export const button = 'inline-flex items-center justify-center rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-inset focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40';
 export const primary = `${button} !bg-accent !text-white !border-accent`;
 export const input = 'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-2 focus:outline-accent';
@@ -16,7 +16,7 @@ export const dayMonthYearTimeLabel = (s: string) => s.length >= 16 ? `${dayMonth
 
 /** Shubh Convention / BLVD Club style tag for a routed campaign lead, then the lead's own tags (EXHB); nothing otherwise. */
 export function CampaignTag({ lead }: { lead: Lead }) {
-  const labels = [routeLabel(lead.claimGroup), ...(lead.tags ?? []).map(tag => tag.toUpperCase())].filter(Boolean);
+  const labels = [routeLabel(lead.claimGroup), ...(lead.tags ?? []).map(tag => TAG_LABELS[tag] ?? tag.toUpperCase())].filter(Boolean);
   return <>{labels.map(label => <span key={label} className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-medium text-accent">{label}</span>)}</>;
 }
 

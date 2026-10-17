@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { callLog, campaignName, convertedLeads, filterLeads, hasLoggedCall, nowLocal, OUTCOMES, salespersonPerformance, STORES, timeAgo, type Dataset, type Lead } from '@/lib/marketing/local';
-import { VIRTUAL_CALLS_GROUP } from '@/lib/marketing/sheet-routing';
+import { ADONMO_TAG, VIRTUAL_CALLS_GROUP } from '@/lib/marketing/sheet-routing';
 import { button, CampaignTag, card, Field, input, money, primary, useMarketing } from './marketing-shared';
 import { LeadActions } from './marketing-lead-actions';
 
@@ -10,6 +10,9 @@ type ExistingCustomerRow = { id: number; name: string; phone: string; branch: st
 type ExistingCustomerDesk = { assignedTotal: number; remaining: number; open: number; called: number; rows: ExistingCustomerRow[]; followups: ExistingCustomerRow[] };
 
 /** Name, number and badges, then source · campaign · how long ago · store, then when the lead asked to visit (or, for Virtual calls, to be called). */
+/** Higher goes first on the desk: AdOnMo leads, then the Shubh Convention route, then the rest. */
+const queuePriority = (lead: Lead) => lead.tags?.includes(ADONMO_TAG) ? 2 : lead.claimGroup === 'shubh-convention' ? 1 : 0;
+
 function LeadHeader({ lead }: { lead: Lead }) {
   const sources = [...new Set(lead.acquisitions.map(acquisition => acquisition.source))].join(', ');
   const campaigns = [...new Set(lead.acquisitions.map(acquisition => campaignName(acquisition.campaignId)).filter(Boolean))].join(', ');
@@ -122,11 +125,11 @@ function ExistingCustomerSalesDesk({ salespersonName, logoutAction, initial, ref
   const [claiming, setClaiming] = useState(false);
   const [status, setStatus] = useState('');
   const previousLeads = data.leads.filter(lead => lead.claimedBy === salespersonName);
-  // Campaign leads routed to them with no call yet go ahead of the existing customers, Shubh Convention first.
+  // Campaign leads routed to them with no call yet go ahead of the existing customers: AdOnMo first, then Shubh Convention.
   const convertedPhones = new Set(convertedLeads(data).map(lead => lead.phone));
   const campaignQueue = previousLeads
     .filter(lead => !hasLoggedCall(lead) && !convertedPhones.has(lead.phone) && !['Connected / not interested', 'Wrong number'].includes(lead.status))
-    .sort((a, b) => Number(b.claimGroup === 'shubh-convention') - Number(a.claimGroup === 'shubh-convention') || a.acquiredAt.localeCompare(b.acquiredAt));
+    .sort((a, b) => queuePriority(b) - queuePriority(a) || a.acquiredAt.localeCompare(b.acquiredAt));
   const previousFollowups = previousLeads.flatMap(lead => lead.followups.filter(followup => !followup.completedAt).map(followup => ({ lead, followup }))).sort((a, b) => a.followup.due.localeCompare(b.followup.due));
   const previousPerformance = salespersonPerformance(data, callLog([data]), [salespersonName])[0];
   const updateLead = (lead: Lead) => save({ ...data, leads: data.leads.map(value => value.id === lead.id ? lead : value) });

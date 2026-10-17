@@ -31,6 +31,12 @@ export const CHENNAI_GROUP = 'chennai';
 /** Tag on leads that registered a visit on the public exhibition form at `/exhb`; shown whatever their date, like Virtual calls. */
 export const EXHB_TAG = 'exhb';
 
+/** Tag on AdOnMo leads (the Shubh Convention Centre exhibition list); they go first on the assigned salesperson's desk. */
+export const ADONMO_TAG = 'adonmo';
+
+/** How a lead tag is written on its label; other tags are shown in capitals. */
+export const TAG_LABELS: Record<string, string> = { [ADONMO_TAG]: 'AdOnMo' };
+
 export const SHEET_ROUTES: SheetRoute[] = [
   { group: 'shubh-convention', label: 'Shubh Convention', tab: 'shubh convention', salesperson: 'Abhishek Thapa', exclusive: false, untilEnv: 'SHUBH_CONVENTION_ROUTING_UNTIL', until: '2026-10-18' },
   { group: 'blvd-club', label: 'BLVD Club', tab: 'blvd club', salesperson: 'Roopa S', exclusive: true, untilEnv: 'BLVD_CLUB_ROUTING_UNTIL', until: '2026-10-18' },
