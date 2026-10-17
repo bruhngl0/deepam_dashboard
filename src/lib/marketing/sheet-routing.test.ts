@@ -9,7 +9,7 @@ describe('temporary campaign routing', () => {
     expect(routeForTab('BLVD Club (Blr) Lead- Oct')?.salesperson).toBe('Roopa S');
     expect(routeForTab('Virtual calls - SEP.')?.salesperson).toBe('Sandhya');
     expect(routeForTab('Virtual calls - Oct')?.group).toBe('virtual-calls');
-    expect(routeForTab('The Residency (Chennai) Lead- Oct')?.salesperson).toBe('Chennai');
+    expect(routeForTab('The Residency (Chennai) Lead- Oct')?.salesperson).toBe('Margaret Prema');
     expect(routeForTab('Store lead campaign- Oct')).toBeUndefined();
   });
 
@@ -31,13 +31,14 @@ describe('temporary campaign routing', () => {
     });
   });
 
-  it('keeps Margaret to BLVD Club, Sandhya to Virtual calls, gives Abhishek the pool with Shubh first, and keeps others out', () => {
+  it('keeps Roopa to BLVD Club, Sandhya to Virtual calls, gives Abhishek and Margaret the pool with their routes first, and keeps others out', () => {
     expect(claimRoutingFor('Roopa S', '2026-10-10')).toEqual({ only: ['blvd-club'] });
     expect(claimRoutingFor('Sandhya', '2026-10-10')).toEqual({ only: ['virtual-calls'] });
     expect(claimRoutingFor('Sandhya', '2027-06-01')).toEqual({ only: ['virtual-calls'] });
     expect(claimRoutingFor('Abhishek Thapa', '2026-10-10')).toEqual({ exclude: ['blvd-club', 'virtual-calls', 'chennai'], first: ['shubh-convention'] });
     expect(claimRoutingFor('Kavya S', '2026-10-10')).toEqual({ exclude: ['shubh-convention', 'blvd-club', 'virtual-calls', 'chennai'], first: [] });
-    expect(claimRoutingFor('Chennai', '2026-10-14')).toEqual({ only: ['chennai'] });
+    expect(claimRoutingFor('Margaret Prema', '2026-10-14')).toEqual({ exclude: ['shubh-convention', 'blvd-club', 'virtual-calls'], first: ['chennai'] });
+    expect(claimRoutingFor('Chennai', '2026-10-14')).toEqual({ exclude: ['shubh-convention', 'blvd-club', 'virtual-calls', 'chennai'], first: [] });
     expect(claimRoutingFor('Roopa S', '2026-10-18')).toEqual({ only: ['blvd-club'] });
     expect(claimRoutingFor('Roopa S', '2026-10-19')).toEqual({ exclude: ['virtual-calls', 'chennai'], first: [] });
   });

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { callLog, campaignName, convertedLeads, filterLeads, hasLoggedCall, nowLocal, OUTCOMES, salespersonPerformance, STORES, timeAgo, type Dataset, type Lead } from '@/lib/marketing/local';
-import { ADONMO_TAG, VIRTUAL_CALLS_GROUP } from '@/lib/marketing/sheet-routing';
+import { ADONMO_TAG, CHENNAI_GROUP, VIRTUAL_CALLS_GROUP } from '@/lib/marketing/sheet-routing';
 import { button, CampaignTag, card, Field, input, money, primary, useMarketing } from './marketing-shared';
 import { LeadActions } from './marketing-lead-actions';
 
@@ -11,7 +11,7 @@ type ExistingCustomerDesk = { assignedTotal: number; remaining: number; open: nu
 
 /** Name, number and badges, then source · campaign · how long ago · store, then when the lead asked to visit (or, for Virtual calls, to be called). */
 /** Higher goes first on the desk: AdOnMo leads, then the Shubh Convention route, then the rest. */
-const queuePriority = (lead: Lead) => lead.tags?.includes(ADONMO_TAG) ? 2 : lead.claimGroup === 'shubh-convention' ? 1 : 0;
+const queuePriority = (lead: Lead) => lead.tags?.includes(ADONMO_TAG) ? 2 : lead.claimGroup === 'shubh-convention' || lead.claimGroup === CHENNAI_GROUP ? 1 : 0;
 
 function LeadHeader({ lead }: { lead: Lead }) {
   const sources = [...new Set(lead.acquisitions.map(acquisition => acquisition.source))].join(', ');

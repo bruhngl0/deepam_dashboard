@@ -25,7 +25,7 @@ export type SheetRoute = {
 /** Virtual calls leads are shown whatever their date (see LEADS_FROM in ./store). */
 export const VIRTUAL_CALLS_GROUP = 'virtual-calls';
 
-/** Leads from the Chennai campaign tabs, handled by the shared Chennai desk. */
+/** Leads from the Chennai campaign tabs, routed to Margaret Prema. */
 export const CHENNAI_GROUP = 'chennai';
 
 /** Tag on leads that registered a visit on the public exhibition form at `/exhb`; shown whatever their date, like Virtual calls. */
@@ -42,8 +42,9 @@ export const SHEET_ROUTES: SheetRoute[] = [
   { group: 'blvd-club', label: 'BLVD Club', tab: 'blvd club', salesperson: 'Roopa S', exclusive: true, untilEnv: 'BLVD_CLUB_ROUTING_UNTIL', until: '2026-10-18' },
   // Standing route, not a campaign window: every "Virtual calls" tab goes to Sandhya and nobody else.
   { group: VIRTUAL_CALLS_GROUP, label: 'Virtual calls', tab: 'virtual calls', salesperson: 'Sandhya', exclusive: true, untilEnv: 'VIRTUAL_CALLS_ROUTING_UNTIL', until: '2099-12-31' },
-  // Standing route: every Chennai tab ("The Residency (Chennai) Lead- Oct") goes to the shared Chennai desk only.
-  { group: CHENNAI_GROUP, label: 'Chennai', tab: 'chennai', salesperson: 'Chennai', exclusive: true, untilEnv: 'CHENNAI_ROUTING_UNTIL', until: '2099-12-31' },
+  // Standing route: every Chennai tab ("The Residency (Chennai) Lead- Oct") goes to Margaret Prema, first on her
+  // desk; not exclusive, so she keeps the general pool too. (Was the shared Chennai desk until 17 Oct 2026.)
+  { group: CHENNAI_GROUP, label: 'Chennai', tab: 'chennai', salesperson: 'Margaret Prema', exclusive: false, untilEnv: 'CHENNAI_ROUTING_UNTIL', until: '2099-12-31' },
 ];
 
 const normalizedTab = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
