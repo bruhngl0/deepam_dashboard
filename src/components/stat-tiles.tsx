@@ -14,19 +14,23 @@
  * label alone, and the one that gets misquoted in meetings.
  */
 
+import Link from 'next/link';
 import { formatNumber, formatCurrency, formatCurrencyCompact } from '@/lib/format';
+import type { OnlineCustomers } from '@/lib/queries/dashboard';
 
 export function HeroTile({
   label,
   value,
   caption,
+  className = '',
 }: {
   label: string;
   value: string;
   caption: string;
+  className?: string;
 }) {
   return (
-    <div className="hero-card flex flex-col rounded-2xl bg-dark-card px-6 py-5 text-on-dark">
+    <div className={`hero-card flex flex-col rounded-2xl bg-dark-card px-6 py-5 text-on-dark ${className}`}>
       <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-white/55">
         {label}
       </p>
@@ -84,6 +88,7 @@ export function KpiRow({
   newCustomerBills,
   grossSales,
   totalBills,
+  online,
 }: {
   totalCustomers: number;
   historicalCustomers: number;
@@ -93,12 +98,16 @@ export function KpiRow({
   newCustomerBills: number;
   grossSales: number;
   totalBills: number;
+  /** Customers added from Shopify; the tile links to the customer table filtered to them. */
+  online: OnlineCustomers & { href: string };
 }) {
   const averageBill = totalBills ? grossSales / totalBills : 0;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    // Seven tiles: on wide screens the hero takes two rows of the first column, so the rest fill a clean 3×2.
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <HeroTile
+        className="xl:row-span-2"
         label="Total customers"
         value={formatNumber(totalCustomers)}
         caption="Loyalty customers plus new buyers"
@@ -133,6 +142,17 @@ export function KpiRow({
         caption={`${formatCurrency(averageBill)} per bill`}
         definition="Total sales divided by every bill in the selected period."
       />
+      <Link
+        href={online.href}
+        className="block rounded-2xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-accent"
+      >
+        <StatTile
+          label="Online customers"
+          value={formatNumber(online.customers)}
+          caption={`${formatNumber(online.paid)} paid · ${formatCurrencyCompact(online.shopifySales)} online sales`}
+          definition="Added from Shopify, all time. They are on no lead sheet, so the channel figures leave them out. Click to list them below."
+        />
+      </Link>
     </div>
   );
 }

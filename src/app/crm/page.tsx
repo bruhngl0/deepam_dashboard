@@ -39,7 +39,6 @@ import { CampaignTable } from '@/components/campaign-table';
 import { StoreChannelMixPanel } from '@/components/store-channel-mix';
 import { CustomerValuePanel } from '@/components/customer-value';
 import { DataQualityPanel } from '@/components/data-quality';
-import { OnlineCustomersCard } from '@/components/online-customers';
 import { CustomerTable } from '@/components/customer-table';
 import { FilterBar, Pagination } from '@/components/filters';
 import {
@@ -131,7 +130,7 @@ export default async function DashboardPage({
   const periodTo = to ?? dateBounds.latest;
   const isFullPeriod = !from && !to;
   const storeName = store ? options.stores.find((s) => s.code === store)?.name : null;
-  // The card's link keeps every other filter and narrows the table to online customers.
+  // The Online customers tile's link keeps every other filter and narrows the table to online customers.
   const onlineHref = (() => {
     const next = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
@@ -170,9 +169,8 @@ export default async function DashboardPage({
         newCustomerBills={kpis.newBills}
         grossSales={kpis.grossSales}
         totalBills={kpis.totalBills}
+        online={{ ...online, href: onlineHref }}
       />
-
-      <OnlineCustomersCard data={online} href={onlineHref} active={filters.source === 'shopify'} />
 
       <div className="mt-6 grid gap-3 lg:grid-cols-2">
         <ChannelPerformance rows={channels} overlap={overlap} />
