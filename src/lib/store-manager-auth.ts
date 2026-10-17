@@ -1,9 +1,8 @@
 import { cookies } from 'next/headers';
+import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from './store-manager-session';
 
-export const STORE_MANAGER_LOGIN_ROUTE = '/store-manager';
+export const STORE_MANAGER_LOGIN_ROUTE = STORE_MANAGER_COOKIE_PATH;
 export const STORE_MANAGER_WORKSPACE_ROUTE = '/store-manager/workspace';
-const STORE_MANAGER_COOKIE = 'store_manager_session';
-const STORE_MANAGER_TOKEN = 'neena-store-manager-session';
 
 export function isStoreManagerLogin(username: string, password: string) {
   return username.trim().toLowerCase() === 'neena' && password === 'neena';
@@ -19,7 +18,7 @@ export async function setStoreManagerSession() {
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: STORE_MANAGER_LOGIN_ROUTE,
-    maxAge: 60 * 60 * 12,
+    maxAge: STORE_MANAGER_MAX_AGE,
   });
 }
 

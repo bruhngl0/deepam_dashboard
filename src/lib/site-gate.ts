@@ -7,6 +7,11 @@
  * function (static `process.env.X` references, which edge middleware needs). In
  * production a module with no password stays locked; in development it is open.
  *
+ * The Hemparshwa OS admin skips every password: Hemparshwa's /go link sends them to
+ * ADMIN_PASS_PATH with a pass signed with ADMIN_SSO_SECRET (shared with Hemparshwa),
+ * valid for one minute and for this app's origin only. A good pass sets the cookie of
+ * every module, plus the app's own admin or staff logins (`adminCookies`).
+ *
  * The same file is copied into CRM, Vendor Intelligence, RC Dashboard and WalkTrack;
  * keep the copies identical.
  */
@@ -15,15 +20,21 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 export type GateModule = { key: string; label: string; password: () => string | undefined };
 
+/** A cookie for one of the app's own logins. `path` defaults to '/'. */
+export type GateCookie = { name: string; value: string; path?: string; maxAge: number };
+
 export type GateConfig = {
   /** Name on the sign-in form when any module's password will do. */
   appName: string;
   modules: GateModule[];
   /** A module, 'any' (any module's password works) or null (open, e.g. health and server-to-server routes). */
   moduleFor: (pathname: string) => GateModule | 'any' | null;
+  /** The app's own logins (admin, staff, store counters) to sign the Hemparshwa admin in to as well. */
+  adminCookies?: () => GateCookie[] | Promise<GateCookie[]>;
 };
 
 export const GATE_PATH = '/__gate';
+export const ADMIN_PASS_PATH = '/__gate/admin';
 const MAX_AGE = 60 * 60 * 12;
 const encoder = new TextEncoder();
 
@@ -65,21 +76,30 @@ const safeNext = (next: unknown) =>
 
 // Proxy redirects must be absolute. Behind App Runner the request reaches Next over
 // plain HTTP on an internal address, so the public origin comes from the forwarded headers.
-function redirect(req: NextRequest, path: string, headers: Record<string, string> = {}) {
+function publicOrigin(req: NextRequest) {
   const proto = req.headers.get('x-forwarded-proto')?.split(',')[0].trim() || req.nextUrl.protocol.replace(':', '');
   const host = req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host') || req.nextUrl.host;
+  return `${proto}://${host}`;
+}
+
+function redirect(req: NextRequest, path: string, headers: Record<string, string> = {}) {
   return new NextResponse(null, {
     status: 303,
-    headers: { Location: new URL(path, `${proto}://${host}`).toString(), 'Cache-Control': 'no-store', ...headers },
+    headers: { Location: new URL(path, publicOrigin(req)).toString(), 'Cache-Control': 'no-store', ...headers },
   });
+}
+
+function setCookie(c: GateCookie) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `${c.name}=${c.value}; Path=${c.path ?? '/'}; Max-Age=${c.maxAge}; HttpOnly; SameSite=Lax${secure}`;
 }
 
 const escape = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 function form(cfg: GateConfig, key: string, next: string, failed: boolean) {
-  const module = cfg.modules.find((m) => m.key === key);
-  const title = module ? module.label : cfg.appName;
+  const chosen = cfg.modules.find((m) => m.key === key);
+  const title = chosen ? chosen.label : cfg.appName;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)} · Sign in</title><meta name="robots" content="noindex">
 <style>
@@ -96,7 +116,7 @@ button{margin-top:16px;width:100%;padding:10px;border:0;border-radius:10px;backg
 </style></head><body>
 <form method="post" action="${GATE_PATH}">
 <h1>${escape(title)}</h1><p>Enter the password to continue.</p>
-<input type="hidden" name="m" value="${escape(module ? module.key : 'any')}">
+<input type="hidden" name="m" value="${escape(chosen ? chosen.key : 'any')}">
 <input type="hidden" name="next" value="${escape(next)}">
 <label for="password">Password</label>
 <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
@@ -124,19 +144,58 @@ async function signIn(req: NextRequest, cfg: GateConfig) {
   for (const m of candidates) {
     const password = passwordOf(m);
     if (!password || !given || !(await same(given, password))) continue;
-    const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    return redirect(req, next, {
-      'Set-Cookie': `${cookieName(m)}=${await tokenFor(m, password)}; Path=/; Max-Age=${MAX_AGE}; HttpOnly; SameSite=Lax${secure}`,
-    });
+    return redirect(req, next, { 'Set-Cookie': setCookie({ name: cookieName(m), value: await tokenFor(m, password), maxAge: MAX_AGE }) });
   }
   // Slows down guessing.
   await new Promise((resolve) => setTimeout(resolve, 600));
   return form(cfg, key, next, true);
 }
 
+const base64url = (bytes: Uint8Array) =>
+  btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+async function hmac(secret: string, data: string) {
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return base64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(data))));
+}
+
+/** A pass is `<base64url JSON>.<base64url HMAC-SHA256 of the first part>`, minted by Hemparshwa's /go. */
+async function adminPassValid(req: NextRequest, pass: string | null) {
+  const secret = process.env.ADMIN_SSO_SECRET;
+  if (!secret || secret.length < 32 || !pass) return false;
+  const [body, signature] = pass.split('.');
+  if (!body || !signature || !(await same(signature, await hmac(secret, body)))) return false;
+  try {
+    const padded = body.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((body.length + 3) % 4);
+    const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))));
+    const expiresAt = Number(claims.exp) * 1000;
+    // Short-lived and for this app only, so a pass seen in a log or history is soon worthless.
+    return claims.role === 'admin' && claims.aud === publicOrigin(req) && expiresAt > Date.now() && expiresAt < Date.now() + 5 * 60_000;
+  } catch {
+    return false;
+  }
+}
+
+async function adminSignIn(req: NextRequest, cfg: GateConfig) {
+  const params = req.nextUrl.searchParams;
+  const next = safeNext(params.get('next'));
+  // A bad or expired pass falls back to the ordinary password form.
+  if (!(await adminPassValid(req, params.get('t')))) return redirect(req, `${GATE_PATH}?${new URLSearchParams({ m: 'any', next })}`);
+  const cookies: GateCookie[] = [];
+  for (const m of cfg.modules) {
+    const password = passwordOf(m);
+    if (password) cookies.push({ name: cookieName(m), value: await tokenFor(m, password), maxAge: MAX_AGE });
+  }
+  cookies.push(...((await cfg.adminCookies?.()) ?? []));
+  const response = redirect(req, next);
+  for (const c of cookies) response.headers.append('Set-Cookie', setCookie(c));
+  return response;
+}
+
 /** Returns the response to send instead of the page, or null to let the request through. */
 export async function siteGate(req: NextRequest, cfg: GateConfig): Promise<NextResponse | null> {
   const { pathname, search } = req.nextUrl;
+  if (pathname === ADMIN_PASS_PATH && req.method === 'GET') return adminSignIn(req, cfg);
   if (pathname === GATE_PATH) {
     if (req.method === 'POST') return signIn(req, cfg);
     const params = req.nextUrl.searchParams;

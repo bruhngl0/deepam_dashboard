@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
 import { SALES_SESSION_COOKIE, verifySalesSessionToken } from '@/lib/sales-session';
+import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from '@/lib/store-manager-session';
 
 // One password per module on the hub. The hub itself, the sales and store-manager
 // logins and the shared APIs open with any of them.
@@ -29,6 +30,9 @@ const gate: GateConfig = {
     if (under(pathname, '/vendor')) return vendor;
     return 'any';
   },
+  // The Hemparshwa admin also gets the store-manager workspace. Salesperson desks stay
+  // personal: they belong to one employee each.
+  adminCookies: () => [{ name: STORE_MANAGER_COOKIE, value: STORE_MANAGER_TOKEN, path: STORE_MANAGER_COOKIE_PATH, maxAge: STORE_MANAGER_MAX_AGE }],
 };
 
 // The sales workspace loads and saves through these, under the salesperson's own login.
