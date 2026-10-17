@@ -4,6 +4,9 @@ export const SOURCES = ['Meta ads', 'Google ads', 'Website', 'WhatsApp', 'Instag
 export const STORES = ['MG', 'JAYNAGAR', 'Online', 'Exhibition'] as const;
 export const OUTCOMES = ['Connected / interested', 'Connected / follow-up required', 'Connected / not interested', 'No answer', 'Callback required', 'Wrong number'] as const;
 export type Outcome = typeof OUTCOMES[number];
+/** Calls that did not reach the customer. Unless a follow-up is chosen, they go to the follow-up queue for 10:00 the next day. A wrong number gets none. */
+export const NOT_CONNECTED: readonly Outcome[] = ['No answer', 'Callback required'];
+export const NOT_CONNECTED_FOLLOWUP_TIME = '10:00';
 export type Acquisition = { source: string; campaignId: string; at: string; cost: number | null };
 export type Interaction = { id: string; at: string; type: 'received' | 'call' | 'note' | 'followup' | 'whatsapp' | 'email' | 'visit' | 'profile'; text: string; outcome?: Outcome; by?: string };
 export type Followup = { id: string; due: string; note: string; completedAt: string | null };
@@ -203,6 +206,10 @@ export function metrics(data: Dataset, leads = data.leads) {
   const spend = costs.reduce((n, a) => n + (a.cost ?? 0), 0);
   return { total: leads.length, contacted: leads.filter(l => l.interactions.some(i => i.type === 'call' && i.outcome?.startsWith('Connected'))).length, interested: leads.filter(l => l.status === 'Connected / interested').length, visits: leads.filter(l => l.interactions.some(i => i.type === 'visit')).length, converted, revenue: sales.reduce((n, s) => n + (s.amount ?? 0), 0), conversion: leads.length ? converted / leads.length * 100 : 0, cpa: costs.length && converted ? spend / converted : null, spend, costsKnown: costs.length, costsTotal: leads.flatMap(l => l.acquisitions).length, orders: sales.length };
 }
+function nextDay(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}
 export function recordCall(lead: Lead, input: { outcome: Outcome; note: string; intent: string; store: string; product: string; category: string; productLink: string; due: string; salesperson?: string; createFollowup?: boolean }, at = nowLocal()): Lead {
   if (!OUTCOMES.includes(input.outcome)) throw new Error('Choose a call outcome.');
   if (!input.salesperson?.trim()) throw new Error('Choose who logged the call.');
@@ -210,7 +217,7 @@ export function recordCall(lead: Lead, input: { outcome: Outcome; note: string; 
   if (input.outcome === 'Connected / interested' && input.store === 'Online' && (!input.product.trim() || !input.category.trim())) throw new Error('Online interest needs a product and category.');
   if (input.due && (!parseDateTime(input.due) || input.due <= at.slice(0, 16))) throw new Error('Follow-up must be in the future.');
   const followups = lead.followups.map(f => f.completedAt ? f : { ...f, completedAt: at });
-  const due = input.due;
+  const due = input.due || (NOT_CONNECTED.includes(input.outcome) ? `${nextDay(at.slice(0, 10))}T${NOT_CONNECTED_FOLLOWUP_TIME}` : '');
   if (due) followups.push({ id: uid(), due, note: input.note.trim() || input.outcome, completedAt: null });
   const note = input.note.trim() || input.outcome;
   return { ...lead, status: input.outcome, intent: input.intent.trim(), preferredStore: input.store, product: input.product.trim(), category: input.category.trim(), productLink: input.productLink.trim(), followups,

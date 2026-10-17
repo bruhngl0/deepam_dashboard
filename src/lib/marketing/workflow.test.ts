@@ -73,6 +73,18 @@ describe('calling and follow-up workflow', () => {
     expect(next.followups[1].due).toBe('2026-09-24T10:00');
     expect(next.interactions.at(-1)?.type).toBe('followup');
   });
+  it('sends a not-connected call to the follow-up queue for 10:00 the next day', () => {
+    const at = '2026-09-30T18:00:00';
+    for (const outcome of ['No answer', 'Callback required'] as Outcome[]) {
+      const next = recordCall(lead(), { ...input, outcome, due: '' }, at);
+      expect(next.followups.filter(f => !f.completedAt).map(f => f.due)).toEqual(['2026-10-01T10:00']);
+      expect(next.interactions.at(-1)?.type).toBe('followup');
+    }
+    // A chosen follow-up wins; a wrong number or a connected call gets none by itself.
+    expect(recordCall(lead(), { ...input, outcome: 'No answer', due: '2026-10-03T10:00' }, at).followups.map(f => f.due)).toEqual(['2026-10-03T10:00']);
+    expect(recordCall(lead(), { ...input, outcome: 'Wrong number', due: '' }, at).followups).toEqual([]);
+    expect(recordCall(lead(), { ...input, outcome: 'Connected / not interested', due: '' }, at).followups).toEqual([]);
+  });
   it('rejects invalid calendar or clock times and converts explicit offsets to IST', () => {
     expect(parseDateTime('2026-02-30 12:00')).toBeNull();
     expect(parseDateTime('2026-09-20 25:00')).toBeNull();

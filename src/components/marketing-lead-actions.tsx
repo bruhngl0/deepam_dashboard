@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { nowLocal, OUTCOMES, recordCall, safeProductLink, STORES, uid, type Lead, type Outcome } from '@/lib/marketing/local';
+import { NOT_CONNECTED, NOT_CONNECTED_FOLLOWUP_TIME, nowLocal, OUTCOMES, recordCall, safeProductLink, STORES, uid, type Lead, type Outcome } from '@/lib/marketing/local';
 import { button, card, Field, input, primary } from './marketing-shared';
 export function LeadActions({ lead, update, variant = 'full', salespersonName = 'Abishek', salespersonView = false }: { lead: Lead; update: (lead: Lead) => boolean; variant?: 'full' | 'call-only'; salespersonName?: string; salespersonView?: boolean }) {
   const [mode, setMode] = useState<'call' | 'note' | 'followup' | 'visit' | null>(null);
@@ -67,7 +67,9 @@ function CallFields({ lead }: { lead: Lead }) {
     <Field label="Call outcome"><select autoFocus name="outcome" className={input} value={outcome} onChange={e => setOutcome(e.target.value as Outcome)}>{OUTCOMES.map(o => <option key={o}>{o}</option>)}</select></Field>
     <Field label={`Preferred store${interested ? ' *' : ''}`}><select name="store" className={input} required={interested} value={store} onChange={e => setStore(e.target.value)}><option value="">Not decided</option>{STORES.map(s => <option key={s}>{s}</option>)}</select></Field>
     <div className="grid gap-3 sm:grid-cols-2"><Field label="Product"><input name="product" defaultValue={lead.product} className={input} required={interested && store === 'Online'} /></Field><Field label="Category"><input name="category" defaultValue={lead.category} className={input} required={interested && store === 'Online'} /></Field></div>
-    <p className="text-xs text-ink-muted">Use the Follow-up button below to add this lead to the follow-up queue with the current IST time.</p>
+    {NOT_CONNECTED.includes(outcome)
+      ? <p className="text-xs font-medium text-ink-2">Not connected: this lead goes to the follow-up queue for tomorrow at {NOT_CONNECTED_FOLLOWUP_TIME}. Use the Follow-up button below to pick another day.</p>
+      : <p className="text-xs text-ink-muted">Use the Follow-up button below to add this lead to the follow-up queue with the current IST time.</p>}
   </div>;
 }
 
