@@ -838,3 +838,39 @@ export async function getFollowupOutcomes(): Promise<FollowupRow[]> {
     GROUP  BY 1 ORDER BY n DESC`);
   return rows.map((r) => ({ remark: String(r.remark), n: Number(r.n ?? 0) }));
 }
+
+export interface OnlineCustomers {
+  customers: number;
+  paid: number;
+  shopifySales: number;
+  storeBuyers: number;
+  storeSales: number;
+}
+
+/**
+ * Customers who came in from the Shopify export (`name_source = 'shopify'`,
+ * scripts/import-shopify-customers.ts). They carry no lead touch, so no
+ * channel figure above counts them. Paid buyers and their online sales come
+ * from the loyalty row the import writes; store bills are the CRM's own
+ * `sales`. Lifetime, like the Customer value panel: the Shopify figures have
+ * no per-order dates to window.
+ */
+export async function getOnlineCustomers(): Promise<OnlineCustomers> {
+  const [r] = await query(`
+    SELECT COUNT(*)::int AS customers,
+           COUNT(lc.id) FILTER (WHERE lc.loyalty_type = 'shopify_online')::int AS paid,
+           COALESCE(SUM(lc.total_bill_amount) FILTER (WHERE lc.loyalty_type = 'shopify_online'), 0)::float AS shopify_sales,
+           COUNT(*) FILTER (WHERE s.customer_id IS NOT NULL)::int AS store_buyers,
+           COALESCE(SUM(s.revenue), 0)::float AS store_sales
+    FROM   customers c
+    LEFT   JOIN loyalty_customers lc ON lc.customer_id = c.id
+    LEFT   JOIN (SELECT customer_id, SUM(bill_amount) AS revenue FROM sales GROUP BY customer_id) s ON s.customer_id = c.id
+    WHERE  c.name_source = 'shopify'`);
+  return {
+    customers: Number(r?.customers ?? 0),
+    paid: Number(r?.paid ?? 0),
+    shopifySales: Number(r?.shopify_sales ?? 0),
+    storeBuyers: Number(r?.store_buyers ?? 0),
+    storeSales: Number(r?.store_sales ?? 0),
+  };
+}

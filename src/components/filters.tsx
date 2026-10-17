@@ -10,7 +10,7 @@
  * sales-derived figure on all of them, not just this table, so it owns those
  * two URL params exclusively. This bar's own "active" count and Clear button
  * therefore cover only the filters below (q, channel, lifecycle, hasSales,
- * tier) — clearing them never surprises someone by also resetting the
+ * tier, source) — clearing them never surprises someone by also resetting the
  * module-wide date/store window.
  */
 
@@ -61,6 +61,7 @@ export function FilterBar({
     params.get('lifecycle'),
     params.get('hasSales'),
     params.get('tier'),
+    params.get('source'),
   ].filter(Boolean).length;
 
   return (
@@ -128,6 +129,15 @@ export function FilterBar({
       </select>
 
       <select
+        value={params.get('source') ?? ''}
+        onChange={(e) => setParam({ source: e.target.value || null })}
+        className={selectClass}
+      >
+        <option value="">All customers</option>
+        <option value="shopify">Online customers</option>
+      </select>
+
+      <select
         value={params.get('sort') ?? 'sales'}
         onChange={(e) => setParam({ sort: e.target.value })}
         className={selectClass}
@@ -174,6 +184,7 @@ export function FilterBar({
               lifecycle: null,
               hasSales: null,
               tier: null,
+              source: null,
             })
           }
           className="rounded-xl px-3 py-2 text-sm font-medium text-accent transition-colors hover:underline active:scale-95"

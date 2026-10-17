@@ -74,6 +74,7 @@ export async function GET(request: Request) {
     lifecycle: params.get('lifecycle') ?? undefined,
     hasSales: (params.get('hasSales') as 'yes' | 'no' | null) ?? undefined,
     tier: tierParam(params.get('tier')),
+    source: params.get('source') === 'shopify' ? 'shopify' : undefined,
     from: parseDateParam(params.get('from')),
     to: parseDateParam(params.get('to')),
     sort: (params.get('sort') as CustomerFilters['sort']) ?? 'sales',

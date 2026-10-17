@@ -28,6 +28,7 @@ import {
   getCustomerValueTiers,
   getDataQuality,
   getSalesDateBounds,
+  getOnlineCustomers,
   parseDateParam,
   type DateRange,
 } from '@/lib/queries/dashboard';
@@ -38,6 +39,7 @@ import { CampaignTable } from '@/components/campaign-table';
 import { StoreChannelMixPanel } from '@/components/store-channel-mix';
 import { CustomerValuePanel } from '@/components/customer-value';
 import { DataQualityPanel } from '@/components/data-quality';
+import { OnlineCustomersCard } from '@/components/online-customers';
 import { CustomerTable } from '@/components/customer-table';
 import { FilterBar, Pagination } from '@/components/filters';
 import {
@@ -89,6 +91,7 @@ export default async function DashboardPage({
     lifecycle: one(params.lifecycle),
     hasSales: one(params.hasSales) as 'yes' | 'no' | undefined,
     tier: tierParam(one(params.tier)),
+    source: one(params.source) === 'shopify' ? ('shopify' as const) : undefined,
     from,
     to,
     sort: (one(params.sort) ?? 'sales') as 'sales' | 'recent' | 'name',
@@ -108,6 +111,7 @@ export default async function DashboardPage({
     dateBounds,
     customers,
     options,
+    online,
   ] = await Promise.all([
     getKpis(range),
     getChannelBreakdown(range),
@@ -120,12 +124,23 @@ export default async function DashboardPage({
     getSalesDateBounds(),
     getCustomers(filters),
     getFilterOptions(),
+    getOnlineCustomers(),
   ]);
 
   const periodFrom = from ?? dateBounds.earliest;
   const periodTo = to ?? dateBounds.latest;
   const isFullPeriod = !from && !to;
   const storeName = store ? options.stores.find((s) => s.code === store)?.name : null;
+  // The card's link keeps every other filter and narrows the table to online customers.
+  const onlineHref = (() => {
+    const next = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      const v = one(value);
+      if (v && key !== 'page') next.set(key, v);
+    }
+    next.set('source', 'shopify');
+    return `?${next.toString()}#customers`;
+  })();
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
@@ -156,6 +171,8 @@ export default async function DashboardPage({
         grossSales={kpis.grossSales}
         totalBills={kpis.totalBills}
       />
+
+      <OnlineCustomersCard data={online} href={onlineHref} active={filters.source === 'shopify'} />
 
       <div className="mt-6 grid gap-3 lg:grid-cols-2">
         <ChannelPerformance rows={channels} overlap={overlap} />
@@ -208,7 +225,7 @@ export default async function DashboardPage({
         <CustomerValuePanel data={valueTiers} />
       </div>
 
-      <section className="card mt-6 rounded-2xl border border-line bg-surface">
+      <section id="customers" className="card mt-6 rounded-2xl border border-line bg-surface">
         <div className="flex flex-col gap-4 p-6 pb-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-ink">Customers</h2>

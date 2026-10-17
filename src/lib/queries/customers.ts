@@ -50,6 +50,8 @@ export interface CustomerFilters {
   lifecycle?: string; // 'new' | 'existing'
   hasSales?: 'yes' | 'no';
   tier?: ValueTierCode;
+  /** 'shopify': customers added from the Shopify export (Online customers). */
+  source?: 'shopify';
   /** Bounds `ca.bill_count`/`total_sales`/`converted` to sales in this window. */
   from?: string | null;
   to?: string | null;
@@ -196,6 +198,7 @@ function buildConditions(filters: CustomerFilters): SQL[] {
   if (filters.hasSales === 'yes') conditions.push(sql`ca.converted`);
   if (filters.hasSales === 'no') conditions.push(sql`NOT ca.converted`);
   if (filters.tier) conditions.push(sql`ca.value_tier = ${filters.tier}`);
+  if (filters.source === 'shopify') conditions.push(sql`c.name_source = 'shopify'`);
 
   return conditions;
 }
