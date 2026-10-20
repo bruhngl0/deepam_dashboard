@@ -57,15 +57,15 @@ import { sql, type SQL } from 'drizzle-orm';
 import { scopeCondition, type DateRange } from './dashboard';
 import type { ValueTierCode } from '@/lib/format';
 
-type Row = Record<string, unknown>;
+export type Row = Record<string, unknown>;
 
-async function query(statement: SQL): Promise<Row[]> {
+export async function query(statement: SQL): Promise<Row[]> {
   const result = (await db.execute(statement)) as unknown;
   return Array.isArray(result) ? (result as Row[]) : ((result as { rows: Row[] }).rows ?? []);
 }
 
-const num = (v: unknown) => Number(v ?? 0);
-const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
+export const num = (v: unknown) => Number(v ?? 0);
+export const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
 
 /**
  * The only gate a buyer id passes through. Ids are `bigserial`, so anything
@@ -93,7 +93,7 @@ const VISIT_DATE = `(s.billed_at AT TIME ZONE 'Asia/Kolkata')::date`;
  * `qty` is nullable on `sales` even though it is populated on every row
  * loaded so far.
  */
-function buyerAggCte(range: DateRange): string {
+export function buyerAggCte(range: DateRange): string {
   return `
   buyer_agg AS (
     SELECT s.customer_id                                          AS customer_id,

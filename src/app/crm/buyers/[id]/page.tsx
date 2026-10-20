@@ -35,6 +35,8 @@ import {
   VALUE_TIER_LABEL,
 } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
+import { getCustomerHeader, getCustomerTimeline } from '@/lib/queries/customer-timeline';
+import { CustomerTimeline } from '@/components/customer-timeline';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,9 +139,11 @@ export default async function BuyerProfilePage({
   // Before any query runs — the proxy redirect is not the boundary.
   await requireUser();
 
+  // The row id from the buyer list, or a Customer ID (CUS-000123) from another app.
   const { id } = await params;
-  const buyerId = parseBuyerId(id);
-  if (buyerId === null) notFound();
+  const customer = await getCustomerHeader(decodeURIComponent(id));
+  const buyerId = customer?.id ?? parseBuyerId(id);
+  if (!customer || buyerId === null) notFound();
 
   const sp = await searchParams;
   const range = {
@@ -148,10 +152,7 @@ export default async function BuyerProfilePage({
     store: one(sp.store) ?? null,
   };
 
-  const p = await getBuyerProfile(buyerId, range);
-  // Either the id does not exist or this buyer has no bill inside the master
-  // filter's window — indistinguishable from here, and a 404 either way.
-  if (!p) notFound();
+  const [p, timeline] = await Promise.all([getBuyerProfile(buyerId, range), getCustomerTimeline(customer)]);
 
   const carried = new URLSearchParams();
   for (const key of ['from', 'to', 'store'] as const) {
@@ -159,6 +160,29 @@ export default async function BuyerProfilePage({
     if (v) carried.set(key, v);
   }
   const backHref = `/crm/buyers${carried.toString() ? `?${carried}` : ''}`;
+
+  // No bill in this window (or none at all): still a customer with walk-ins, calls or campaigns.
+  if (!p) {
+    return (
+      <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
+        <Link href={backHref} className="text-sm font-medium text-accent underline-offset-2 hover:underline">
+          ← All buyers
+        </Link>
+        <header className="mt-3 mb-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">{orNotProvided(customer.fullName)}</h1>
+          <p className="tnum mt-1 text-sm text-ink-2">
+            {customer.customerCode && `Customer ID ${customer.customerCode} · `}
+            {formatPhone(customer.phoneE164)}
+            {customer.city && ` · ${customer.city}`}
+          </p>
+          <p className="mt-2 max-w-[80ch] text-sm text-ink-2">
+            {carried.toString() ? 'No bill in the selected period.' : 'No bill on record yet.'} Everything else known about them is below.
+          </p>
+        </header>
+        <CustomerTimeline events={timeline} />
+      </main>
+    );
+  }
 
   const busiestDay = [...p.byDay].sort((a, b) => b.bills - a.bills)[0];
   const topSalesman = p.salesmen[0];
@@ -408,6 +432,8 @@ export default async function BuyerProfilePage({
           )}
         </Finding>
       </div>
+
+      <CustomerTimeline events={timeline} />
 
       {/* ── Visit log ───────────────────────────────────────────────────── */}
       <section className="card mt-3 rounded-2xl border border-line bg-surface">
