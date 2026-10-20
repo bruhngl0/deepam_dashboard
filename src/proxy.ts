@@ -24,7 +24,7 @@ const gate: GateConfig = {
     if (under(pathname, '/sales')) return null;
     // The public exhibition visit form, shared with customers.
     if (under(pathname, '/exhb')) return null;
-    if (under(pathname, '/flow')) return overview;
+    if (under(pathname, '/flow', '/daily')) return overview;
     if (under(pathname, '/crm')) return customer;
     if (under(pathname, '/marketing', '/marketing-team')) return marketing;
     if (under(pathname, '/vendor')) return vendor;

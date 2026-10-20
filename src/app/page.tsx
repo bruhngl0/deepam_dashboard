@@ -1,7 +1,8 @@
 /**
  * Hero — module picker.
  *
- * The modules behind this app: the cross-module Overview (`/flow`), Customer
+ * The modules behind this app: the cross-module Overview (`/flow`), the Daily
+ * dashboard (`/daily`), Customer
  * Intelligence (`/crm`), Vendor Intelligence (`/vendor`), the external Driver
  * Network Management and Store Performance Tracker services, and Marketing
  * Intelligence (`/marketing`). This page is just the door between them, not
@@ -39,6 +40,22 @@ export default async function HeroPage() {
           <h2 className="text-lg font-semibold tracking-tight text-ink">Overview</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
             How the modules connect — one customer journey from walk-in to delivery.
+          </p>
+        </Link>
+
+        <Link
+          href="/daily"
+          className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]">
+              <rect x="3" y="4" width="18" height="17" rx="2" />
+              <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
+            </svg>
+          </span>
+          <h2 className="text-lg font-semibold tracking-tight text-ink">Daily dashboard</h2>
+          <p className="max-w-[36ch] text-sm text-ink-2">
+            One day, every store: walk-ins, sales, driver visits, commission owed, calls and stock alerts.
           </p>
         </Link>
 

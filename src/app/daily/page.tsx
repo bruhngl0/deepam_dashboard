@@ -1,0 +1,208 @@
+/**
+ * Daily dashboard — one day, every store, across the four apps.
+ *
+ * Walk-ins (WalkTrack, every minute), sales (Hemparshwa OS, every few hours), calls and
+ * follow-ups come from CRM's own tables (lib/queries/daily.ts). Driver visits and commission
+ * come from RC Dashboard and stock alerts from Vendor Intelligence, fetched live
+ * (lib/integration/apps.ts); when either cannot be reached its rows say so and the rest of
+ * the page still renders.
+ */
+
+import Link from 'next/link';
+import { requireUser } from '@/lib/auth';
+import { getDailyCrm, isDay, shiftDay, todayIst, type DailyStore } from '@/lib/queries/daily';
+import { getRcDaily, getStockAlerts, type RcDaily, type StockAlerts } from '@/lib/integration/apps';
+import { Finding, Note } from '@/components/finding-card';
+import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent } from '@/lib/format';
+
+export const dynamic = 'force-dynamic';
+
+const UNAVAILABLE = 'Not available right now';
+
+type Column = DailyStore & {
+  rc: { visits: number; people: number; commission: number; owed: number; owedVisits: number } | null;
+  stock: { agedUnits: number; agedCost: number; low: number } | null;
+};
+
+function Cell({ children, strong }: { children: React.ReactNode; strong?: boolean }) {
+  return <td className={`tnum whitespace-nowrap px-3 py-2 text-right ${strong ? 'font-semibold text-ink' : 'text-ink-2'}`}>{children}</td>;
+}
+
+function Section({ label, colSpan }: { label: string; colSpan: number }) {
+  return (
+    <tr className="border-t border-grid bg-inset/60">
+      <th colSpan={colSpan} scope="colgroup" className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+        {label}
+      </th>
+    </tr>
+  );
+}
+
+function Row({ label, columns, value, total, strong }: { label: string; columns: Column[]; value: (c: Column) => React.ReactNode; total: React.ReactNode; strong?: boolean }) {
+  return (
+    <tr className="border-t border-grid">
+      <th scope="row" className="whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-ink">{label}</th>
+      {columns.map((c) => <Cell key={c.storeCode}>{value(c)}</Cell>)}
+      <Cell strong={strong ?? true}>{total}</Cell>
+    </tr>
+  );
+}
+
+export default async function DailyPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requireUser();
+  const sp = await searchParams;
+  const requested = Array.isArray(sp.date) ? sp.date[0] : sp.date;
+  const today = todayIst();
+  const date = isDay(requested) && requested <= today ? requested : today;
+
+  const [crm, rc, stock] = await Promise.all([getDailyCrm(date), getRcDaily(date), getStockAlerts()]);
+  const columns = buildColumns(crm.stores, rc, stock);
+  const sum = (pick: (c: Column) => number) => columns.reduce((n, c) => n + pick(c), 0);
+
+  const walkIns = sum((c) => c.walkIns);
+  const converted = sum((c) => c.converted);
+  const bills = sum((c) => c.bills);
+  const sales = sum((c) => c.sales);
+  const unassignedRc = rc ? rc.day.filter((d) => !d.storeCode).reduce((n, d) => n + d.visits, 0) : 0;
+  const rcTotal = rc
+    ? {
+        visits: rc.day.reduce((n, d) => n + d.visits, 0),
+        people: rc.day.reduce((n, d) => n + d.people, 0),
+        commission: rc.day.reduce((n, d) => n + (d.commission ?? 0), 0),
+        owed: rc.owed.reduce((n, d) => n + (d.commission ?? 0), 0),
+        owedVisits: rc.owed.reduce((n, d) => n + d.visits, 0),
+      }
+    : null;
+  const colSpan = columns.length + 2;
+  const rcCell = (pick: (r: NonNullable<Column['rc']>) => string) => (c: Column) => (c.rc ? pick(c.rc) : '—');
+  const stockCell = (pick: (s: NonNullable<Column['stock']>) => string) => (c: Column) => (c.stock ? pick(c.stock) : '—');
+
+  return (
+    <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Daily dashboard</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">{formatDate(`${date}T12:00:00+05:30`)}{date === today ? ' · today' : ''}</h1>
+          <p className="mt-1 text-sm text-ink-2">Every store, across WalkTrack, billing, RC Dashboard and Vendor Intelligence.</p>
+        </div>
+        <nav aria-label="Choose day" className="flex flex-wrap items-center gap-2 text-sm">
+          <Link href={`/daily?date=${shiftDay(date, -1)}`} className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">← Previous day</Link>
+          <form action="/daily" className="flex items-center gap-2">
+            <label className="sr-only" htmlFor="daily-date">Day</label>
+            <input id="daily-date" type="date" name="date" defaultValue={date} max={today} className="rounded-lg border border-line bg-surface px-3 py-2 text-ink" />
+            <button className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Show</button>
+          </form>
+          {date < today && <Link href={`/daily?date=${shiftDay(date, 1)}`} className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Next day →</Link>}
+        </nav>
+      </header>
+
+      <section className="card overflow-hidden rounded-2xl border border-line bg-surface">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[48rem] border-collapse text-sm">
+            <thead>
+              <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+                <th scope="col" className="px-3 py-3 text-left font-bold">Store</th>
+                {columns.map((c) => (
+                  <th key={c.storeCode} scope="col" className="px-3 py-3 text-right font-bold">
+                    {c.name}<span className="block font-medium normal-case tracking-normal text-ink-muted">{c.storeCode}</span>
+                  </th>
+                ))}
+                <th scope="col" className="px-3 py-3 text-right font-bold text-ink">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <Section label="Walk-ins (WalkTrack)" colSpan={colSpan} />
+              <Row label="Walk-ins" columns={columns} value={(c) => formatNumber(c.walkIns)} total={formatNumber(walkIns)} />
+              <Row label="People" columns={columns} value={(c) => formatNumber(c.people)} total={formatNumber(sum((c) => c.people))} />
+              <Row label="Converted" columns={columns} value={(c) => formatNumber(c.converted)} total={formatNumber(converted)} />
+              <Row label="Conversion rate" columns={columns} value={(c) => (c.walkIns ? formatPercent(c.converted, c.walkIns) : '—')} total={walkIns ? formatPercent(converted, walkIns) : '—'} />
+
+              <Section label="Sales (billing)" colSpan={colSpan} />
+              <Row label="Total sales" columns={columns} value={(c) => formatCurrency(c.sales)} total={formatCurrency(sales)} />
+              <Row label="Bills" columns={columns} value={(c) => formatNumber(c.bills)} total={formatNumber(bills)} />
+              <Row label="Average bill value" columns={columns} value={(c) => (c.bills ? formatCurrency(c.sales / c.bills) : '—')} total={bills ? formatCurrency(sales / bills) : '—'} />
+
+              <Section label={`Driver visits (RC Dashboard)${rc ? '' : ` · ${UNAVAILABLE}`}`} colSpan={colSpan} />
+              <Row label="Visits" columns={columns} value={rcCell((r) => formatNumber(r.visits))} total={rcTotal ? formatNumber(rcTotal.visits) : '—'} />
+              <Row label="People" columns={columns} value={rcCell((r) => formatNumber(r.people))} total={rcTotal ? formatNumber(rcTotal.people) : '—'} />
+              <Row label="Commission (this day)" columns={columns} value={rcCell((r) => formatCurrency(r.commission))} total={rcTotal ? formatCurrency(rcTotal.commission) : '—'} />
+              <Row label="Commission not yet paid" columns={columns} value={rcCell((r) => (r.owedVisits ? `${formatCurrency(r.owed)} · ${formatNumber(r.owedVisits)}` : formatCurrency(0)))} total={rcTotal ? `${formatCurrency(rcTotal.owed)} · ${formatNumber(rcTotal.owedVisits)}` : '—'} />
+
+              <Section label={`Stock alerts (Vendor Intelligence)${stock ? ` · stock as of ${formatDate(`${stock.asOf}T12:00:00+05:30`)}` : ` · ${UNAVAILABLE}`}`} colSpan={colSpan} />
+              <Row label={`Aged stock (over ${stock?.rules.agedDays ?? 90} days)`} columns={columns} value={stockCell((s) => `${formatNumber(s.agedUnits)} units`)} total={stock ? `${formatNumber(sum((c) => c.stock?.agedUnits ?? 0))} units` : '—'} />
+              <Row label="Aged stock at cost" columns={columns} value={stockCell((s) => formatCurrency(s.agedCost))} total={stock ? formatCurrency(sum((c) => c.stock?.agedCost ?? 0)) : '—'} />
+              <Row label="Fast sellers running low" columns={columns} value={stockCell((s) => formatNumber(s.low))} total={stock ? formatNumber(sum((c) => c.stock?.low ?? 0)) : '—'} />
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-grid px-4 py-3 text-xs leading-relaxed text-ink-muted">
+          <p>Sales arrive from Hemparshwa OS every few hours{crm.salesThrough ? `; the latest bill loaded is from ${formatDateTime(crm.salesThrough)}` : ''}. Walk-ins arrive from WalkTrack within a minute.</p>
+          {rc && <p>Commission not yet paid: commission on visits up to this day that is not marked Paid in RC, and how many visits. {unassignedRc ? `${formatNumber(unassignedRc)} visit${unassignedRc === 1 ? '' : 's'} this day had no store recorded and count only in the Total.` : ''}</p>}
+          {stock && <p>Fast sellers: products that sold at least {stock.rules.fastSellerMinSold} units across all stores in the {stock.rules.fastSellerDays} days to {formatDate(`${stock.salesThrough}T12:00:00+05:30`)}, with {stock.rules.lowStockMax} unit or fewer left in that store. Sales are not recorded per store.</p>}
+        </div>
+      </section>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <Finding eyebrow="Calls (all stores)" title={`${formatNumber(crm.calls.calls)} call${crm.calls.calls === 1 ? '' : 's'}, ${formatNumber(crm.calls.connected)} connected, ${formatNumber(crm.calls.interested)} interested`}>
+          {crm.calls.bySalesperson.length ? (
+            <table className="w-full text-sm">
+              <thead><tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted"><th className="py-1 text-left">Salesperson</th><th className="py-1 text-right">Calls</th><th className="py-1 text-right">Connected</th><th className="py-1 text-right">Interested</th></tr></thead>
+              <tbody>{crm.calls.bySalesperson.map((r) => <tr key={r.name} className="border-t border-grid"><td className="py-1.5 text-ink">{r.name}</td><td className="tnum py-1.5 text-right">{formatNumber(r.calls)}</td><td className="tnum py-1.5 text-right">{formatNumber(r.connected)}</td><td className="tnum py-1.5 text-right">{formatNumber(r.interested)}</td></tr>)}</tbody>
+            </table>
+          ) : <Note>No calls logged this day.</Note>}
+          <Note>Calls are not tied to a store, so they are counted for the whole company.</Note>
+        </Finding>
+
+        <Finding eyebrow="Follow-ups" title={`${formatNumber(crm.followups.dueToday)} due this day, ${formatNumber(crm.followups.overdue)} overdue`}>
+          {crm.followups.byStore.length ? (
+            <table className="w-full text-sm">
+              <thead><tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted"><th className="py-1 text-left">Preferred store</th><th className="py-1 text-right">Due</th><th className="py-1 text-right">Overdue</th></tr></thead>
+              <tbody>{crm.followups.byStore.map((r) => <tr key={r.store} className="border-t border-grid"><td className="py-1.5 text-ink">{r.store}</td><td className="tnum py-1.5 text-right">{formatNumber(r.dueToday)}</td><td className="tnum py-1.5 text-right">{formatNumber(r.overdue)}</td></tr>)}</tbody>
+            </table>
+          ) : <Note>Nothing due or overdue.</Note>}
+          <Note>Open follow-ups on the existing-customer call list, by the store the customer prefers.</Note>
+        </Finding>
+      </div>
+
+      {stock && <StockDetail stock={stock} names={new Map(columns.map((c) => [c.storeCode, c.name]))} />}
+    </main>
+  );
+}
+
+function StockDetail({ stock, names }: { stock: StockAlerts; names: Map<string, string> }) {
+  const stores = stock.stores.filter((s) => s.aged.items.length || s.lowFastSellers.length);
+  if (!stores.length) return null;
+  return (
+    <section className="mt-3 grid gap-3 lg:grid-cols-2">
+      {stores.map((s) => (
+        <Finding key={s.storeCode} eyebrow={`Stock alerts · ${s.storeCode}`} title={names.get(s.storeCode) ?? s.storeCode}>
+          {s.lowFastSellers.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-ink">Fast sellers running low</p>
+              <ul className="mt-1 text-sm text-ink-2">{s.lowFastSellers.map((r) => <li key={`${r.vendor}-${r.item}`} className="tnum">{r.vendor} · {r.item}: {formatNumber(r.left)} left, {formatNumber(r.soldLast30Days)} sold in {stock.rules.fastSellerDays} days</li>)}</ul>
+            </div>
+          )}
+          {s.aged.items.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-ink">Costliest aged stock</p>
+              <ul className="mt-1 text-sm text-ink-2">{s.aged.items.map((r) => <li key={`${r.vendor}-${r.item}`} className="tnum">{r.vendor} · {r.item}: {formatNumber(r.units)} units, {formatCurrency(r.cost)}, oldest from {formatDate(`${r.oldestInward}T12:00:00+05:30`)}</li>)}</ul>
+            </div>
+          )}
+        </Finding>
+      ))}
+    </section>
+  );
+}
+
+function buildColumns(stores: DailyStore[], rc: RcDaily | null, stock: StockAlerts | null): Column[] {
+  return stores.map((s) => {
+    const day = rc?.day.find((d) => d.storeCode === s.storeCode);
+    const owed = rc?.owed.find((d) => d.storeCode === s.storeCode);
+    const alerts = stock?.stores.find((a) => a.storeCode === s.storeCode);
+    return {
+      ...s,
+      rc: rc ? { visits: day?.visits ?? 0, people: day?.people ?? 0, commission: day?.commission ?? 0, owed: owed?.commission ?? 0, owedVisits: owed?.visits ?? 0 } : null,
+      stock: stock ? { agedUnits: alerts?.aged.units ?? 0, agedCost: alerts?.aged.cost ?? 0, low: alerts?.lowFastSellers.length ?? 0 } : null,
+    };
+  });
+}
