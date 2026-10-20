@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { NOT_CONNECTED, NOT_CONNECTED_FOLLOWUP_TIME, nowLocal, OUTCOMES, recordCall, safeProductLink, STORES, uid, type Lead, type Outcome } from '@/lib/marketing/local';
+import { storeName, NOT_CONNECTED, NOT_CONNECTED_FOLLOWUP_TIME, nowLocal, OUTCOMES, recordCall, safeProductLink, STORES, uid, type Lead, type Outcome } from '@/lib/marketing/local';
 import { button, card, Field, input, primary } from './marketing-shared';
 export function LeadActions({ lead, update, variant = 'full', salespersonName = 'Abishek', salespersonView = false }: { lead: Lead; update: (lead: Lead) => boolean; variant?: 'full' | 'call-only'; salespersonName?: string; salespersonView?: boolean }) {
   const [mode, setMode] = useState<'call' | 'note' | 'followup' | 'visit' | null>(null);
@@ -19,7 +19,7 @@ export function LeadActions({ lead, update, variant = 'full', salespersonName = 
         {!salespersonView && (lead.email ? <a className={button} href={`mailto:${encodeURIComponent(lead.email)}`} onClick={() => update({ ...lead, interactions: [...lead.interactions, { id: uid(), at: nowLocal(), type: 'email', text: 'Opened email draft; sending is not confirmed.' }] })}>Email</a> : <Link className={button} href={`/marketing/leads/${lead.id}`}>Add email</Link>)}
       </>}
       {variant === 'call-only' && <button className={callLogged ? 'rounded-xl border border-status-good/30 bg-status-good/10 px-3 py-2 text-xs font-medium text-status-good' : button} onClick={() => start('call')}>{callLogged ? 'Call logged' : 'Log call'}</button>}
-      {variant === 'full' && !salespersonView && <button className={button} onClick={() => start('visit')}>Store visit</button>}
+      {variant === 'full' && !salespersonView && <button className={button} onClick={() => start('visit')}>Walk-in</button>}
     </div>
     {mode && <div role="dialog" aria-modal="true" aria-label={`${mode} for ${lead.name}`} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4" onKeyDown={e => { if (e.key === 'Escape') setMode(null); }}>
       <form className={`${card} max-h-[90vh] w-full max-w-xl overflow-y-auto shadow-xl`} onSubmit={e => {
@@ -49,7 +49,7 @@ export function LeadActions({ lead, update, variant = 'full', salespersonName = 
         <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-semibold text-ink">{mode === 'call' ? 'Record call outcome' : mode === 'note' ? 'Add a note' : mode === 'visit' ? 'Record store visit' : 'Schedule follow-up'}</h2><p className="mt-1 text-sm text-ink-2">{lead.name} · {lead.phone}</p></div><button type="button" className={button} onClick={() => setMode(null)}>Close</button></div>
         {mode === 'call' && <CallFields lead={lead} />}
         {mode === 'followup' && <Field label="Follow-up date and time (IST)"><input autoFocus required name="due" type="datetime-local" min={nowLocal().slice(0, 16)} className={input} /></Field>}
-        {mode === 'visit' && <Field label="Visited store"><select name="store" required className={input} defaultValue={lead.preferredStore === 'Online' ? '' : lead.preferredStore}><option value="">Select store</option><option>MG</option><option>JAYNAGAR</option></select></Field>}
+        {mode === 'visit' && <Field label="Visited store"><select name="store" required className={input} defaultValue={lead.preferredStore === 'Online' ? '' : lead.preferredStore}><option value="">Select store</option><option value="MG">MG Road</option><option value="JAYNAGAR">Jayanagar</option></select></Field>}
         <div className="mt-4"><Field label="Notes"><textarea autoFocus={mode === 'note'} name="note" required={mode === 'note'} rows={4} className={input} placeholder="What did the customer say? What should happen next?" /></Field></div>
         {mode === 'call' && <div className="mt-4"><Field label="Logged by"><select name="salesperson" required className={input} defaultValue={salespersonName}><option>{salespersonName}</option></select></Field></div>}
         {mode === 'call' && <><button type="button" className={createFollowup ? 'mt-4 rounded-xl border border-status-good/30 bg-status-good/10 px-3 py-2 text-xs font-medium text-status-good' : `${button} mt-4`} onClick={() => { setCreateFollowup(!createFollowup); setFollowupChoice(''); }}>{createFollowup ? 'Remove follow-up' : 'Follow-up'}</button>{createFollowup && <div className="mt-4 grid gap-3 sm:grid-cols-2"><Field label="Follow up"><select name="followupChoice" required className={input} value={followupChoice} onChange={event => setFollowupChoice(event.target.value)}><option value="">Choose when</option><option value="tomorrow">Tomorrow</option><option value="three-days">After three days</option><option value="date">Select a date</option></select></Field>{followupChoice === 'date' && <Field label="Follow-up date"><input name="followupDate" required type="date" min={addDays(nowLocal().slice(0, 10), 1)} className={input} /></Field>}</div>}</>}
@@ -65,7 +65,7 @@ function CallFields({ lead }: { lead: Lead }) {
   const interested = outcome === 'Connected / interested';
   return <div className="space-y-4">
     <Field label="Call outcome"><select autoFocus name="outcome" className={input} value={outcome} onChange={e => setOutcome(e.target.value as Outcome)}>{OUTCOMES.map(o => <option key={o}>{o}</option>)}</select></Field>
-    <Field label={`Preferred store${interested ? ' *' : ''}`}><select name="store" className={input} required={interested} value={store} onChange={e => setStore(e.target.value)}><option value="">Not decided</option>{STORES.map(s => <option key={s}>{s}</option>)}</select></Field>
+    <Field label={`Preferred store${interested ? ' *' : ''}`}><select name="store" className={input} required={interested} value={store} onChange={e => setStore(e.target.value)}><option value="">Not decided</option>{STORES.map(s => <option key={s} value={s}>{storeName(s)}</option>)}</select></Field>
     <div className="grid gap-3 sm:grid-cols-2"><Field label="Product"><input name="product" defaultValue={lead.product} className={input} required={interested && store === 'Online'} /></Field><Field label="Category"><input name="category" defaultValue={lead.category} className={input} required={interested && store === 'Online'} /></Field></div>
     {NOT_CONNECTED.includes(outcome)
       ? <p className="text-xs font-medium text-ink-2">Not connected: this lead goes to the follow-up queue for tomorrow at {NOT_CONNECTED_FOLLOWUP_TIME}. Use the Follow-up button below to pick another day.</p>

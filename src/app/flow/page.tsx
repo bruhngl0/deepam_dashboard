@@ -143,7 +143,7 @@ export default async function FlowPage() {
                 ['Conversion', 'Walk-in → lead → sale by store and product'],
                 ['Availability', 'Missed demand where requested SKUs were unavailable'],
                 ['Fulfilment', 'Order → delivery time and delivery success rate'],
-                ['Profitability', 'Revenue − vendor cost − delivery cost'],
+                ['Profitability', 'Sales − vendor cost − delivery cost'],
               ].map(([title, description]) => (
                 <div key={title} className="rounded-xl border border-line bg-surface p-4">
                   <p className="font-medium text-ink">{title}</p>

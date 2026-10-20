@@ -30,10 +30,10 @@ export function LeadTypeConversionsPanel() {
     return () => { live = false; };
   }, []);
 
-  const intro = <div className="p-4"><h2 className="text-lg font-semibold text-ink">Store visits and virtual calls</h2><p className="text-xs text-ink-muted">Every Store visit and Virtual calls lead from the Meta and Google lead sheets, of any date. Converted: a CRM bill on the lead’s phone dated on or after the lead date{data?.latestBill ? `; sales are recorded up to ${day(data.latestBill)}` : ''}. Spend and cost per lead come from the sheets’ Campaign Summary tabs. Not affected by the filters above.</p></div>;
+  const intro = <div className="p-4"><h2 className="text-lg font-semibold text-ink">Store-visit and virtual-call campaigns</h2><p className="text-xs text-ink-muted">Every Store visit and Virtual calls lead from the Meta and Google lead sheets, of any date. Converted: a CRM bill on the lead’s phone dated on or after the lead date{data?.latestBill ? `; sales are recorded up to ${day(data.latestBill)}` : ''}. Spend and cost per lead come from the sheets’ Campaign Summary tabs. Not affected by the filters above.</p></div>;
   if (!data) return <section className="overflow-hidden rounded-2xl border border-line bg-surface">{intro}<p role="status" className="px-4 pb-4 text-sm text-ink-2">{error || 'Loading…'}</p></section>;
 
-  return <section aria-label="Store visits and virtual calls" className="space-y-4">
+  return <section aria-label="Store-visit and virtual-call campaigns" className="space-y-4">
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
       {intro}
       {data.spendError && <p role="status" className="px-4 pb-3 text-sm text-ink">Spend is unavailable: {data.spendError}</p>}

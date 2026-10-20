@@ -174,14 +174,14 @@ export default async function InsightsPage({
           </Finding>
 
           <Finding
-            eyebrow="Branch mix"
+            eyebrow="Store mix"
             title="The two branches are running different businesses"
           >
             <StoreChannelBars stores={stores} />
             <Note>
               One branch runs on people who already knew you; the other runs on acquisition —
               a real operational difference in staffing and campaign spend. This finding now
-              has a permanent home: the Branch × channel panel on the dashboard, which reads
+              has a permanent home: the Store × channel panel on the dashboard, which reads
               the same query as the bars above.
             </Note>
           </Finding>

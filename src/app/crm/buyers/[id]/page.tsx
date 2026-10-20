@@ -271,7 +271,7 @@ export default async function BuyerProfilePage({
         {/* ── Customer master ──────────────────────────────────────────── */}
         <Finding eyebrow="Customer master" title="Registered customer details">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Registered branch" value={orNotProvided(p.registeredStore)} />
+            <Field label="Registered store" value={orNotProvided(p.registeredStore)} />
             <Field label="City" value={orNotProvided(p.city)} />
             <Field label="Email" value={orNotProvided(p.email)} />
             <Field label="Date of birth" value={formatDate(p.dateOfBirth)} />
@@ -284,10 +284,10 @@ export default async function BuyerProfilePage({
 
         {/* ── Where and with whom ─────────────────────────────────────── */}
         <Finding
-          eyebrow="Branch and staff"
+          eyebrow="Store and staff"
           title={
             p.stores.length > 1
-              ? `Shops at ${formatNumber(p.stores.length)} branches`
+              ? `Shops at ${formatNumber(p.stores.length)} stores`
               : `${p.stores[0]?.storeName ?? 'Unknown'} only`
           }
         >
@@ -463,9 +463,9 @@ export default async function BuyerProfilePage({
                 <table className="w-full min-w-[48rem] border-collapse text-left text-sm">
                   <thead>
                     <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
-                      <th className="py-2 pr-4 font-bold">Voucher</th>
+                      <th className="py-2 pr-4 font-bold">Invoice</th>
                       <th className="py-2 pr-4 font-bold">Date</th>
-                      <th className="py-2 pr-4 font-bold">Branch</th>
+                      <th className="py-2 pr-4 font-bold">Store</th>
                       <th className="py-2 pr-4 font-bold">Staff</th>
                       <th className="py-2 pr-4 text-right font-bold">Units</th>
                       <th className="py-2 pr-4 text-right font-bold">Discount</th>

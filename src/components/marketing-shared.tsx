@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { callsForSync, campaignName, type Dataset, type Lead, type Sale } from '@/lib/marketing/local';
+import { storeName, callsForSync, campaignName, type Dataset, type Lead, type Sale } from '@/lib/marketing/local';
 import { routeLabel, TAG_LABELS } from '@/lib/marketing/sheet-routing';
 export const button = 'inline-flex items-center justify-center rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-inset focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40';
 export const primary = `${button} !bg-accent !text-white !border-accent`;
@@ -26,7 +26,7 @@ export function LeadMeta({ lead, className = 'mt-3' }: { lead: Lead; className?:
     <span>{[...new Set(lead.acquisitions.map(acquisition => acquisition.source))].join(', ')}</span>
     <span>{[...new Set(lead.acquisitions.map(acquisition => campaignName(acquisition.campaignId)).filter(Boolean))].join(', ') || 'No campaign'}</span>
     <span>{dayMonthYearTimeLabel(lead.acquiredAt)}</span>
-    <span>{lead.preferredStore || 'Store not recorded'}</span>
+    <span>{storeName(lead.preferredStore) || 'Store not recorded'}</span>
   </div>;
 }
 export function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="flex min-w-0 flex-col gap-1.5 text-sm text-ink-2">{label}{children}</label>; }

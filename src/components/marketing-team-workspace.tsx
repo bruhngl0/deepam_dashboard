@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { conversionsByCampaign, filterLeads, metrics, SOURCES, STORES, type Dataset, type Lead } from '@/lib/marketing/local';
+import { storeName, conversionsByCampaign, filterLeads, metrics, SOURCES, STORES, type Dataset, type Lead } from '@/lib/marketing/local';
 import { button, card, input, primary, useMarketing } from './marketing-shared';
 import { LeadTypeConversionsPanel } from './lead-type-conversions-panel';
 
@@ -48,7 +48,7 @@ export function MarketingTeamWorkspace() {
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
     <section aria-label="Marketing team filters" className={`${card} grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end`}>
       <label className="flex flex-col gap-1.5 text-sm text-ink-2">Date<input type="date" className={input} value={date} onChange={event => setDate(event.target.value)} /></label>
-      <label className="flex flex-col gap-1.5 text-sm text-ink-2">Store<select className={input} value={store} onChange={event => setStore(event.target.value)}><option value="">All stores</option>{STORES.map(value => <option key={value}>{value}</option>)}</select></label>
+      <label className="flex flex-col gap-1.5 text-sm text-ink-2">Store<select className={input} value={store} onChange={event => setStore(event.target.value)}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></label>
       <label className="flex flex-col gap-1.5 text-sm text-ink-2">Source<select className={input} value={source} onChange={event => setSource(event.target.value)}><option value="">All sources</option>{availableSources.map(value => <option key={value}>{value}</option>)}</select></label>
       <button className={button} onClick={clear}>Clear filters</button>
     </section>

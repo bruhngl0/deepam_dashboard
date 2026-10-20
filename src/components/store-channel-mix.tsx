@@ -61,9 +61,9 @@ export function StoreChannelBars({ stores }: { stores: StoreChannelMix[] }) {
 export function StoreChannelMixPanel({ stores }: { stores: StoreChannelMix[] }) {
   return (
     <section className="card rounded-2xl border border-line bg-surface p-6">
-      <h2 className="text-lg font-semibold tracking-tight text-ink">Branch × channel</h2>
+      <h2 className="text-lg font-semibold tracking-tight text-ink">Store × channel</h2>
       <p className="mt-1 text-sm text-ink-2">
-        Each branch&rsquo;s identified revenue, split by where the customer came from.
+        Each store&rsquo;s identified sales, split by where the customer came from.
       </p>
       <div className="mt-5">
         <StoreChannelBars stores={stores} />

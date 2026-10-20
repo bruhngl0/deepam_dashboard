@@ -46,7 +46,7 @@ export function BuyerFilterBar({ total }: { total: number }) {
       <input
         type="search"
         defaultValue={params.get('q') ?? ''}
-        placeholder="Search buyer name, phone or email"
+        placeholder="Search buyer name, Contact No. or email"
         onChange={(e) => {
           const value = e.target.value;
           clearTimeout((window as unknown as { __bt?: number }).__bt);

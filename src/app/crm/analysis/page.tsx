@@ -265,7 +265,7 @@ export default async function AnalysisPage({
 
         <Finding
           eyebrow="Salesperson performance"
-          title={`Top 12 of 40 salesman codes, by revenue`}
+          title={`Top 12 of 40 salesperson codes, by sales`}
         >
           <div className="overflow-x-auto">
             <table className="w-full min-w-[30rem] text-sm">

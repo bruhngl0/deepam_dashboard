@@ -31,6 +31,11 @@ export const EMPTY: Dataset = { version: 2, demo: false, leads: [], sales: [] };
 export const uid = () => crypto.randomUUID();
 export const nowLocal = () => new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).replace(' ', 'T');
 
+/** Display name for a stored marketing store value (stored as MG / JAYNAGAR / Online / Exhibition). */
+export function storeName(value: string | null | undefined): string {
+  return value === 'MG' ? 'MG Road' : value === 'JAYNAGAR' ? 'Jayanagar' : value ?? '';
+}
+
 export function normalizeStore(value: string): string {
   const store = value.toUpperCase().replace(/[\s._-]/g, '');
   return ['MG', 'MGROAD'].includes(store) ? 'MG' : ['JAYNAGAR', 'JAYANAGAR'].includes(store) ? 'JAYNAGAR' : store === 'ONLINE' ? 'Online' : store === 'EXHIBITION' ? 'Exhibition' : '';
@@ -144,7 +149,7 @@ export function previewRows(rows: Record<string, unknown>[], kind: Kind, mapping
     const at = parseDateTime(row[mapping.date]);
     if (at === null) { fail('Invalid date/time. Use YYYY-MM-DD HH:mm or DD/MM/YYYY HH:mm'); continue; }
     const store = normalizeStore(get('preferredStore'));
-    if (get('preferredStore') && !store) { fail('Store must be MG, JAYNAGAR, Online, or Exhibition'); continue; }
+    if (get('preferredStore') && !store) { fail('Store must be MG Road, Jayanagar, Online or Exhibition'); continue; }
     if (kind === 'leads') {
       const sources = [...new Set(get('source').split(/[,;|]/).map(normalizeSource))];
       if (!get('name') || !sources.length || sources.some(s => !s)) { fail('Name and a supported source are required'); continue; }

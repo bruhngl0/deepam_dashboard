@@ -14,7 +14,7 @@ vi.mock('@/components/marketing-shared', async importOriginal => {
 describe('marketing page rendering', () => {
   it('renders dashboard metrics and navigation with demo data', () => {
     const html = renderToStaticMarkup(createElement(MarketingWorkspace));
-    for (const label of ['Queue', 'Existing customers', 'Existing customer call list', 'Existing customer', 'Follow-ups', 'Converted', 'Team performance', 'Campaigns', 'Cost per acquisition', 'Converted customers', 'Store visits', 'Date-Time From']) expect(html).toContain(label);
+    for (const label of ['Queue', 'Existing customers', 'Existing customer call list', 'Existing customer', 'Follow-ups', 'Converted', 'Team performance', 'Campaigns', 'Cost per acquisition', 'Converted customers', 'Walk-ins', 'Date-Time From']) expect(html).toContain(label);
     const navigation = html.match(/<nav[^>]*aria-label="Marketing sections"[\s\S]*?<\/nav>/)?.[0] ?? '';
     for (const removed of ['>Sales<', '>Insights<', '>Salespeople<', '>Import<']) expect(navigation).not.toContain(removed);
     expect(html).toContain('shared by every desk');
@@ -23,7 +23,7 @@ describe('marketing page rendering', () => {
   it('renders converted customer KPIs, sources and profile links', () => {
     const data = demoData();
     const html = renderToStaticMarkup(createElement(MarketingConverted, { data, leads: data.leads, search: '', page: 0, onSearch: () => {}, onPage: () => {} }));
-    for (const label of ['Converted customer profiles', 'Conversion rate', 'Revenue', 'Average order value', 'Repeat customers', 'Top source', 'Source / campaign', 'View profile']) expect(html).toContain(label);
+    for (const label of ['Converted customer profiles', 'Conversion rate', 'Total sales', 'Average bill value', 'Repeat customers', 'Top source', 'Source / campaign', 'View profile']) expect(html).toContain(label);
     expect(html).toContain('/marketing/leads/LD-DEMO-0001');
   });
   it('renders customer acquisition, action links and purchase timeline', () => {

@@ -69,7 +69,7 @@ export function FilterBar({
       <input
         type="search"
         defaultValue={params.get('q') ?? ''}
-        placeholder="Search name, phone, email or city"
+        placeholder="Search name, Contact No., email or city"
         onChange={(e) => {
           const value = e.target.value;
           // Debounce so a query does not fire on every keystroke.

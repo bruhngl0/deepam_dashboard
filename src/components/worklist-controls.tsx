@@ -29,7 +29,7 @@ export function WorklistControls({ listKind, total }: { listKind: ListKind; tota
       <input
         type="search"
         defaultValue={params.get('q') ?? ''}
-        placeholder="Search name or phone"
+        placeholder="Search name or Contact No."
         onChange={(e) => {
           const value = e.target.value;
           clearTimeout((window as unknown as { __wl?: number }).__wl);
