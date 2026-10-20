@@ -71,7 +71,8 @@ export function routeSheetLead(lead: Lead, tab: string, route: SheetRoute, claim
     ...lead,
     sheetTabs,
     claimGroup: route.group,
-    ...(active ? {
+    // A lead moved to someone by hand stays with them; the route only assigns the others.
+    ...(active && !(lead.claimPinned && lead.claimedBy) ? {
       claimedBy: route.salesperson,
       claimedAt: lead.claimedBy === route.salesperson && lead.claimedAt ? lead.claimedAt : claimedAt,
     } : {}),

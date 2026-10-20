@@ -31,6 +31,15 @@ describe('temporary campaign routing', () => {
     });
   });
 
+  it('leaves a lead that was moved by hand with its new salesperson', () => {
+    const lead = { ...makeLead({ phone: '+919000123411', name: 'Meena', source: 'Meta ads' }), claimedBy: 'Roopa S', claimedAt: '2026-10-20T15:00:00', claimPinned: true };
+    const route = routeForTab('The Residency (Chennai) Lead- Oct')!;
+    const routed = routeSheetLead(lead, 'The Residency (Chennai) Lead- Oct', route, '2026-10-20T15:05:00', true);
+    expect(routed).toMatchObject({ claimedBy: 'Roopa S', claimedAt: '2026-10-20T15:00:00', claimGroup: 'chennai' });
+    // Without the pin, the same lead goes back to the route's salesperson.
+    expect(routeSheetLead({ ...lead, claimPinned: undefined }, 'The Residency (Chennai) Lead- Oct', route, '2026-10-20T15:05:00', true).claimedBy).toBe('Margaret Prema');
+  });
+
   it('keeps Roopa to BLVD Club, Sandhya to Virtual calls, gives Abhishek and Margaret the pool with their routes first, and keeps others out', () => {
     expect(claimRoutingFor('Roopa S', '2026-10-10')).toEqual({ only: ['blvd-club'] });
     expect(claimRoutingFor('Sandhya', '2026-10-10')).toEqual({ only: ['virtual-calls'] });

@@ -14,6 +14,8 @@ export type Lead = {
   id: string; phone: string; name: string; email: string; city: string;
   source: string; campaignId: string; preferredStore: string; date: string; acquiredAt: string;
   claimedBy?: string; claimedAt?: string;
+  /** Set when the lead was moved to its salesperson by hand: sheet routing then leaves claimedBy alone. */
+  claimPinned?: boolean;
   claimGroup?: string; sheetTabs?: string[];
   /** Short labels shown on the lead card next to the campaign tag, e.g. 'exhb' for the exhibition visit form. */
   tags?: string[];
