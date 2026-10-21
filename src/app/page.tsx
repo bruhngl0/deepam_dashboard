@@ -2,7 +2,7 @@
  * Hero — module picker.
  *
  * The modules behind this app: the cross-module Overview (`/flow`), the Daily
- * dashboard (`/daily`), Customer
+ * dashboard (`/daily`), Reports (`/reports`), Customer
  * Intelligence (`/crm`), Vendor Intelligence (`/vendor`), the external Driver
  * Network Management and Store Performance Tracker services, and Marketing
  * Intelligence (`/marketing`). This page is just the door between them, not
@@ -56,6 +56,21 @@ export default async function HeroPage() {
           <h2 className="text-lg font-semibold tracking-tight text-ink">Daily dashboard</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
             One day, every store: walk-ins, sales, driver visits, commission owed, calls and stock alerts.
+          </p>
+        </Link>
+
+        <Link
+          href="/reports"
+          className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]">
+              <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" strokeLinecap="round" />
+            </svg>
+          </span>
+          <h2 className="text-lg font-semibold tracking-tight text-ink">Reports</h2>
+          <p className="max-w-[36ch] text-sm text-ink-2">
+            Funnel, salespeople, payback, cohorts and stock, across every app.
           </p>
         </Link>
 
