@@ -1,6 +1,6 @@
 /**
- * Starts the Marketing Intelligence Google Sheet sync timer and the Hemparshwa
- * sales sync timer when a long-running Node server boots. Skipped during `next build` and on Vercel, where there is
+ * Starts the Marketing Intelligence Google Sheet sync timer, the Hemparshwa
+ * sales sync timer and the analytics refresh timer when a long-running Node server boots. Skipped during `next build` and on Vercel, where there is
  * no process to keep a timer alive; there the cron route does the same job.
  */
 export async function register() {
@@ -9,4 +9,6 @@ export async function register() {
   startSheetSyncScheduler();
   const { startHemparshwaSyncScheduler } = await import('@/lib/integration/hemparshwa-schedule');
   startHemparshwaSyncScheduler();
+  const { startAnalyticsRefreshScheduler } = await import('@/lib/analytics/refresh');
+  startAnalyticsRefreshScheduler();
 }

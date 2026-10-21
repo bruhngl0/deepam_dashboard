@@ -1,17 +1,18 @@
 /**
  * Daily dashboard — one day, every store, across the four apps.
  *
- * Walk-ins (WalkTrack, every minute), sales (Hemparshwa OS, every few hours), calls and
- * follow-ups come from CRM's own tables (lib/queries/daily.ts). Driver visits and commission
- * come from RC Dashboard and stock alerts from Vendor Intelligence, fetched live
- * (lib/integration/apps.ts); when either cannot be reached its rows say so and the rest of
- * the page still renders.
+ * When the analytics database is configured (ANALYTICS_DATABASE_URL) every figure comes from it
+ * (lib/analytics/daily.ts), refreshed every few minutes. Otherwise walk-ins, sales, calls and
+ * follow-ups come from CRM's own tables (lib/queries/daily.ts), and driver visits, commission and
+ * stock alerts from RC Dashboard and Vendor Intelligence, fetched live (lib/integration/apps.ts);
+ * when either cannot be reached its rows say so and the rest of the page still renders.
  */
 
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
-import { getDailyCrm, isDay, shiftDay, todayIst, type DailyStore } from '@/lib/queries/daily';
+import { getDailyCrm, isDay, shiftDay, todayIst, type DailyCrm, type DailyStore } from '@/lib/queries/daily';
 import { getRcDaily, getStockAlerts, type RcDaily, type StockAlerts } from '@/lib/integration/apps';
+import { dailyFromAnalytics } from '@/lib/analytics/daily';
 import { Finding, Note } from '@/components/finding-card';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent } from '@/lib/format';
 
@@ -55,7 +56,13 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
   const today = todayIst();
   const date = isDay(requested) && requested <= today ? requested : today;
 
-  const [crm, rc, stock] = await Promise.all([getDailyCrm(date), getRcDaily(date), getStockAlerts()]);
+  const fromAnalytics = await dailyFromAnalytics(date).catch((error) => {
+    console.warn('[daily] analytics', error instanceof Error ? error.message : error);
+    return null;
+  });
+  let crm: DailyCrm, rc: RcDaily | null, stock: StockAlerts | null;
+  if (fromAnalytics) ({ crm, rc, stock } = fromAnalytics);
+  else [crm, rc, stock] = await Promise.all([getDailyCrm(date), getRcDaily(date), getStockAlerts()]);
   const columns = buildColumns(crm.stores, rc, stock);
   const sum = (pick: (c: Column) => number) => columns.reduce((n, c) => n + pick(c), 0);
 
