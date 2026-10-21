@@ -25,8 +25,8 @@ type Masters = {
 };
 type Pair = { id: string; code: string };
 export type HemparshwaIdsResult = {
-  sent: { customers: number; vendors: number; categories: number; leads: number };
-  applied: { customers: number; vendors: number; categories: number; leads: number } | null;
+  sent: { customers: number; vendors: number; categories: number; leads: number; provisional: number };
+  applied: { customers: number; vendors: number; categories: number; leads: number; provisional: number } | null;
   skipped: number;
   notMatched: { customers: number; leads: number };
 };
@@ -57,18 +57,23 @@ const day = (value: string | null) => {
 };
 
 /** The pairs to send: exported for tests. */
-export async function crmIdsFor(masters: Masters): Promise<{ customers: Pair[]; vendors: Pair[]; categories: Pair[]; leads: (Pair & { companyId: string })[]; notMatched: HemparshwaIdsResult['notMatched'] }> {
+export async function crmIdsFor(masters: Masters): Promise<{ customers: Pair[]; vendors: Pair[]; categories: Pair[]; leads: (Pair & { companyId: string })[]; provisional: { customers: string[] }; notMatched: HemparshwaIdsResult['notMatched'] }> {
   // Customers: by phone, customers only.
   const phones = [...new Set(masters.customers.flatMap((c) => national(c.phone)?.national ?? []))];
   const codeByPhone = new Map(rows<{ phone_national: string; customer_code: string }>(await db.execute(sql`
     SELECT phone_national, customer_code FROM customers
     WHERE customer_code IS NOT NULL AND phone_national IN (SELECT json_array_elements_text(${JSON.stringify(phones)}::json))`)).map((r) => [r.phone_national, r.customer_code]));
   const customers: Pair[] = [];
+  // Not a CRM customer (a lead, or no usable phone) but holding an old CUS-: Hemparshwa moves it to an HCU-.
+  const provisional: string[] = [];
   let unmatchedCustomers = 0;
   for (const c of masters.customers) {
     const code = codeByPhone.get(national(c.phone)?.national ?? '');
     if (code) customers.push({ id: c.id, code });
-    else unmatchedCustomers++;
+    else {
+      unmatchedCustomers++;
+      if (/^CUS-\d{6}$/.test(c.id)) provisional.push(c.id);
+    }
   }
 
   // Vendors and categories: by name.
@@ -127,6 +132,7 @@ export async function crmIdsFor(masters: Masters): Promise<{ customers: Pair[]; 
     vendors: vendors.filter((p) => p.id !== p.code),
     categories: categories.filter((p) => p.id !== p.code),
     leads: leads.filter((p) => p.id !== p.code),
+    provisional: { customers: provisional },
     notMatched: { customers: unmatchedCustomers, leads: masters.leads.length - leads.length },
   };
 }
@@ -135,11 +141,11 @@ export async function crmIdsFor(masters: Masters): Promise<{ customers: Pair[]; 
 export async function assignHemparshwaIds(): Promise<HemparshwaIdsResult> {
   const masters = await hemparshwa<Masters>('/api/integration/masters');
   const { notMatched, ...pairs } = await crmIdsFor(masters);
-  const sent = { customers: pairs.customers.length, vendors: pairs.vendors.length, categories: pairs.categories.length, leads: pairs.leads.length };
-  if (!sent.customers && !sent.vendors && !sent.categories && !sent.leads) return { sent, applied: null, skipped: 0, notMatched };
-  const applied = await hemparshwa<{ customers: number; vendors: number; categories: number; leads: number; skipped: unknown[] }>(
+  const sent = { customers: pairs.customers.length, vendors: pairs.vendors.length, categories: pairs.categories.length, leads: pairs.leads.length, provisional: pairs.provisional.customers.length };
+  if (!sent.customers && !sent.vendors && !sent.categories && !sent.leads && !sent.provisional) return { sent, applied: null, skipped: 0, notMatched };
+  const applied = await hemparshwa<{ customers: number; vendors: number; categories: number; leads: number; provisional?: number; skipped: unknown[] }>(
     '/api/integration/crm-ids', { method: 'POST', body: JSON.stringify(pairs) },
   );
   if (applied.skipped.length) console.warn('[hemparshwa ids] skipped', JSON.stringify(applied.skipped.slice(0, 20)));
-  return { sent, applied: { customers: applied.customers, vendors: applied.vendors, categories: applied.categories, leads: applied.leads }, skipped: applied.skipped.length, notMatched };
+  return { sent, applied: { customers: applied.customers, vendors: applied.vendors, categories: applied.categories, leads: applied.leads, provisional: applied.provisional ?? 0 }, skipped: applied.skipped.length, notMatched };
 }
