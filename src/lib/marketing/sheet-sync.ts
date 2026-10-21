@@ -26,6 +26,7 @@ import { routeActive, routeForTab, routeSheetLead } from './sheet-routing';
 import { CANONICAL, tabRows } from './sheet-rows';
 import { loadDataset, saveChanges } from './store';
 import { linkMarketingLeadsToCrm } from './crm-sync';
+import { campaignSpendFromWorkbooks, saveCampaignSpend } from './campaign-spend';
 
 const CONFIG_KEY = 'marketing_sheet_sync';
 const STATUS_KEY = 'marketing_sheet_sync_status';
@@ -130,6 +131,8 @@ async function sync(force: boolean): Promise<SyncOutcome> {
     const hash = createHash('sha1').update(JSON.stringify([config, workbooks])).digest('hex');
     state.checkedAt = at;
     if (!force && hash === state.hash) return { state: 'unchanged', status: null };
+    // Ad spend from the Campaign Summary tabs, kept for analytics; a bad summary tab never stops the lead import.
+    await saveCampaignSpend(campaignSpendFromWorkbooks(workbooks)).catch((error) => console.error('[campaign spend]', error));
 
     const collected = config.sheets.reduce((into, source, i) => collectRows(source, workbooks[i], into), undefined as Collected | undefined)!;
     if (!collected.tabs.length && !collected.problems.length) throw new Error('No lead tab found. A lead tab needs a row of headings that includes a contact number and a name.');

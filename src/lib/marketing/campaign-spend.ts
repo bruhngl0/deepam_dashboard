@@ -80,3 +80,22 @@ export function spendByCampaign(weeks: CampaignSpendWeek[]): CampaignSpend[] {
   }
   return [...map.values()].map((row) => ({ ...row, spend: Math.round(row.spend * 100) / 100 }));
 }
+
+/**
+ * Saves the weeks of spend read from the sheets (replacing what was saved before), for the analytics
+ * database's cost-per-lead and payback figures. Called by the sheet sync whenever the sheets change.
+ */
+export async function saveCampaignSpend(weeks: CampaignSpendWeek[]): Promise<number> {
+  const { db } = await import('@/db');
+  const { sql } = await import('drizzle-orm');
+  const rows = [...new Map(weeks.map((w) => [`${w.campaign}|${w.platform}|${w.month}|${w.week}`, w])).values()];
+  await db.transaction(async (t) => {
+    await t.execute(sql`DELETE FROM marketing_campaign_spend`);
+    if (rows.length) {
+      await t.execute(sql`INSERT INTO marketing_campaign_spend (campaign, platform, month, week, spend, leads)
+        SELECT campaign, platform, month, week, spend, leads
+        FROM json_to_recordset(${JSON.stringify(rows)}::json) AS x(campaign text, platform text, month text, week text, spend numeric, leads integer)`);
+    }
+  });
+  return rows.length;
+}
