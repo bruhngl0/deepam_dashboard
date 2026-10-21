@@ -51,6 +51,16 @@ export async function POST(request: Request) {
       }
       const people = Math.max(1, Number(event.data.menCount ?? 0) + Number(event.data.womenCount ?? 0) + Number(event.data.childrenCount ?? 0));
 
+      // Every walk-in person is at least a lead: a valid Contact No. CRM has not seen becomes a person
+      // here (with no Customer ID; one is issued only when a walk-in of theirs converts, drizzle/0026).
+      if (phone) {
+        await tx.execute(sql`
+          INSERT INTO customers (phone_e164, phone_national, first_seen_at, last_seen_at)
+          VALUES (${'+91' + phone}, ${phone}, ${visitedAt}::timestamptz, ${visitedAt}::timestamptz)
+          ON CONFLICT (phone_e164) DO NOTHING
+        `);
+      }
+
       await tx.execute(sql`
         INSERT INTO store_visits
           (source_system, external_id, store_id, customer_id, external_customer_ref, visited_at, stopped_at,
@@ -72,19 +82,28 @@ export async function POST(request: Request) {
           raw=excluded.raw, source_updated_at=excluded.source_updated_at, deleted_at=NULL, updated_at=now()
         WHERE excluded.source_updated_at >= store_visits.source_updated_at
       `);
+      // The walk-in is a lead touch on the "WalkTrack walk-ins" campaign: that is the person's Lead ID.
+      await tx.execute(sql`
+        SELECT ensure_walkin_lead(sv.customer_id, sv.visited_at, sv.store_id)
+        FROM store_visits sv WHERE sv.source_system='walktrack' AND sv.external_id=${event.entityId} AND sv.customer_id IS NOT NULL
+      `);
       return 'processed';
     });
-    // Hand CRM's Customer ID back so WalkTrack can show the same number. (INTEGRATION.md)
-    const resolved = outcome === 'processed' && event.type !== 'walkin.deleted'
-      ? await db.execute(sql`
-          SELECT c.customer_code FROM store_visits sv JOIN customers c ON c.id = sv.customer_id
-          WHERE sv.source_system='walktrack' AND sv.external_id=${event.entityId}`)
-      : null;
-    const customerCode = (resolved?.rows[0]?.customer_code as string | undefined) ?? null;
+    // Matching a bill can make the person a customer, so match first and read the IDs after.
     const reconciled = outcome === 'processed' && event.type !== 'walkin.deleted'
       ? await reconcileStoreVisits(event.entityId)
       : 0;
-    return NextResponse.json({ status: outcome, salesReconciled: reconciled, customerCode });
+    // Hand CRM's IDs back so WalkTrack shows the same numbers (INTEGRATION.md): the Lead ID always,
+    // the Customer ID only once the person is a customer (a converted walk-in, a bill, ...).
+    const resolved = outcome === 'processed' && event.type !== 'walkin.deleted'
+      ? await db.execute(sql`
+          SELECT c.customer_code, person_lead_code(c.id) AS lead_code
+          FROM store_visits sv JOIN customers c ON c.id = sv.customer_id
+          WHERE sv.source_system='walktrack' AND sv.external_id=${event.entityId}`)
+      : null;
+    const customerCode = (resolved?.rows[0]?.customer_code as string | undefined) ?? null;
+    const leadCode = (resolved?.rows[0]?.lead_code as string | undefined) ?? null;
+    return NextResponse.json({ status: outcome, salesReconciled: reconciled, customerCode, leadCode });
   } catch (error) {
     console.error('integration/events', error);
     return NextResponse.json({ error: 'Event processing failed' }, { status: 500 });

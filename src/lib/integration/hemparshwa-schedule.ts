@@ -11,8 +11,14 @@
 
 import { syncHemparshwa, type SyncResult } from './hemparshwa';
 import type { CustomerProjectionResult, ProjectionResult } from './hemparshwa-project';
+import type { HemparshwaIdsResult } from './hemparshwa-ids';
 
-export type HemparshwaRun = SyncResult & { customers: CustomerProjectionResult | null; projection: ProjectionResult | null };
+export type HemparshwaRun = SyncResult & {
+  customers: CustomerProjectionResult | null;
+  projection: ProjectionResult | null;
+  /** Hemparshwa renumbered to CRM's IDs (hemparshwa-ids.ts); an error here never fails the sync. */
+  ids: HemparshwaIdsResult | { error: string } | null;
+};
 
 const state = globalThis as unknown as {
   hemparshwaSyncTimer?: ReturnType<typeof setInterval>;
@@ -24,12 +30,22 @@ export function runHemparshwaSync(forceRebuild = false): Promise<HemparshwaRun> 
   state.hemparshwaSyncRunning ??= (async () => {
     const sync = await syncHemparshwa();
     const changed = sync.removed.length > 0 || sync.synced.length > 0;
-    if (!changed && !forceRebuild) return { ...sync, customers: null, projection: null };
-    // Loaded only when needed: it pulls in the database client.
-    const { projectHemparshwaCustomers, projectHemparshwaSales } = await import('./hemparshwa-project');
-    // The Customer Master first: the sales rebuild ends by refreshing what the customer screens read.
-    const customers = await projectHemparshwaCustomers();
-    return { ...sync, customers, projection: await projectHemparshwaSales() };
+    let customers: CustomerProjectionResult | null = null;
+    let projection: ProjectionResult | null = null;
+    if (changed || forceRebuild) {
+      // Loaded only when needed: it pulls in the database client.
+      const { projectHemparshwaCustomers, projectHemparshwaSales } = await import('./hemparshwa-project');
+      // The Customer Master first: the sales rebuild ends by refreshing what the customer screens read.
+      customers = await projectHemparshwaCustomers();
+      projection = await projectHemparshwaSales();
+    }
+    // Every run, changed or not: someone may have become a customer in CRM since the last one.
+    const { assignHemparshwaIds } = await import('./hemparshwa-ids');
+    const ids = await assignHemparshwaIds().catch((error: unknown) => {
+      console.error('[hemparshwa ids]', error);
+      return { error: error instanceof Error ? error.message : String(error) };
+    });
+    return { ...sync, customers, projection, ids };
   })().finally(() => {
     state.hemparshwaSyncRunning = undefined;
   });

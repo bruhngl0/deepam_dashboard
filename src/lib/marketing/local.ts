@@ -14,6 +14,8 @@ export type Lead = {
   id: string; phone: string; name: string; email: string; city: string;
   source: string; campaignId: string; preferredStore: string; date: string; acquiredAt: string;
   claimedBy?: string; claimedAt?: string;
+  /** Shown only, never stored: CRM's Lead ID (LED-) and, once they are a customer, Customer ID (CUS-). Filled when leads are read. */
+  leadCode?: string | null; customerCode?: string | null;
   /** Set when the lead was moved to its salesperson by hand: sheet routing then leaves claimedBy alone. */
   claimPinned?: boolean;
   claimGroup?: string; sheetTabs?: string[];
@@ -198,12 +200,21 @@ export function convertedLeads(data: Dataset) {
   return data.leads.filter(l => byPhone.has(l.phone)).map(l => ({ ...l, sales: byPhone.get(l.phone)! }));
 }
 /** A lead leaves every calling queue as soon as its first call is logged. */
+/** How a lead is identified on screen: its Lead ID, plus the Customer ID once they have bought. */
+export function leadIdLabel(lead: Lead): string {
+  return [lead.leadCode ?? 'Lead ID pending', lead.customerCode].filter(Boolean).join(' · ');
+}
+/** A lead by its internal key, Lead ID or Customer ID (the lead page's URL accepts any). */
+export function findLead(leads: Lead[], key: string): Lead | undefined {
+  const k = decodeURIComponent(key).toUpperCase();
+  return leads.find(l => l.id === key) ?? leads.find(l => l.leadCode === k || l.customerCode === k);
+}
 export function hasLoggedCall(lead: Lead): boolean {
   return lead.interactions.some(interaction => interaction.type === 'call');
 }
 export type LeadFilters = { from: string; to: string; store: string; source: string; search: string };
 export function filterLeads(leads: Lead[], filters: LeadFilters): Lead[] {
-  return leads.filter(l => (!filters.store || l.preferredStore === filters.store) && (!filters.source || l.acquisitions.some(a => a.source === filters.source)) && (!filters.from || (!!l.date && l.date >= filters.from)) && (!filters.to || (!!l.date && l.date <= filters.to)) && `${l.id} ${l.name} ${l.phone} ${l.email} ${l.acquisitions.map(a => `${a.source} ${a.campaignId}`).join(' ')}`.toLowerCase().includes(filters.search.toLowerCase()));
+  return leads.filter(l => (!filters.store || l.preferredStore === filters.store) && (!filters.source || l.acquisitions.some(a => a.source === filters.source)) && (!filters.from || (!!l.date && l.date >= filters.from)) && (!filters.to || (!!l.date && l.date <= filters.to)) && `${l.id} ${l.leadCode ?? ''} ${l.customerCode ?? ''} ${l.name} ${l.phone} ${l.email} ${l.acquisitions.map(a => `${a.source} ${a.campaignId}`).join(' ')}`.toLowerCase().includes(filters.search.toLowerCase()));
 }
 export function metrics(data: Dataset, leads = data.leads) {
   const phones = new Set(leads.map(l => l.phone));

@@ -37,7 +37,10 @@ export interface TimelineEvent {
 
 export interface CustomerHeader {
   id: number;
+  /** Only for customers (drizzle/0026); a lead has none. */
   customerCode: string | null;
+  /** The person's Lead ID, when they came in as a lead. */
+  leadCode: string | null;
   fullName: string | null;
   phoneE164: string;
   city: string | null;
@@ -54,17 +57,25 @@ const clean = (v: unknown) => {
 const humanize = (v: unknown) => clean(v)?.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()) ?? null;
 const compact = (parts: (string | null | undefined | false)[]) => parts.filter((p): p is string => Boolean(p));
 
-/** A Customer ID (CUS-000123) or the numeric row id, as typed in a URL. */
+/**
+ * A person by Customer ID (CUS-000123, including one retired from a lead, drizzle/0026), Lead ID
+ * (LED-000123) or the numeric row id the buyer list links to.
+ */
 export async function getCustomerHeader(idOrCode: string): Promise<CustomerHeader | null> {
-  // Only an explicit CUS- prefix is a Customer ID here; a bare number is the row id the buyer list links to.
   const code = /^CUS-/i.test(idOrCode) ? possibleCustomerCode(idOrCode) : null;
-  const id = !code && /^\d{1,18}$/.test(idOrCode) ? Number(idOrCode) : null;
-  if (!code && !(id && Number.isSafeInteger(id))) return null;
+  const lead = /^LED-\d{6}$/i.test(idOrCode) ? idOrCode.toUpperCase() : null;
+  const id = !code && !lead && /^\d{1,18}$/.test(idOrCode) ? Number(idOrCode) : null;
+  if (!code && !lead && !(id && Number.isSafeInteger(id))) return null;
+  const where = code
+    ? sql`c.customer_code = ${code} OR c.id = (SELECT customer_id FROM customer_codes_retired WHERE code = ${code})`
+    : lead
+      ? sql`c.id = (SELECT customer_id FROM lead_touches WHERE lead_code = ${lead})`
+      : sql`c.id = ${id}`;
   const [row] = await query(sql`
-    SELECT id, customer_code, full_name, phone_e164, city FROM customers
-    WHERE ${code ? sql`customer_code = ${code}` : sql`id = ${id}`} LIMIT 1`);
+    SELECT c.id, c.customer_code, person_lead_code(c.id) AS lead_code, c.full_name, c.phone_e164, c.city
+    FROM customers c WHERE ${where} LIMIT 1`);
   return row
-    ? { id: num(row.id), customerCode: str(row.customer_code), fullName: str(row.full_name), phoneE164: String(row.phone_e164), city: str(row.city) }
+    ? { id: num(row.id), customerCode: str(row.customer_code), leadCode: str(row.lead_code), fullName: str(row.full_name), phoneE164: String(row.phone_e164), city: str(row.city) }
     : null;
 }
 
@@ -216,7 +227,9 @@ export async function getCustomerTimeline(customer: CustomerHeader): Promise<Tim
 
 export interface CustomerCard {
   found: true;
+  /** Only once they are a customer; a lead has just the Lead ID. */
   customerCode: string | null;
+  leadCode: string | null;
   name: string | null;
   /** 'none' when they have never been billed. */
   valueTier: ValueTierCode;
@@ -238,8 +251,8 @@ export async function getCustomerCard(contactNo: string, excludeWalkIn?: string)
   const code = possibleCustomerCode(contactNo);
   if (!national && !code) return { found: false };
   const [customer] = await query(sql`
-    SELECT id, customer_code, full_name, phone_e164 FROM customers
-    WHERE ${national ? sql`phone_national = ${national}` : sql`customer_code = ${code}`} LIMIT 1`);
+    SELECT id, customer_code, person_lead_code(id) AS lead_code, full_name, phone_e164 FROM customers
+    WHERE ${national ? sql`phone_national = ${national}` : sql`customer_code = ${code} OR id = (SELECT customer_id FROM customer_codes_retired WHERE code = ${code})`} LIMIT 1`);
   if (!customer) return { found: false };
   const id = num(customer.id);
   const phone = String(customer.phone_e164);
@@ -281,6 +294,7 @@ export async function getCustomerCard(contactNo: string, excludeWalkIn?: string)
   return {
     found: true,
     customerCode: str(customer.customer_code),
+    leadCode: str(customer.lead_code),
     name: clean(customer.full_name),
     valueTier: (str(one(tier)?.value_tier) as ValueTierCode | null) ?? 'none',
     visits: num(one(tier)?.visits),

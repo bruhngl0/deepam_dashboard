@@ -171,7 +171,7 @@ export default async function BuyerProfilePage({
         <header className="mt-3 mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-ink">{orNotProvided(customer.fullName)}</h1>
           <p className="tnum mt-1 text-sm text-ink-2">
-            {customer.customerCode && `Customer ID ${customer.customerCode} · `}
+            {customer.customerCode ? `Customer ID ${customer.customerCode} · ` : customer.leadCode ? `Lead ID ${customer.leadCode} · ` : ''}
             {formatPhone(customer.phoneE164)}
             {customer.city && ` · ${customer.city}`}
           </p>
@@ -203,6 +203,7 @@ export default async function BuyerProfilePage({
         </h1>
         <p className="tnum mt-1 text-sm text-ink-2">
           {p.customerCode && `Customer ID ${p.customerCode} · `}
+          {customer.leadCode && `Lead ID ${customer.leadCode} · `}
           {formatPhone(p.phoneE164)}
         </p>
         <p className="mt-2 max-w-[80ch] text-sm text-ink-2">{headline(p)}</p>

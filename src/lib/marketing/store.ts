@@ -109,11 +109,27 @@ export async function datasetStamp(): Promise<string> {
 
 /** `shownOnly` limits the page to the leads Marketing Intelligence shows (see LEADS_FROM). */
 export async function leadPage(after: number, limit: number, shownOnly = false) {
-  const rows = await db.select({ seq: marketingLeads.seq, doc: marketingLeads.doc, version: marketingLeads.version })
+  // Each lead comes with CRM's IDs for its person: the Lead ID, and the Customer ID once they are a
+  // customer (drizzle/0026). They are display-only: saveChanges strips them before writing.
+  const rows = await db.select({
+    seq: marketingLeads.seq, doc: marketingLeads.doc, version: marketingLeads.version,
+    leadCode: sql<string | null>`(SELECT person_lead_code(c.id) FROM customers c WHERE c.phone_e164 = ${marketingLeads.phone})`,
+    customerCode: sql<string | null>`(SELECT c.customer_code FROM customers c WHERE c.phone_e164 = ${marketingLeads.phone})`,
+  })
     .from(marketingLeads)
     .where(shownOnly ? and(gt(marketingLeads.seq, after), shownWhere(sql`${marketingLeads.doc}`)) : gt(marketingLeads.seq, after))
     .orderBy(asc(marketingLeads.seq)).limit(limit);
-  return { rows: rows.map((r) => ({ lead: r.doc as Lead, version: r.version })), next: rows.length === limit ? rows[rows.length - 1].seq : null };
+  return {
+    rows: rows.map((r) => ({ lead: { ...(r.doc as Lead), leadCode: r.leadCode ?? null, customerCode: r.customerCode ?? null }, version: r.version })),
+    next: rows.length === limit ? rows[rows.length - 1].seq : null,
+  };
+}
+
+/** The lead as stored: without the display-only CRM IDs that leadPage adds. */
+function stored(lead: Lead): Lead {
+  const { leadCode: _lead, customerCode: _customer, ...doc } = lead;
+  void _lead; void _customer;
+  return doc;
 }
 
 export async function salePage(after: number, limit: number) {
@@ -154,8 +170,9 @@ export function isSale(value: unknown): value is Sale {
     && (s.amount === null || (typeof s.amount === 'number' && Number.isFinite(s.amount) && s.amount > 0)) && typeof s.date === 'string' && typeof s.store === 'string';
 }
 
-export async function saveChanges(leads: LeadWrite[], sales: Sale[]): Promise<SaveResult> {
+export async function saveChanges(writes: LeadWrite[], sales: Sale[]): Promise<SaveResult> {
   const result: SaveResult = { versions: {}, conflicts: [], inserted: 0, updated: 0, sales: 0 };
+  const leads = writes.map((w) => ({ ...w, lead: stored(w.lead) }));
 
   const fresh = leads.filter((w) => w.version === 0);
   for (let i = 0; i < fresh.length; i += INSERT_CHUNK) {

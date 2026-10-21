@@ -273,3 +273,17 @@ export async function syncMarketingLeadsToCrm(
   if (changed) await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY customer_attribution`);
   return result;
 }
+
+/**
+ * Every marketing lead, not only the Google Sheet's, gets its CRM person and a campaign touch, so
+ * each lead carries a Lead ID (LED-) whether it came from the sheet, an Excel import, a hand entry or
+ * a one-off script. Then anyone who now qualifies as a customer gets their Customer ID
+ * (assign_customer_codes, drizzle/0026). Unchanged leads hash the same, so a quiet run writes nothing.
+ */
+export async function linkMarketingLeadsToCrm(): Promise<MarketingCrmSyncResult & { customerCodesIssued: number }> {
+  const { loadDataset } = await import('./store');
+  const { data } = await loadDataset();
+  const result = await syncMarketingLeadsToCrm(data.leads, 'marketing-leads-link');
+  const issued = await db.execute(sql`SELECT assign_customer_codes() AS n`);
+  return { ...result, customerCodesIssued: Number(issued.rows[0]?.n ?? 0) };
+}

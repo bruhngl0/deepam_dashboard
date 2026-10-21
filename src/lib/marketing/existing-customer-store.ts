@@ -9,7 +9,8 @@ export type ExistingCustomerDeskRow = {
   phone: string;
   branch: string;
   city: string;
-  sourceCustomerId: string | null;
+  /** The CRM Customer ID (CUS-) of this existing customer. */
+  customerCode: string | null;
   claimedAt: string;
   preferredStore: string;
   product: string;
@@ -47,7 +48,7 @@ export async function existingCustomerDesk(salesperson: string) {
     `),
     db.execute(sql`
       SELECT contact.id, contact.name, contact.phone, contact.branch, contact.city,
-             contact.source_customer_id, contact.claimed_at, contact.preferred_store,
+             (SELECT c.customer_code FROM customers c WHERE c.phone_e164 = contact.phone) AS customer_code, contact.claimed_at, contact.preferred_store,
              contact.product, contact.category, contact.followup_due, contact.followup_note
       FROM marketing_call_list_contacts contact
       WHERE ${anyCallList}
@@ -60,7 +61,7 @@ export async function existingCustomerDesk(salesperson: string) {
     `),
     db.execute(sql`
       SELECT contact.id, contact.name, contact.phone, contact.branch, contact.city,
-             contact.source_customer_id, contact.claimed_at, contact.preferred_store,
+             (SELECT c.customer_code FROM customers c WHERE c.phone_e164 = contact.phone) AS customer_code, contact.claimed_at, contact.preferred_store,
              contact.product, contact.category, contact.followup_due, contact.followup_note
       FROM marketing_call_list_contacts contact
       WHERE ${anyCallList}
@@ -88,7 +89,7 @@ function mapDeskRow(row: Record<string, unknown>): ExistingCustomerDeskRow {
     phone: String(row.phone),
     branch: String(row.branch ?? ''),
     city: String(row.city ?? ''),
-    sourceCustomerId: row.source_customer_id ? String(row.source_customer_id) : null,
+    customerCode: row.customer_code ? String(row.customer_code) : null,
     claimedAt: String(row.claimed_at).replace(' ', 'T'),
     preferredStore: String(row.preferred_store ?? ''),
     product: String(row.product ?? ''),
@@ -107,7 +108,7 @@ export type ExistingCustomerView = (typeof EXISTING_CUSTOMER_VIEWS)[number];
 /** `from` and `to` are IST days (YYYY-MM-DD); `store` is a branch name from the list. Empty means no limit. */
 export type ExistingCustomerFilters = { from?: string; to?: string; store?: string };
 export type ExistingCustomerListRow = {
-  id: number; sourceCustomerId: string | null; name: string; phone: string; branch: string; city: string; assignedTo: string | null;
+  id: number; customerCode: string | null; name: string; phone: string; branch: string; city: string; assignedTo: string | null;
   lastCalledAt: string | null; lastOutcome: string; lastNote: string; followupDue: string | null; followupNote: string; billed: number | null;
 };
 
@@ -206,7 +207,7 @@ export async function existingCustomerPage(view: ExistingCustomerView, search: s
   const like = `%${search}%`;
   const where = sql.join([
     joined,
-    ...(search ? [sql`(contact.name ILIKE ${like} OR contact.phone ILIKE ${`%${search.replace(/\s/g, '')}%`} OR contact.source_customer_id ILIKE ${like} OR contact.branch ILIKE ${like} OR contact.assigned_to ILIKE ${like})`] : []),
+    ...(search ? [sql`(contact.name ILIKE ${like} OR contact.phone ILIKE ${`%${search.replace(/\s/g, '')}%`} OR contact.source_customer_id ILIKE ${like} OR EXISTS (SELECT 1 FROM customers c WHERE c.phone_e164 = contact.phone AND c.customer_code ILIKE ${like}) OR contact.branch ILIKE ${like} OR contact.assigned_to ILIKE ${like})`] : []),
     ...(view === 'all' ? [] : [is[view]]),
   ], sql` AND `);
   // The called and interested lists are about calls in the period; the others show the customer's latest call of all.
@@ -215,7 +216,7 @@ export async function existingCustomerPage(view: ExistingCustomerView, search: s
   const [countResult, rowResult] = await Promise.all([
     db.execute(sql`${source} SELECT count(*)::int AS filtered ${where}`),
     db.execute(sql`${source}
-      SELECT contact.id, contact.source_customer_id, contact.name, contact.phone, contact.branch, contact.city, contact.assigned_to,
+      SELECT contact.id, (SELECT c.customer_code FROM customers c WHERE c.phone_e164 = contact.phone) AS customer_code, contact.name, contact.phone, contact.branch, contact.city, contact.assigned_to,
              ${isoSql(inPeriod ? 'calls.called_at' : 'calls.last_at')} AS last_called_at,
              ${sql.raw(inPeriod ? 'calls.outcome' : 'calls.last_outcome')} AS last_outcome,
              ${sql.raw(inPeriod ? 'calls.note' : 'calls.last_note')} AS last_note,
@@ -230,7 +231,7 @@ export async function existingCustomerPage(view: ExistingCustomerView, search: s
     pageSize: PAGE_SIZE,
     rows: rowsOf<Record<string, unknown>>(rowResult).map(row => ({
       id: Number(row.id),
-      sourceCustomerId: row.source_customer_id ? String(row.source_customer_id) : null,
+      customerCode: row.customer_code ? String(row.customer_code) : null,
       name: String(row.name),
       phone: String(row.phone),
       branch: String(row.branch ?? ''),

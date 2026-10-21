@@ -20,12 +20,12 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { settings } from '@/db/schema';
 import { normalizePhone } from '@/lib/phone';
-import { EMPTY, formChoice, nowLocal, previewRows, SOURCES } from './local';
+import { formChoice, nowLocal, previewRows, SOURCES } from './local';
 import { readWorkbook, SheetError, type Workbook } from './google-sheets';
 import { routeActive, routeForTab, routeSheetLead } from './sheet-routing';
 import { CANONICAL, tabRows } from './sheet-rows';
 import { loadDataset, saveChanges } from './store';
-import { syncMarketingLeadsToCrm } from './crm-sync';
+import { linkMarketingLeadsToCrm } from './crm-sync';
 
 const CONFIG_KEY = 'marketing_sheet_sync';
 const STATUS_KEY = 'marketing_sheet_sync_status';
@@ -156,11 +156,9 @@ async function sync(force: boolean): Promise<SyncOutcome> {
       if (JSON.stringify(routed) !== JSON.stringify(lead)) changed.set(phone.e164, routed);
     });
     const saved = await saveChanges([...changed.values()].map((lead) => ({ lead, version: versions[lead.id] ?? 0 })), []);
-    // Build the complete valid population independently of Marketing
-    // Intelligence's change detection. If a prior CRM write failed after the
-    // marketing rows committed, the next run can still repair the CRM side.
-    const crmPopulation = previewRows(collected.rows, 'leads', CANONICAL, EMPTY).leads;
-    const crm = await syncMarketingLeadsToCrm(crmPopulation);
+    // Every marketing lead (these sheet rows and anything added another way) gets its CRM person
+    // and Lead ID; a failed CRM write is repaired on the next run, since it starts from all leads.
+    const crm = await linkMarketingLeadsToCrm();
 
     // previewRows numbers rows as if they were one sheet with a header in row 1; map each back to its own tab and row.
     const invalid = [...collected.problems, ...preview.errors.map((e) => ({ ...collected.origin[e.row - 2], reason: e.reason }))];
@@ -187,7 +185,13 @@ export const schedulerRunning = () => state.timer !== null;
 
 /** `force` re-reads the connection and imports even if the sheet looks unchanged. */
 export function runSheetSync(force = false): Promise<SyncOutcome> {
-  return state.running ??= sync(force).finally(() => { state.running = null; });
+  return state.running ??= sync(force).then(async (outcome) => {
+    // Leads added outside the sheet still need their Lead ID when the sheet itself is quiet or off.
+    if (outcome.state === 'unchanged' || outcome.state === 'off') {
+      await linkMarketingLeadsToCrm().catch((error) => console.error('[marketing leads -> CRM]', error));
+    }
+    return outcome;
+  }).finally(() => { state.running = null; });
 }
 
 /** In-process timer for long-running Node hosts. Serverless hosts call the cron route instead. */

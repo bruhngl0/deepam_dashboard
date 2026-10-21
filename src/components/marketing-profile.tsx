@@ -1,19 +1,19 @@
 'use client';
 import Link from 'next/link';
-import { storeName, nowLocal, SOURCES, STORES, uid, type Lead } from '@/lib/marketing/local';
+import { findLead, leadIdLabel, storeName, nowLocal, SOURCES, STORES, uid, type Lead } from '@/lib/marketing/local';
 import { button, card, dateLabel, Field, input, money, primary, useMarketing } from './marketing-shared';
 import { LeadActions } from './marketing-lead-actions';
 export function MarketingProfile({ leadId }: { leadId: string }) {
   const { data, save, message, setMessage } = useMarketing();
   if (!data) return <p className="p-8" role="status">{message || 'Loading customer profile…'}</p>;
-  const lead = data.leads.find(l => l.id === leadId);
+  const lead = findLead(data.leads, leadId);
   if (!lead) return <div className="p-8 text-ink"><h1 className="text-xl font-semibold">Lead not found</h1><Link className={`${button} mt-4`} href="/marketing">Back to Marketing</Link></div>;
   const update = (next: Lead) => { const ok = save({ ...data, leads: data.leads.map(l => l.id === lead.id ? next : l) }); if (ok) setMessage('Profile saved.'); return ok; };
   const sales = data.sales.filter(s => s.phone === lead.phone);
   const timeline = [...lead.interactions.map(i => ({ id: i.id, at: i.at, title: i.outcome ?? i.type, text: i.text })), ...sales.map(s => ({ id: `sale-${s.invoice}`, at: s.date, title: 'Purchase', text: `${s.invoice} · ${s.amount === null ? 'Amount not recorded' : money(s.amount)} · ${storeName(s.store) || 'Store not recorded'}` }))].sort((a, b) => b.at.localeCompare(a.at));
   return <main className="mx-auto max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
     <Link href="/marketing" className="text-sm text-accent">← Marketing workspace</Link>
-    <header><p className="text-xs uppercase tracking-widest text-ink-muted">Customer profile</p><h1 className="mt-2 text-3xl font-semibold text-ink">{lead.name}</h1><p className="mt-2 break-all text-sm text-ink-2">{lead.id} · {lead.phone}</p></header>
+    <header><p className="text-xs uppercase tracking-widest text-ink-muted">Customer profile</p><h1 className="mt-2 text-3xl font-semibold text-ink">{lead.name}</h1><p className="mt-2 break-all text-sm text-ink-2">{leadIdLabel(lead)} · {lead.phone}</p></header>
     <LeadActions key={lead.id} lead={lead} update={update} />
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
     <div className="grid gap-3 sm:grid-cols-4">{[['Lifetime sales', money(sales.reduce((n, s) => n + (s.amount ?? 0), 0))], ['Orders', String(sales.length)], ['Last purchase', dateLabel(sales.map(s => s.date).filter(Boolean).sort().at(-1) ?? '')], ['Preferred store', storeName(lead.preferredStore) || 'Not recorded']].map(([label, value]) => <div className={card} key={label}><p className="text-xs text-ink-muted">{label}</p><p className="mt-2 text-xl font-semibold text-ink">{value}</p></div>)}</div>

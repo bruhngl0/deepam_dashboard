@@ -117,6 +117,8 @@ export async function projectHemparshwaCustomers(): Promise<CustomerProjectionRe
         RETURNING (xmax = 0) AS added
       `);
       const added = (written.rows as { added: boolean }[]).filter((r) => r.added).length;
+      // The ERP master lists people who have bought: they are customers and get their CUS- now.
+      await t.execute(sql`SELECT assign_customer_codes()`);
       return {
         customers: count(await t.execute(sql`SELECT count(DISTINCT e164) AS n FROM hp_master_phone`)),
         added,

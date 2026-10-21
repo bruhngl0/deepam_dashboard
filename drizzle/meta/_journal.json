@@ -183,6 +183,20 @@
       "when": 1792569600000,
       "tag": "0025_the_residency_chennai_store",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792656000000,
+      "tag": "0026_customer_codes_for_customers_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792659600000,
+      "tag": "0027_walk_in_leads",
+      "breakpoints": true
     }
   ]
 }

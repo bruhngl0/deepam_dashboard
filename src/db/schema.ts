@@ -208,7 +208,10 @@ export const customers = pgTable(
   'customers',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    /** Customer ID: CUS-000001, assigned by trigger on insert (drizzle/0017). */
+    /**
+     * Customer ID: CUS-000001, only for customers (a bill, the loyalty list, the ERP master, a call
+     * list, or a store walk-in). Leads have none; it is issued when they first qualify (drizzle/0026).
+     */
     customerCode: text('customer_code').unique(),
     phoneE164: text('phone_e164').notNull().unique(), // '+919964767307'
     phoneNational: text('phone_national').notNull(), // '9964767307'
@@ -248,6 +251,19 @@ export const customers = pgTable(
     index('customers_email_trgm_idx').using('gin', t.email.op('gin_trgm_ops')),
     index('customers_lifecycle_idx').on(t.lifecycle),
   ],
+);
+
+/** CUS- codes taken back from people who are only leads (drizzle/0026). Never issued again; an old code still finds the person. */
+export const customerCodesRetired = pgTable(
+  'customer_codes_retired',
+  {
+    code: text('code').primaryKey(),
+    customerId: bigint('customer_id', { mode: 'number' })
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    retiredAt: timestamp('retired_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('customer_codes_retired_customer_idx').on(t.customerId)],
 );
 
 // ── Lead touches ─────────────────────────────────────────────────────────────

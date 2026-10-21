@@ -8,8 +8,19 @@ import type { HemparshwaRun } from '@/lib/integration/hemparshwa-schedule';
 
 type Outcome = { ok: true; run: HemparshwaRun } | { ok: false; error: string };
 
+/** What changed in Hemparshwa's IDs this run (they follow CRM's). */
+function describeIds(ids: HemparshwaRun['ids']): string {
+  if (!ids) return '';
+  if ('error' in ids) return ` Hemparshwa's IDs were not updated this time: ${ids.error}`;
+  if (!ids.applied) return '';
+  const a = ids.applied;
+  const changed = [[a.customers, 'Customer'], [a.vendors, 'Vendor'], [a.categories, 'Category'], [a.leads, 'Lead']]
+    .filter(([n]) => Number(n) > 0).map(([n, label]) => `${formatNumber(Number(n))} ${label} ID${n === 1 ? '' : 's'}`);
+  return changed.length ? ` Hemparshwa now uses CRM's numbers for ${changed.join(', ')}${ids.skipped ? ` (${formatNumber(ids.skipped)} skipped)` : ''}.` : '';
+}
+
 function describe(run: HemparshwaRun): string {
-  if (run.synced.length === 0 && run.removed.length === 0) return 'Already up to date — nothing new in Hemparshwa OS.';
+  if (run.synced.length === 0 && run.removed.length === 0) return `Already up to date — nothing new in Hemparshwa OS.${describeIds(run.ids)}`;
   const parts: string[] = [];
   const rows = run.synced.reduce((n, s) => n + s.rows, 0);
   if (run.synced.length > 0) parts.push(`${formatNumber(run.synced.length)} import${run.synced.length === 1 ? '' : 's'} pulled (${formatNumber(rows)} rows)`);
@@ -18,7 +29,7 @@ function describe(run: HemparshwaRun): string {
     parts.push(`${formatNumber(run.customers.added)} customers added and ${formatNumber(run.customers.updated)} updated from the Customer Master`);
   }
   if (run.projection) parts.push(`${formatNumber(run.projection.bills)} bills now in CRM`);
-  return `${parts.join(', ')}.`;
+  return `${parts.join(', ')}.${describeIds(run.ids)}`;
 }
 
 const TYPE_LABEL: Record<string, string> = { sales: 'Sales', customers: 'Customer Master' };
