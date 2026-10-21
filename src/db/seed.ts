@@ -33,6 +33,7 @@ const STORES = [
   { code: 'ONLINE', storeCode: 'STR-003', name: 'Online', voucherPrefix: 'BK03-' },
   { code: 'SHUBH_CONVENTION', storeCode: 'STR-004', name: 'Shubh Convention', voucherPrefix: 'BK004-' },
   { code: 'BLVD_COLLECTION', storeCode: 'STR-005', name: 'BLVD Collection', voucherPrefix: 'BK005-' },
+  { code: 'THE_RESIDENCY_CHENNAI', storeCode: 'STR-006', name: 'The Residency-Chennai', voucherPrefix: null },
 ];
 
 /**

@@ -176,6 +176,13 @@
       "when": 1792134000000,
       "tag": "0024_shubh_convention_blvd_collection_stores",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792569600000,
+      "tag": "0025_the_residency_chennai_store",
+      "breakpoints": true
     }
   ]
 }

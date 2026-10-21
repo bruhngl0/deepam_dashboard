@@ -23,7 +23,8 @@ function pass(claims: Record<string, unknown>, secret = SECRET) {
 const now = () => Math.floor(Date.now() / 1000);
 const request = (path: string, cookies: Record<string, string> = {}, method = 'GET') =>
   new NextRequest(`${ORIGIN}${path}`, { method, headers: { host: 'crm.example', 'x-forwarded-proto': 'https', cookie: Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; ') } });
-const cookiesOf = (res: Response) => Object.fromEntries(res.headers.getSetCookie().map((c) => c.split(';')[0].split(/=(.*)/s).slice(0, 2)));
+const cookiesOf = (res: Response) =>
+  Object.fromEntries(res.headers.getSetCookie().map((c) => { const pair = c.split(';')[0]; const at = pair.indexOf('='); return [pair.slice(0, at), pair.slice(at + 1)]; }));
 
 describe('site gate: admin session', () => {
   beforeEach(() => {
@@ -67,7 +68,8 @@ describe('site gate: admin session', () => {
   });
 
   it('sends everyone else to the password form as before, including with a forged or expired admin cookie', async () => {
-    for (const cookies of [{}, { gate_admin: 'nonsense.value' }, { gate_admin: pass({ sub: 7, name: 'A', role: 'admin', exp: now() - 5 }) }]) {
+    const jars: Record<string, string>[] = [{}, { gate_admin: 'nonsense.value' }, { gate_admin: pass({ sub: 7, name: 'A', role: 'admin', exp: now() - 5 }) }];
+    for (const cookies of jars) {
       const res = (await siteGate(request('/crm', cookies), cfg))!;
       expect(res.headers.get('location')).toContain('/__gate?');
     }
