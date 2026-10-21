@@ -61,7 +61,8 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
     return null;
   });
   let crm: DailyCrm, rc: RcDaily | null, stock: StockAlerts | null;
-  if (fromAnalytics) ({ crm, rc, stock } = fromAnalytics);
+  // Stock history in analytics starts on the day it was built; before that, the live stock alerts as before.
+  if (fromAnalytics) ({ crm, rc, stock } = { ...fromAnalytics, stock: fromAnalytics.stock ?? (await getStockAlerts()) });
   else [crm, rc, stock] = await Promise.all([getDailyCrm(date), getRcDaily(date), getStockAlerts()]);
   const columns = buildColumns(crm.stores, rc, stock);
   const sum = (pick: (c: Column) => number) => columns.reduce((n, c) => n + pick(c), 0);
