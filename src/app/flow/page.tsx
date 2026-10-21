@@ -19,18 +19,19 @@ type ModuleCardProps = {
 };
 
 function ModuleCard({ name, description, produces, href, external, icon }: ModuleCardProps) {
-  return (
-    <Link
-      href={href}
-      {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
-      className="card group flex min-h-44 flex-col rounded-2xl border border-line bg-surface p-5 transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-    >
+  const className = 'card group flex min-h-44 flex-col rounded-2xl border border-line bg-surface p-5 transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent';
+  const content = (
+    <>
       <span className="flex size-9 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">{icon}</span>
       <h2 className="mt-4 text-base font-semibold tracking-tight text-ink">{name}</h2>
       <p className="mt-1 text-sm text-ink-2">{description}</p>
       <p className="mt-auto pt-4 text-xs font-medium text-accent">{produces} <span aria-hidden="true">{external ? '↗' : '→'}</span></p>
-    </Link>
+    </>
   );
+  // Other apps open through the gate's /__gate/go (signed in for an admin): a plain link, never prefetched.
+  return external
+    ? <a href={href} target="_blank" rel="noreferrer" className={className}>{content}</a>
+    : <Link href={href} className={className}>{content}</Link>;
 }
 
 function Arrow({ label }: { label: string }) {
@@ -73,7 +74,7 @@ export default async function FlowPage() {
               name="Store Performance Tracker"
               description="Store arrivals, enquiries and product interest."
               produces="Visit · prospect · store event"
-              href="https://na8yspyqqp.ap-south-1.awsapprunner.com"
+              href="/__gate/go?to=https%3A%2F%2Fna8yspyqqp.ap-south-1.awsapprunner.com%2F"
               external
               icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="10" r="2.5" /></svg>}
             />
@@ -88,7 +89,7 @@ export default async function FlowPage() {
               name="Vendor Intelligence"
               description="SKU availability, purchase cost and stock movement."
               produces="SKU · stock · cost event"
-              href="https://n7v6pm6bm2.ap-south-1.awsapprunner.com"
+              href="/__gate/go?to=https%3A%2F%2Fn7v6pm6bm2.ap-south-1.awsapprunner.com%2F"
               external
               icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="m3 7 9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10" strokeLinejoin="round" /></svg>}
             />
@@ -96,7 +97,7 @@ export default async function FlowPage() {
               name="Driver Network Management"
               description="Delivery assignments, status and proof of delivery."
               produces="Dispatch · delivery · cost event"
-              href="https://2q9cmkmxnu.ap-south-1.awsapprunner.com/"
+              href="/__gate/go?to=https%3A%2F%2F2q9cmkmxnu.ap-south-1.awsapprunner.com%2F"
               external
               icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="M3 6h11v11H3zM14 10h3l4 4v3h-7zM7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" strokeLinecap="round" strokeLinejoin="round" /></svg>}
             />

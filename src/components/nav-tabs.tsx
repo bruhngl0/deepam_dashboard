@@ -35,7 +35,7 @@ const CRM_TABS = [
 // Overview lives in the separately deployed vendor application; linking to it
 // directly avoids the hop through `/vendor`, which only redirects there.
 const VENDOR_TABS = [
-  { href: 'https://n7v6pm6bm2.ap-south-1.awsapprunner.com', label: 'Overview' },
+  { href: '/__gate/go?to=https%3A%2F%2Fn7v6pm6bm2.ap-south-1.awsapprunner.com%2F', label: 'Overview' },
   { href: '/vendor/vendors', label: 'Vendors' },
   { href: '/vendor/purchases', label: 'Purchases' },
   { href: '/vendor/performance', label: 'Performance' },
@@ -71,19 +71,18 @@ export function NavTabs() {
         // moment someone opened a profile. The module roots (`/crm`, `/vendor`)
         // are matched exactly on purpose: prefix-matching them would light
         // every tab at once.
-        const external = tab.href.startsWith('http');
+        // Another app, opened through the gate's /__gate/go: a plain link, never prefetched.
+        const external = tab.href.startsWith('http') || tab.href.startsWith('/__gate/');
         const active =
           pathname === tab.href ||
           (tab.href !== '/crm' && !external && pathname.startsWith(`${tab.href}/`));
-        return (
-          <Link
-            key={tab.href}
-            href={external ? tab.href : `${tab.href}${suffix}`}
-            aria-current={active ? 'page' : undefined}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-              active ? 'bg-inset text-ink' : 'text-ink-2 hover:bg-inset hover:text-ink'
-            }`}
-          >
+        const className = `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+          active ? 'bg-inset text-ink' : 'text-ink-2 hover:bg-inset hover:text-ink'
+        }`;
+        return external ? (
+          <a key={tab.href} href={tab.href} className={className}>{tab.label}</a>
+        ) : (
+          <Link key={tab.href} href={`${tab.href}${suffix}`} aria-current={active ? 'page' : undefined} className={className}>
             {tab.label}
           </Link>
         );

@@ -10,7 +10,10 @@
  * The Hemparshwa OS admin skips every password: Hemparshwa's /go link sends them to
  * ADMIN_PASS_PATH with a pass signed with ADMIN_SSO_SECRET (shared with Hemparshwa),
  * valid for one minute and for this app's origin only. A good pass sets the cookie of
- * every module, plus the app's own admin or staff logins (`adminCookies`).
+ * every module, plus the app's own admin or staff logins (`adminCookies`), and keeps a signed admin
+ * session (30 days, renewed on use) so those logins are renewed before they lapse and the admin
+ * never sees a password here. GO_PATH sends a signed-in admin on to another Deepam app with a
+ * fresh pass, so moving between the apps needs no password either.
  *
  * The same file is copied into CRM, Vendor Intelligence, RC Dashboard and WalkTrack;
  * keep the copies identical.
@@ -31,11 +34,22 @@ export type GateConfig = {
   moduleFor: (pathname: string) => GateModule | 'any' | null;
   /** The app's own logins (admin, staff, store counters) to sign the Hemparshwa admin in to as well. */
   adminCookies?: () => GateCookie[] | Promise<GateCookie[]>;
+  /** Origins of the other Deepam apps this one links to through GO_PATH. */
+  peers?: string[];
 };
 
 export const GATE_PATH = '/__gate';
 export const ADMIN_PASS_PATH = '/__gate/admin';
+/** Opens another Deepam app, signed in for an admin (see goToPeer). */
+export const GO_PATH = '/__gate/go';
 const MAX_AGE = 60 * 60 * 12;
+// The admin session: renewed on use, so it ends only after 30 days without opening the app.
+const ADMIN_COOKIE = 'gate_admin';
+const ADMIN_MAX_AGE = 60 * 60 * 24 * 30;
+// Marks the app's logins as recently renewed for the admin; when it lapses they are renewed again.
+const FRESH_COOKIE = 'gate_admin_fresh';
+const FRESH_MAX_AGE = 60 * 60;
+const PASS_SECONDS = 60;
 const encoder = new TextEncoder();
 
 async function sha256(text: string) {
@@ -159,51 +173,118 @@ async function hmac(secret: string, data: string) {
   return base64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(data))));
 }
 
-/** A pass is `<base64url JSON>.<base64url HMAC-SHA256 of the first part>`, minted by Hemparshwa's /go. */
-async function adminPassValid(req: NextRequest, pass: string | null) {
+const fromBase64url = (text: string) => {
+  const padded = text.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((text.length + 3) % 4);
+  return new TextDecoder().decode(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0)));
+};
+const ssoSecret = () => {
   const secret = process.env.ADMIN_SSO_SECRET;
-  if (!secret || secret.length < 32 || !pass) return false;
-  const [body, signature] = pass.split('.');
-  if (!body || !signature || !(await same(signature, await hmac(secret, body)))) return false;
+  return secret && secret.length >= 32 ? secret : null;
+};
+
+type AdminClaims = { sub: string; name: string; role: 'admin'; aud?: string; exp: number };
+
+/** `<base64url JSON>.<base64url HMAC-SHA256 of the first part>` under ADMIN_SSO_SECRET; null when forged, expired or not an admin. */
+async function readSigned(token: string | null | undefined): Promise<AdminClaims | null> {
+  const secret = ssoSecret();
+  if (!secret || !token) return null;
+  const [body, signature] = token.split('.');
+  if (!body || !signature || !(await same(signature, await hmac(secret, body)))) return null;
   try {
-    const padded = body.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((body.length + 3) % 4);
-    const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))));
-    const expiresAt = Number(claims.exp) * 1000;
-    // Short-lived and for this app only, so a pass seen in a log or history is soon worthless.
-    return claims.role === 'admin' && claims.aud === publicOrigin(req) && expiresAt > Date.now() && expiresAt < Date.now() + 5 * 60_000;
+    const claims = JSON.parse(fromBase64url(body));
+    return claims.role === 'admin' && Number(claims.exp) * 1000 > Date.now() ? { ...claims, sub: String(claims.sub ?? ''), name: String(claims.name ?? '') } : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-async function adminSignIn(req: NextRequest, cfg: GateConfig) {
-  const params = req.nextUrl.searchParams;
-  const next = safeNext(params.get('next'));
-  // A bad or expired pass falls back to the ordinary password form.
-  if (!(await adminPassValid(req, params.get('t')))) return redirect(req, `${GATE_PATH}?${new URLSearchParams({ m: 'any', next })}`);
+async function signed(claims: AdminClaims) {
+  const body = base64url(encoder.encode(JSON.stringify(claims)));
+  return `${body}.${await hmac(ssoSecret()!, body)}`;
+}
+
+/** A pass, minted by Hemparshwa's /go or by another Deepam app's GO_PATH: one minute, for this app only. */
+async function adminPassValid(req: NextRequest, pass: string | null) {
+  const claims = await readSigned(pass);
+  // Short-lived and for this app only, so a pass seen in a log or history is soon worthless.
+  return claims && claims.aud === publicOrigin(req) && claims.exp * 1000 < Date.now() + 5 * 60_000 ? claims : null;
+}
+
+/** The admin session this app keeps once a pass has been accepted (see ADMIN_COOKIE). */
+const adminSession = (req: NextRequest) => readSigned(req.cookies.get(ADMIN_COOKIE)?.value);
+
+/** Every cookie that signs the admin in here: each module, the app's own logins, the admin session and the freshness marker. */
+async function adminCookies(cfg: GateConfig, claims: AdminClaims): Promise<GateCookie[]> {
   const cookies: GateCookie[] = [];
   for (const m of cfg.modules) {
     const password = passwordOf(m);
     if (password) cookies.push({ name: cookieName(m), value: await tokenFor(m, password), maxAge: MAX_AGE });
   }
   cookies.push(...((await cfg.adminCookies?.()) ?? []));
-  const response = redirect(req, next);
+  const session: AdminClaims = { sub: claims.sub, name: claims.name, role: 'admin', exp: Math.floor(Date.now() / 1000) + ADMIN_MAX_AGE };
+  cookies.push({ name: ADMIN_COOKIE, value: await signed(session), maxAge: ADMIN_MAX_AGE });
+  cookies.push({ name: FRESH_COOKIE, value: '1', maxAge: FRESH_MAX_AGE });
+  return cookies;
+}
+
+function withCookies(response: NextResponse, cookies: GateCookie[]) {
   for (const c of cookies) response.headers.append('Set-Cookie', setCookie(c));
   return response;
+}
+
+async function adminSignIn(req: NextRequest, cfg: GateConfig) {
+  const params = req.nextUrl.searchParams;
+  const next = safeNext(params.get('next'));
+  const claims = await adminPassValid(req, params.get('t'));
+  // A bad or expired pass falls back to the ordinary password form.
+  if (!claims) return redirect(req, `${GATE_PATH}?${new URLSearchParams({ m: 'any', next })}`);
+  return withCookies(redirect(req, next), await adminCookies(cfg, claims));
+}
+
+/**
+ * Opens another Deepam app (cfg.peers). A signed-in admin goes through that app's
+ * ADMIN_PASS_PATH with a one-minute pass for it, so they arrive signed in there too;
+ * anyone else is sent to the app as is and meets its own password.
+ */
+async function goToPeer(req: NextRequest, cfg: GateConfig) {
+  let target: URL;
+  try {
+    target = new URL(req.nextUrl.searchParams.get('to') ?? '');
+  } catch {
+    return new NextResponse('Unknown app', { status: 400 });
+  }
+  if (!(cfg.peers ?? []).includes(target.origin)) return new NextResponse('Unknown app', { status: 400 });
+  const session = await adminSession(req);
+  let location = target.toString();
+  if (session) {
+    const pass = await signed({ sub: session.sub, name: session.name, role: 'admin', aud: target.origin, exp: Math.floor(Date.now() / 1000) + PASS_SECONDS });
+    location = `${target.origin}${ADMIN_PASS_PATH}?${new URLSearchParams({ t: pass, next: target.pathname + target.search })}`;
+  }
+  return new NextResponse(null, { status: 303, headers: { Location: location, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 }
 
 /** Returns the response to send instead of the page, or null to let the request through. */
 export async function siteGate(req: NextRequest, cfg: GateConfig): Promise<NextResponse | null> {
   const { pathname, search } = req.nextUrl;
   if (pathname === ADMIN_PASS_PATH && req.method === 'GET') return adminSignIn(req, cfg);
+  if (pathname === GO_PATH && req.method === 'GET') return goToPeer(req, cfg);
   if (pathname === GATE_PATH) {
     if (req.method === 'POST') return signIn(req, cfg);
     const params = req.nextUrl.searchParams;
     return form(cfg, params.get('m') ?? 'any', safeNext(params.get('next')), false);
   }
 
+  // An admin signed in once (from Hemparshwa) never meets a password here: about once an hour,
+  // on a page view, every login of this app is renewed and the admin session slides forward.
+  const session = await adminSession(req);
+  const page = (req.method === 'GET' || req.method === 'HEAD') && !pathname.startsWith('/api/');
+  if (session && page && !req.cookies.get(FRESH_COOKIE)) {
+    return withCookies(redirect(req, pathname + search), await adminCookies(cfg, session));
+  }
+
   const need = cfg.moduleFor(pathname);
   if (!need) return null;
+  if (session) return null;
   for (const m of need === 'any' ? cfg.modules : [need]) if (await signedIn(req, m)) return null;
 
   if (pathname.startsWith('/api/')) {

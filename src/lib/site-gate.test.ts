@@ -39,7 +39,8 @@ describe('admin pass', () => {
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe(`${ORIGIN}/crm`);
     const cookies = res.headers.getSetCookie();
-    expect(cookies.map((c) => c.split('=')[0])).toEqual(['gate_customer', 'gate_marketing', 'store_manager_session']);
+    // Plus the admin session (30 days, renewed on use) and the marker that renews the logins about hourly.
+    expect(cookies.map((c) => c.split('=')[0])).toEqual(['gate_customer', 'gate_marketing', 'store_manager_session', 'gate_admin', 'gate_admin_fresh']);
     expect(cookies[2]).toContain('Path=/store-manager');
 
     const jar = cookies.map((c) => c.split(';')[0]).join('; ');

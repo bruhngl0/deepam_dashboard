@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import type { PurchaseRegisterRow } from '@/lib/queries/vendor-workspace';
 
@@ -11,7 +10,7 @@ export function VendorPurchaseRegister({ rows }: { rows: PurchaseRegisterRow[] }
           <h1 className="text-3xl font-semibold tracking-tight text-ink">Purchase register</h1>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">PO, receipt, QC, returns and branch allocation at SKU level.</p>
         </div>
-        <Link href="https://n7v6pm6bm2.ap-south-1.awsapprunner.com" className="text-sm font-medium text-accent">← Dashboard</Link>
+        <a href="/__gate/go?to=https%3A%2F%2Fn7v6pm6bm2.ap-south-1.awsapprunner.com%2F" className="text-sm font-medium text-accent">← Dashboard</a>
       </header>
       <section className="card overflow-x-auto rounded-2xl border border-line bg-surface">
         <table className="w-full min-w-[98rem] text-sm">
