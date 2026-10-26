@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { storeName, campaignName, convertedLeads, filterLeads, hasLoggedCall, metrics, nowLocal, type Lead } from '@/lib/marketing/local';
-import { button, CampaignTag, card, dateLabel, dayMonthYearLabel, input, LeadMeta, money, primary, useMarketing } from './marketing-shared';
+import { storeName, campaignName, convertedLeads, filterLeads, hasLoggedCall, metrics, nowLocal, STORES, type Lead } from '@/lib/marketing/local';
+import { button, CampaignTag, card, dateLabel, dayMonthYearLabel, Field, input, LeadMeta, money, primary, useMarketing } from './marketing-shared';
 import { MarketingSalespeople } from './marketing-salespeople';
 
 type ManagerTab = 'Overview' | 'All leads' | 'Team queue' | 'Follow-ups' | 'Team performance';
@@ -18,14 +18,19 @@ export function StoreManagerWorkspace({ logoutAction }: { logoutAction: () => Pr
   const [tab, setTab] = useState<ManagerTab>('Overview');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [store, setStore] = useState('');
   if (!data) return <p role="status" className="p-8 text-ink-2">{message || 'Loading store manager workspace...'}</p>;
 
+  // The date (lead date) and store (preferred store) filters narrow every tab except Team performance, which has its own.
+  const leads = filterLeads(data.leads, { from, to, store, source: '', search: '' });
   const converted = convertedLeads(data);
   const convertedPhones = new Set(converted.map(lead => lead.phone));
-  const queue = data.leads.filter(lead => !hasLoggedCall(lead) && !convertedPhones.has(lead.phone) && !['Connected / not interested', 'Wrong number'].includes(lead.status));
-  const pending = data.leads.flatMap(lead => lead.followups.filter(followup => !followup.completedAt).map(followup => ({ lead, followup }))).sort((a, b) => a.followup.due.localeCompare(b.followup.due));
-  const stats = metrics(data);
-  const selected = tab === 'Team queue' ? queue : data.leads;
+  const queue = leads.filter(lead => !hasLoggedCall(lead) && !convertedPhones.has(lead.phone) && !['Connected / not interested', 'Wrong number'].includes(lead.status));
+  const pending = leads.flatMap(lead => lead.followups.filter(followup => !followup.completedAt).map(followup => ({ lead, followup }))).sort((a, b) => a.followup.due.localeCompare(b.followup.due));
+  const stats = metrics(data, leads);
+  const selected = tab === 'Team queue' ? queue : leads;
   const visible = filterLeads(selected, { from: '', to: '', store: '', source: '', search });
   const currentPage = Math.min(page, Math.max(0, Math.ceil(visible.length / 20) - 1));
   const now = nowLocal().slice(0, 16);
@@ -35,6 +40,14 @@ export function StoreManagerWorkspace({ logoutAction }: { logoutAction: () => Pr
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
     <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Store manager</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Team operations dashboard</h1><p className="mt-2 text-sm text-ink-2">Monitor the lead pipeline, follow-ups, and salesperson performance.</p></div><form action={logoutAction}><button className={button}>Sign out</button></form></header>
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
+    {tab !== 'Team performance' && <section aria-label="Lead filters" className={`${card} flex flex-wrap items-end gap-3`}>
+      <Field label="Leads from"><input type="date" className={input} max={to || undefined} value={from} onChange={event => { setFrom(event.target.value); setPage(0); }} /></Field>
+      <Field label="Leads to"><input type="date" className={input} min={from || undefined} value={to} onChange={event => { setTo(event.target.value); setPage(0); }} /></Field>
+      <Field label="Store"><select className={input} value={store} onChange={event => { setStore(event.target.value); setPage(0); }}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></Field>
+      <button className={button} onClick={() => { setFrom(''); setTo(''); setStore(''); setPage(0); }}>Clear filters</button>
+      <p className="w-full text-xs text-ink-muted">By the date the lead arrived and the store they prefer.</p>
+      {from && to && from > to && <p role="alert" className="w-full text-sm text-red-600">From must be on or before To.</p>}
+    </section>}
     <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Store manager sections">{tabs.map(value => <button key={value} className={tab === value ? primary : button} aria-current={tab === value ? 'page' : undefined} onClick={() => changeTab(value)}>{value}{value === 'Team queue' ? ` (${queue.length})` : value === 'Follow-ups' ? ` (${pending.length})` : ''}</button>)}</nav>
     {tab === 'Overview' && <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
       ['Total leads', stats.total], ['Team queue', queue.length], ['Pending follow-ups', pending.length], ['Interested', stats.interested], ['Converted', stats.converted], ['Sales', money(stats.revenue)], ['Contacted', stats.contacted], ['Walk-ins', stats.visits],

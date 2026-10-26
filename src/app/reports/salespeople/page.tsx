@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
-import { periodFrom, salespeople, unattributed } from '@/lib/analytics/reports';
+import { periodFrom, reportStores, salespeople, unattributed } from '@/lib/analytics/reports';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { Card, PeriodForm, pct, ReportShell, Table } from '../report-shell';
 
@@ -9,12 +9,12 @@ export const dynamic = 'force-dynamic';
 export default async function SalespeoplePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireUser();
   const period = periodFrom(await searchParams);
-  const [rows, missing] = await Promise.all([salespeople(period).catch(() => []), unattributed(period).catch(() => null)]);
+  const [rows, missing, stores] = await Promise.all([salespeople(period).catch(() => []), unattributed(period).catch(() => null), reportStores().catch(() => [])]);
 
   return (
     <ReportShell title="Salespeople" current="/reports/salespeople"
-      intro="One row per Salesperson ID, adding up their WalkTrack walk-ins, bills and marketing calls. A walk-in served by two people counts for each."
-      actions={<PeriodForm action="/reports/salespeople" from={period.from} to={period.to} />}>
+      intro="One row per Salesperson ID, adding up their WalkTrack walk-ins, bills and marketing calls. A walk-in served by two people counts for each. Picking a store shows that store's salespeople; unmatched calls are not recorded per store."
+      actions={<PeriodForm action="/reports/salespeople" from={period.from} to={period.to} stores={stores} store={period.store} />}>
       {missing && (missing.bills > 0 || missing.calls > 0) && (
         <p className="mb-4 text-sm text-ink-2">
           Not credited to anyone yet: {formatNumber(missing.bills)} bills ({formatCurrency(missing.sales)}) and {formatNumber(missing.calls)} calls in this period, from {formatNumber(missing.unmatchedNames)} names not matched.{' '}

@@ -85,8 +85,10 @@ export function Table({ head, rows, empty = 'Nothing to show for this period.', 
   );
 }
 
-/** From/to picker; keeps any other query values (e.g. the funnel grouping) as hidden fields. */
-export function PeriodForm({ action, from, to, keep = {} }: { action: string; from: string; to: string; keep?: Record<string, string> }) {
+/** From/to and store picker; keeps any other query values (e.g. the funnel grouping) as hidden fields. */
+export function PeriodForm({ action, from, to, stores, store, keep = {} }: {
+  action: string; from: string; to: string; stores: { code: string; name: string }[]; store: string | null; keep?: Record<string, string>;
+}) {
   const input = 'rounded-lg border border-line bg-surface px-3 py-2 text-ink';
   return (
     <form action={action} className="flex flex-wrap items-center gap-2 text-sm">
@@ -95,6 +97,11 @@ export function PeriodForm({ action, from, to, keep = {} }: { action: string; fr
       <input id="period-from" type="date" name="from" defaultValue={from} max={to} className={input} />
       <label className="text-ink-2" htmlFor="period-to">To</label>
       <input id="period-to" type="date" name="to" defaultValue={to} className={input} />
+      <label className="text-ink-2" htmlFor="period-store">Store</label>
+      <select id="period-store" name="store" defaultValue={store ?? ''} className={input}>
+        <option value="">All stores</option>
+        {stores.map((s) => <option key={s.code} value={s.code}>{s.name} ({s.code})</option>)}
+      </select>
       <button className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Show</button>
     </form>
   );
