@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
-import { funnel, FUNNEL_GROUPS, periodFrom, type FunnelGroup } from '@/lib/analytics/reports';
+import { funnel, FUNNEL_GROUPS, periodFrom, reportStores, type FunnelGroup } from '@/lib/analytics/reports';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { Card, PeriodForm, pct, ReportShell, Table } from '../report-shell';
 
@@ -11,19 +11,19 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const period = periodFrom(sp);
   const by: FunnelGroup = (Object.keys(FUNNEL_GROUPS) as FunnelGroup[]).find((k) => k === sp.by) ?? 'store';
-  const rows = await funnel(period, by).catch(() => []);
+  const [rows, stores] = await Promise.all([funnel(period, by).catch(() => []), reportStores().catch(() => [])]);
   const total = rows.reduce((t, r) => ({ leads: t.leads + r.leads, called: t.called + r.called, walkedIn: t.walkedIn + r.walkedIn, bought: t.bought + r.bought, boughtAgain: t.boughtAgain + r.boughtAgain, sales: t.sales + r.sales }),
     { leads: 0, called: 0, walkedIn: 0, bought: 0, boughtAgain: 0, sales: 0 });
   const row = (label: React.ReactNode, r: typeof total) => [
     label, formatNumber(r.leads), `${formatNumber(r.called)} · ${pct(r.called, r.leads)}`, `${formatNumber(r.walkedIn)} · ${pct(r.walkedIn, r.leads)}`,
     `${formatNumber(r.bought)} · ${pct(r.bought, r.leads)}`, `${formatNumber(r.boughtAgain)} · ${pct(r.boughtAgain, r.bought)}`, formatCurrency(r.sales),
   ];
-  const q = (k: FunnelGroup) => `/reports/funnel?${new URLSearchParams({ from: period.from, to: period.to, by: k })}`;
+  const q = (k: FunnelGroup) => `/reports/funnel?${new URLSearchParams({ from: period.from, to: period.to, by: k, ...(period.store ? { store: period.store } : {}) })}`;
 
   return (
     <ReportShell title="Funnel" current="/reports/funnel"
       intro="Leads that arrived in the period, and what each did afterwards: called, walked in, bought, bought again. Percentages are of leads, except Bought again, which is of those who bought."
-      actions={<PeriodForm action="/reports/funnel" from={period.from} to={period.to} keep={{ by }} />}>
+      actions={<PeriodForm action="/reports/funnel" from={period.from} to={period.to} stores={stores} store={period.store} keep={{ by }} />}>
       <nav aria-label="Group by" className="mb-4 flex flex-wrap items-center gap-2 text-sm">
         <span className="text-ink-2">By</span>
         {(Object.keys(FUNNEL_GROUPS) as FunnelGroup[]).map((k) => (

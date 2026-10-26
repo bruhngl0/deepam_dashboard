@@ -9,7 +9,9 @@
  * the query string across them). Unset means the full loaded period and every
  * store — nothing narrows until someone actually picks a bound.
  *
- * Hidden on `/crm/import`: nothing on that page reads either param. Owns its
+ * Also used above `/vendor/*` (app/vendor/layout.tsx), where `notes` says per page what the filters narrow.
+ *
+ * Hidden on the import pages: nothing on them reads either param. Owns its
  * own bordered wrapper rather than `layout.tsx` owning one around it, so
  * hiding it there leaves no empty strip behind.
  */
@@ -26,15 +28,18 @@ const selectClass =
 export function MasterFilterBar({
   stores,
   dateBounds,
+  notes = {},
 }: {
   stores: { code: string; name: string }[];
   /** The full loaded range — the `min`/`max` a date picker can't sensibly exceed. */
   dateBounds: { earliest: string | null; latest: string | null };
+  /** A short line shown after the controls on the page with this pathname. */
+  notes?: Record<string, string>;
 }) {
   const pathname = usePathname();
   const { setParam, params, pending } = useSetParam();
 
-  if (pathname === '/crm/import') return null;
+  if (pathname.endsWith('/import')) return null;
 
   const from = params.get('from');
   const to = params.get('to');
@@ -97,6 +102,7 @@ export function MasterFilterBar({
             Clear
           </button>
         )}
+        {notes[pathname] && <span className="w-full text-xs text-ink-muted sm:w-auto">{notes[pathname]}</span>}
       </div>
     </div>
   );
