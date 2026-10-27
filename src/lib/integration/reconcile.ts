@@ -34,6 +34,8 @@ export async function reconcileStoreVisits(externalId?: string): Promise<number>
       JOIN sales s ON s.customer_id = sv.customer_id AND s.store_id = sv.store_id
         AND (s.billed_at AT TIME ZONE 'Asia/Kolkata')::date = (sv.visited_at AT TIME ZONE 'Asia/Kolkata')::date
       WHERE sv.deleted_at IS NULL AND sv.customer_id IS NOT NULL AND sv.pos_sale_id IS NULL ${filter}
+        -- A bill already tied to another visit is taken (one visit per bill, store_visits_pos_sale_uidx).
+        AND NOT EXISTS (SELECT 1 FROM store_visits taken WHERE taken.pos_sale_id = s.id)
     ), chosen AS (
       SELECT visit_id, sale_id FROM candidates WHERE visit_rank=1 AND sale_rank=1
     )
