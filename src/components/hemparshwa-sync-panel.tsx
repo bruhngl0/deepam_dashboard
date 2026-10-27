@@ -19,8 +19,15 @@ function describeIds(ids: HemparshwaRun['ids']): string {
   return changed.length ? ` Hemparshwa now uses CRM's numbers for ${changed.join(', ')}${ids.skipped ? ` (${formatNumber(ids.skipped)} skipped)` : ''}.` : '';
 }
 
+/** Bills from marketing leads that this run copied into Marketing Intelligence. */
+function describeConversions(c: HemparshwaRun['conversions']): string {
+  if (!c) return '';
+  if ('error' in c) return ` Marketing Intelligence conversions were not updated this time: ${c.error}`;
+  return c.billsAdded > 0 ? ` ${formatNumber(c.billsAdded)} new bill${c.billsAdded === 1 ? '' : 's'} from marketing leads copied to Marketing Intelligence.` : '';
+}
+
 function describe(run: HemparshwaRun): string {
-  if (run.synced.length === 0 && run.removed.length === 0) return `Already up to date — nothing new in Hemparshwa OS.${describeIds(run.ids)}`;
+  if (run.synced.length === 0 && run.removed.length === 0) return `Already up to date — nothing new in Hemparshwa OS.${describeIds(run.ids)}${describeConversions(run.conversions)}`;
   const parts: string[] = [];
   const rows = run.synced.reduce((n, s) => n + s.rows, 0);
   if (run.synced.length > 0) parts.push(`${formatNumber(run.synced.length)} import${run.synced.length === 1 ? '' : 's'} pulled (${formatNumber(rows)} rows)`);
@@ -29,7 +36,7 @@ function describe(run: HemparshwaRun): string {
     parts.push(`${formatNumber(run.customers.added)} customers added and ${formatNumber(run.customers.updated)} updated from the Customer Master`);
   }
   if (run.projection) parts.push(`${formatNumber(run.projection.bills)} bills now in CRM`);
-  return `${parts.join(', ')}.${describeIds(run.ids)}`;
+  return `${parts.join(', ')}.${describeIds(run.ids)}${describeConversions(run.conversions)}`;
 }
 
 const TYPE_LABEL: Record<string, string> = { sales: 'Sales', customers: 'Customer Master' };

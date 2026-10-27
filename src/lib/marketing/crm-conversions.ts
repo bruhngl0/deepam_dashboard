@@ -16,7 +16,16 @@ export type CrmConversionSync = { billsAdded: number; convertedLeads: number; la
 const rowsOf = <T>(result: unknown): T[] =>
   Array.isArray(result) ? (result as T[]) : ((result as { rows?: T[] }).rows ?? []);
 
+/** CRM store code → the store value Marketing Intelligence keeps (MG / JAYNAGAR / Online / Exhibition). */
+const STORE_OF = sql.raw(`CASE st.code WHEN 'MG_ROAD' THEN 'MG' WHEN 'JAYANAGAR' THEN 'JAYNAGAR' WHEN 'ONLINE' THEN 'Online' WHEN 'EXHIBITION' THEN 'Exhibition' ELSE '' END`);
+
 export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
+  // Bills copied before a store was mapped (Exhibition) were saved with no store: fill it in.
+  await db.execute(sql`
+    UPDATE marketing_sales ms SET store = ${STORE_OF}
+    FROM sales s JOIN stores st ON st.id = s.store_id
+    WHERE s.voucher_no = ms.invoice AND coalesce(ms.store, '') = '' AND ${STORE_OF} <> ''
+  `);
   const added = rowsOf<{ invoice: string }>(await db.execute(sql`
     INSERT INTO marketing_sales (invoice, phone, amount, sold_at, store)
     SELECT DISTINCT ON (s.voucher_no)
@@ -24,7 +33,7 @@ export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
       ml.phone,
       s.bill_amount,
       to_char(s.billed_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS'),
-      CASE st.code WHEN 'MG_ROAD' THEN 'MG' WHEN 'JAYANAGAR' THEN 'JAYNAGAR' WHEN 'ONLINE' THEN 'Online' ELSE '' END
+      ${STORE_OF}
     FROM marketing_leads ml
     JOIN customers c ON c.phone_e164 = ml.phone
     JOIN sales s ON s.customer_id = c.id
