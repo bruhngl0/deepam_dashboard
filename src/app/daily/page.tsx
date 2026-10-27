@@ -106,15 +106,6 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
     ['Stock sold (cost)', stockTotal ? formatCurrency(stockTotal.sold) : '—'],
     ['Closing stock', stockTotal ? formatCurrency(stockTotal.closing) : '—'],
   ];
-  const whatsappText = [
-    `*Deepam daily · ${formatDate(`${date}T12:00:00+05:30`)}*`,
-    store ? `${columns[0].name} (${store})` : 'All stores',
-    '',
-    ...summary.map(([k, v]) => `${k}: ${v}`),
-    '',
-    `*Stock at cost*${stockAsOf ? ` (from the stock report of ${stockAsOf})` : ''}`,
-    ...stockSummary.map(([k, v]) => `${k}: ${v}`),
-  ].join('\n');
   const unassignedRc = rc && !store ? rc.day.filter((d) => !d.storeCode).reduce((n, d) => n + d.visits, 0) : 0;
   const rcDay = rc ? rc.day.filter((d) => inStore(d.storeCode)) : [];
   const rcOwed = rc ? rc.owed.filter((d) => inStore(d.storeCode)) : [];
@@ -127,6 +118,12 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
         owedVisits: rcOwed.reduce((n, d) => n + d.visits, 0),
       }
     : null;
+  const whatsappText = dailyText({
+    date, scope: store ? `${columns[0].name} (${store})` : 'All stores', columns, summary, stockTotal, stockAsOf,
+    rc: rc && rcTotal ? { total: rcTotal, unassigned: unassignedRc } : null,
+    stock: stock ? { ...stock, stores: stock.stores.filter((s) => inStore(s.storeCode)) } : null,
+    calls: crm.calls, followups: crm.followups,
+  });
   const colSpan = columns.length + 2;
   const rcCell = (pick: (r: NonNullable<Column['rc']>) => string) => (c: Column) => (c.rc ? pick(c.rc) : '—');
   const stockCell = (pick: (s: NonNullable<Column['stock']>) => string) => (c: Column) => (c.stock ? pick(c.stock) : '—');
@@ -290,4 +287,72 @@ function buildColumns(stores: DailyStore[], rc: RcDaily | null, stock: StockAler
       value: v ? { opening: v.opening, sold: v.sold, closing: v.closing } : null,
     };
   });
+}
+
+/** The whole day as WhatsApp text: every section of the page, a line per store that had anything. */
+function dailyText(d: {
+  date: string;
+  scope: string;
+  columns: Column[];
+  summary: [string, string][];
+  stockTotal: { opening: number; sold: number; closing: number } | null;
+  stockAsOf: string | null;
+  rc: { total: { visits: number; people: number; commission: number; owed: number; owedVisits: number }; unassigned: number } | null;
+  stock: StockAlerts | null;
+  calls: DailyCrm['calls'];
+  followups: DailyCrm['followups'];
+}): string {
+  const cur = formatCurrency;
+  const pct = (part: number, whole: number) => (whole ? formatPercent(part, whole) : '—');
+  const many = d.columns.length > 1;
+  const name = (code: string) => d.columns.find((c) => c.storeCode === code)?.name ?? code;
+  const out: string[] = [`*Deepam daily · ${formatDate(`${d.date}T12:00:00+05:30`)}*`, d.scope, ''];
+  const section = (title: string, lines: string[]) => { if (lines.length) out.push(`*${title}*`, ...lines, ''); };
+
+  section('Summary', d.summary.map(([k, v]) => `${k}: ${v}`));
+
+  const walked = d.columns.filter((c) => c.walkIns);
+  section('Walk-ins (WalkTrack)', walked.length
+    ? walked.map((c) => `${many ? `${c.name}: ` : ''}${formatNumber(c.walkIns)} walk-ins, ${formatNumber(c.people)} people, ${formatNumber(c.converted)} converted (${pct(c.converted, c.walkIns)})`)
+    : ['No walk-ins']);
+
+  const sold = d.columns.filter((c) => c.bills || c.sales || c.mtdSales);
+  section('Sales (billing)', sold.length
+    ? sold.map((c) => `${many ? `${c.name}: ` : ''}${cur(c.sales)} · ${formatNumber(c.bills)} bills · avg ${c.bills ? cur(c.sales / c.bills) : '—'} · ${formatNumber(c.units)} units · prev day ${cur(c.prevSales)} · MTD ${cur(c.mtdSales)}`)
+    : ['No sales']);
+
+  if (d.rc) {
+    const visited = d.columns.filter((c) => c.rc && (c.rc.visits || c.rc.owed));
+    const lines = visited.map((c) => `${many ? `${c.name}: ` : ''}${formatNumber(c.rc!.visits)} visits, ${formatNumber(c.rc!.people)} people, commission ${cur(c.rc!.commission)}${c.rc!.owedVisits ? `, not yet paid ${cur(c.rc!.owed)} (${formatNumber(c.rc!.owedVisits)} visits)` : ''}`);
+    if (d.rc.unassigned) lines.push(`No store recorded: ${formatNumber(d.rc.unassigned)} visits`);
+    if (many && lines.length) lines.push(`Total: ${formatNumber(d.rc.total.visits)} visits, ${formatNumber(d.rc.total.people)} people, commission ${cur(d.rc.total.commission)}, not yet paid ${cur(d.rc.total.owed)} (${formatNumber(d.rc.total.owedVisits)} visits)`);
+    section('Driver visits (RC Dashboard)', lines.length ? lines : ['No driver visits']);
+  } else section('Driver visits (RC Dashboard)', [UNAVAILABLE]);
+
+  const valued = d.columns.filter((c) => c.value);
+  section(`Stock at cost${d.stockAsOf ? ` (from the stock report of ${d.stockAsOf})` : ''}`, d.stockTotal
+    ? [
+        ...valued.map((c) => `${many ? `${c.name}: ` : ''}opening ${cur(c.value!.opening)}, sold ${cur(c.value!.sold)}, closing ${cur(c.value!.closing)}`),
+        ...(many ? [`Total: opening ${cur(d.stockTotal.opening)}, sold ${cur(d.stockTotal.sold)}, closing ${cur(d.stockTotal.closing)}`] : []),
+        `Stock received: ${NOT_CONNECTED}`,
+      ]
+    : ['No stock report']);
+
+  if (d.stock) {
+    const lines: string[] = [];
+    for (const s of d.stock.stores) {
+      if (!s.aged.units && !s.lowFastSellers.length) continue;
+      lines.push(`${name(s.storeCode)}: aged over ${d.stock.rules.agedDays} days ${formatNumber(s.aged.units)} units (${cur(s.aged.cost)}), ${formatNumber(s.lowFastSellers.length)} fast sellers running low`);
+      for (const r of s.lowFastSellers) lines.push(`  • Low: ${r.vendor} · ${r.item}, ${formatNumber(r.left)} left, ${formatNumber(r.soldLast30Days)} sold in ${d.stock.rules.fastSellerDays} days`);
+      for (const r of s.aged.items) lines.push(`  • Aged: ${r.vendor} · ${r.item}, ${formatNumber(r.units)} units, ${cur(r.cost)}`);
+    }
+    section(`Stock alerts (Vendor Intelligence, stock as of ${formatDate(`${d.stock.asOf}T12:00:00+05:30`)})`, lines.length ? lines : ['No alerts']);
+  }
+
+  section(`Calls (all stores): ${formatNumber(d.calls.calls)}, ${formatNumber(d.calls.connected)} connected, ${formatNumber(d.calls.interested)} interested`,
+    d.calls.bySalesperson.length ? d.calls.bySalesperson.map((r) => `${r.name}: ${formatNumber(r.calls)} calls, ${formatNumber(r.connected)} connected, ${formatNumber(r.interested)} interested`) : ['No calls logged']);
+  section(`Follow-ups: ${formatNumber(d.followups.dueToday)} due, ${formatNumber(d.followups.overdue)} overdue`,
+    d.followups.byStore.length ? d.followups.byStore.map((r) => `${r.store}: ${formatNumber(r.dueToday)} due, ${formatNumber(r.overdue)} overdue`) : ['Nothing due or overdue']);
+
+  return out.join('\n').trim();
 }
