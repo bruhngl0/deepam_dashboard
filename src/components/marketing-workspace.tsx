@@ -8,6 +8,8 @@ import { MarketingImport } from './marketing-import';
 import { LeadActions } from './marketing-lead-actions';
 import { ExistingCustomerCallCard, ExistingCustomerCallList } from './existing-customer-call-list';
 import { MarketingConverted } from './marketing-converted';
+import { useLeadTypeConversions } from './lead-type-conversions-panel';
+import { campaignKey } from '@/lib/marketing/campaign-spend';
 
 type Tab = 'Overview' | 'All leads' | 'Existing customers' | 'Online customers' | 'Calling queue' | 'Follow-ups' | 'Converted' | 'Team performance' | 'Campaigns' | 'Import';
 const tabs = [
@@ -84,17 +86,20 @@ export function MarketingWorkspace() {
   </main>;
 }
 function CampaignPerformance({ data, leads }: { data: Dataset; leads: Lead[] }) {
+  // Spend typed on a lead wins; otherwise the campaign's total from the Campaign Summary tabs.
+  const sheetSpend = useLeadTypeConversions().data?.spend ?? [];
   const campaigns = [...new Set(leads.flatMap(lead => lead.acquisitions.map(acquisition => acquisition.campaignId.trim()).filter(Boolean)))];
   const rows = campaigns.map(campaign => {
     const campaignLeads = leads.filter(lead => lead.acquisitions.some(acquisition => acquisition.campaignId.trim() === campaign));
     const acquisitions = campaignLeads.flatMap(lead => lead.acquisitions.filter(acquisition => acquisition.campaignId.trim() === campaign));
     const sources = [...new Set(acquisitions.map(acquisition => acquisition.source))];
     const knownCosts = acquisitions.filter(acquisition => acquisition.cost !== null);
-    const totalSpend = knownCosts.reduce((total, acquisition) => total + (acquisition.cost ?? 0), 0);
-    return { campaign, sources, stats: metrics(data, campaignLeads), totalSpend, hasSpend: knownCosts.length > 0 };
+    const sheetRow = sheetSpend.find(row => campaignKey(row.campaign) === campaignKey(campaign));
+    const totalSpend = knownCosts.length ? knownCosts.reduce((total, acquisition) => total + (acquisition.cost ?? 0), 0) : sheetRow?.spend ?? 0;
+    return { campaign, sources, stats: metrics(data, campaignLeads), totalSpend, hasSpend: knownCosts.length > 0 || !!sheetRow };
   }).sort((a, b) => b.stats.total - a.stats.total || a.campaign.localeCompare(b.campaign));
 
-  return <section className={card}><h2 className="text-xl font-semibold text-ink">Campaign performance</h2><p className="mt-2 text-sm text-ink-2">CPL is spend ÷ leads, CAC is spend ÷ converted customers, and ROAS is sales ÷ spend. A dash means campaign cost data is unavailable.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Campaign ID', 'Source', 'Leads', 'Contacted', 'Interested', 'Converted', 'Sales', 'Total spend', 'CPL', 'CAC', 'ROAS'].map(heading => <th className="whitespace-nowrap p-3" key={heading}>{heading}</th>)}</tr></thead><tbody>{rows.map(({ campaign, sources, stats, totalSpend, hasSpend }) => <tr key={campaign} className="border-t border-line text-ink"><td className="min-w-64 p-3 font-medium">{campaign}</td><td className="p-3 text-ink-2">{sources.join(', ') || '—'}</td><td className="p-3">{stats.total}</td><td className="p-3">{stats.contacted}</td><td className="p-3">{stats.interested}</td><td className="p-3">{stats.converted}</td><td className="p-3">{money(stats.revenue)}</td><td className="p-3">{hasSpend ? money(totalSpend) : '—'}</td><td className="p-3">{hasSpend && stats.total ? money(totalSpend / stats.total) : '—'}</td><td className="p-3">{hasSpend && stats.converted ? money(totalSpend / stats.converted) : '—'}</td><td className="p-3">{hasSpend && totalSpend > 0 ? `${(stats.revenue / totalSpend).toFixed(2)}×` : '—'}</td></tr>)}</tbody></table>{!rows.length && <p className="p-8 text-center text-ink-muted">No campaigns match the selected filters.</p>}</div></section>;
+  return <section className={card}><h2 className="text-xl font-semibold text-ink">Campaign performance</h2><p className="mt-2 text-sm text-ink-2">CPL is spend ÷ leads, CAC is spend ÷ converted customers, and ROAS is sales ÷ spend. Spend comes from the Campaign Summary tabs; a dash means none is recorded. Open a campaign for its full report.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Campaign ID', 'Source', 'Leads', 'Contacted', 'Interested', 'Converted', 'Sales', 'Total spend', 'CPL', 'CAC', 'ROAS'].map(heading => <th className="whitespace-nowrap p-3" key={heading}>{heading}</th>)}</tr></thead><tbody>{rows.map(({ campaign, sources, stats, totalSpend, hasSpend }) => <tr key={campaign} className="border-t border-line text-ink"><td className="min-w-64 p-3 font-medium"><Link href={`/marketing/campaign?name=${encodeURIComponent(campaign)}`} className="text-accent hover:underline">{campaign}</Link></td><td className="p-3 text-ink-2">{sources.join(', ') || '—'}</td><td className="p-3">{stats.total}</td><td className="p-3">{stats.contacted}</td><td className="p-3">{stats.interested}</td><td className="p-3">{stats.converted}</td><td className="p-3">{money(stats.revenue)}</td><td className="p-3">{hasSpend ? money(totalSpend) : '—'}</td><td className="p-3">{hasSpend && stats.total ? money(totalSpend / stats.total) : '—'}</td><td className="p-3">{hasSpend && stats.converted ? money(totalSpend / stats.converted) : '—'}</td><td className="p-3">{hasSpend && totalSpend > 0 ? `${(stats.revenue / totalSpend).toFixed(2)}×` : '—'}</td></tr>)}</tbody></table>{!rows.length && <p className="p-8 text-center text-ink-muted">No campaigns match the selected filters.</p>}</div></section>;
 }
 function AddLead({ data, save, close }: { data: Dataset; save: (d: Dataset) => boolean; close: () => void }) {
   const [error, setError] = useState('');

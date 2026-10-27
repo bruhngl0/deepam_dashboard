@@ -18,7 +18,7 @@ const rowsOf = <T>(result: unknown): T[] =>
   Array.isArray(result) ? (result as T[]) : ((result as { rows?: T[] }).rows ?? []);
 
 /** Spend per campaign from the connected sheets, read at most every five minutes. */
-async function campaignSpend(): Promise<CampaignSpend[]> {
+export async function campaignSpend(): Promise<CampaignSpend[]> {
   const cached = holder.__campaignSpend;
   if (cached && Date.now() - cached.at < SPEND_TTL_MS) return cached.value;
   const config = await getSheetConfig();
