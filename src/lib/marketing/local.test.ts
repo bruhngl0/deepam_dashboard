@@ -21,10 +21,13 @@ describe('local marketing imports', () => {
       { Number: '9000123499', Invoice: 'C', Amount: '' },
     ], 'sales', mapping, EMPTY).sales;
     expect(convertedLeads({ ...EMPTY, sales })).toEqual([]);
-    const leads = previewRows([{ Name: 'Asha', Number: '+91 90001 23410', Source: 'Meta' }], 'leads', mapping, EMPTY).leads;
-    const converted = convertedLeads({ ...EMPTY, leads, sales });
+    const leads = previewRows([{ Name: 'Asha', Number: '+91 90001 23410', Source: 'Meta' }], 'leads', mapping, EMPTY).leads.map(l => ({ ...l, date: '2026-09-01' }));
+    const dated = sales.map(s => ({ ...s, date: '2026-09-05T12:00:00' }));
+    const converted = convertedLeads({ ...EMPTY, leads, sales: dated });
     expect(converted).toHaveLength(1);
     expect(converted[0].sales.reduce((n, s) => n + (s.amount ?? 0), 0)).toBe(3500);
+    // A bill from before the lead came in is not a conversion.
+    expect(convertedLeads({ ...EMPTY, leads, sales: dated.map(s => ({ ...s, date: '2026-08-31T12:00:00' })) })).toEqual([]);
     expect(sales[2].amount).toBeNull();
     expect(previewRows([{ Number: '9000123410', Invoice: 'A', Amount: 2500 }], 'sales', mapping, { ...EMPTY, sales }).duplicates).toBe(1);
   });

@@ -46,10 +46,10 @@ async function getJson<T>(url: string): Promise<T> {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return await r.json() as T;
 }
-async function pages<T>(part: 'leads' | 'sales'): Promise<T[]> {
+async function pages<T>(part: 'leads' | 'sales', allLeads = false): Promise<T[]> {
   const all: T[] = [];
   for (let after: number | null = 0; after !== null;) {
-    const page: { rows: T[]; next: number | null } = await getJson(`${DATASET}?part=${part}&after=${after}`);
+    const page: { rows: T[]; next: number | null } = await getJson(`${DATASET}?part=${part}&after=${after}${allLeads ? '&scope=all' : ''}`);
     all.push(...page.rows); after = page.next;
   }
   return all;
@@ -59,9 +59,10 @@ async function pages<T>(part: 'leads' | 'sales'): Promise<T[]> {
  * sees the same leads and the Google Sheet sync can add to them. `save` shows
  * the change at once and writes it in the background; if the server refuses
  * it (someone else changed the same lead, or the request failed) the change is
- * rolled back by reloading, with a message.
+ * rolled back by reloading, with a message. `allLeads` loads every lead of any
+ * date (the team dashboard), not only those shown on desks.
  */
-export function useMarketing() {
+export function useMarketing({ allLeads = false }: { allLeads?: boolean } = {}) {
   const [data, setData] = useState<Dataset | null>(null);
   const [message, setMessage] = useState('');
   const current = useRef<Dataset | null>(null);
@@ -77,7 +78,7 @@ export function useMarketing() {
     try {
       const { stamp: latest } = await getJson<{ stamp: string }>(`${DATASET}?part=stamp`);
       if (latest === stamp.current && current.current) return;
-      const [leads, sales] = await Promise.all([pages<{ lead: Lead; version: number }>('leads'), pages<Sale>('sales')]);
+      const [leads, sales] = await Promise.all([pages<{ lead: Lead; version: number }>('leads', allLeads), pages<Sale>('sales')]);
       if (saves.current !== started) return; // Loaded around a save, so this copy may predate it; the next poll reloads.
       const first = !current.current;
       const next: Dataset = { version: 2, demo: false, leads: leads.map(r => r.lead), sales };
@@ -85,7 +86,7 @@ export function useMarketing() {
       stamp.current = latest; current.current = next; setData(next);
       if (first) syncCalls(next);
     } catch { if (!current.current) setMessage('Unable to load marketing records. Check your connection and reload this page.'); }
-  }, []);
+  }, [allLeads]);
   useEffect(() => {
     const tick = () => { if (!document.hidden) void refresh(); };
     const first = setTimeout(() => void refresh(), 0);

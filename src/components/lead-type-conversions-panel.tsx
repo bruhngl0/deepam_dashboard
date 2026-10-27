@@ -18,8 +18,8 @@ function cells(row: Costed) {
 const th = 'whitespace-nowrap px-4 py-3';
 const td = 'whitespace-nowrap px-4 py-3';
 
-/** Store visit and Virtual calls leads, conversions from the CRM's sales and spend from the Campaign Summary tabs. Not affected by the page filters. */
-export function LeadTypeConversionsPanel() {
+/** Loads the campaign figures (conversions from the CRM's sales, spend from the Campaign Summary tabs) once per page. */
+export function useLeadTypeConversions() {
   const [data, setData] = useState<LeadTypeConversions | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -29,6 +29,11 @@ export function LeadTypeConversionsPanel() {
       .then((body) => { if (live) setData(body); }, (e: Error) => { if (live) setError(e.message); });
     return () => { live = false; };
   }, []);
+  return { data, error };
+}
+
+/** Store visit and Virtual calls leads, conversions from the CRM's sales and spend from the Campaign Summary tabs. Not affected by the page filters. */
+export function LeadTypeConversionsPanel({ data, error }: { data: LeadTypeConversions | null; error: string }) {
 
   const intro = <div className="p-4"><h2 className="text-lg font-semibold text-ink">Store-visit and virtual-call campaigns</h2><p className="text-xs text-ink-muted">Every Store visit and Virtual calls lead from the Meta and Google lead sheets, of any date. Converted: a CRM bill on the lead’s phone dated on or after the lead date{data?.latestBill ? `; sales are recorded up to ${day(data.latestBill)}` : ''}. Spend and cost per lead come from the sheets’ Campaign Summary tabs. Not affected by the filters above.</p></div>;
   if (!data) return <section className="overflow-hidden rounded-2xl border border-line bg-surface">{intro}<p role="status" className="px-4 pb-4 text-sm text-ink-2">{error || 'Loading…'}</p></section>;

@@ -194,10 +194,18 @@ export function commitPreview(data: Dataset, preview: Preview): Dataset {
   for (const lead of preview.leads) leads.set(lead.phone, lead);
   return { ...data, leads: [...leads.values()], sales: [...data.sales, ...preview.sales] };
 }
+/** A bill counts as a lead's conversion when it is dated on or after the lead date (the campaign rule; salespeople use billAfterClaim). */
+export const billOnOrAfterLead = (billDate: string, leadDate: string | null | undefined) => !!leadDate && billDate.slice(0, 10) >= leadDate.slice(0, 10);
 export function convertedLeads(data: Dataset) {
   const byPhone = new Map<string, Sale[]>();
   for (const sale of data.sales) byPhone.set(sale.phone, [...(byPhone.get(sale.phone) ?? []), sale]);
-  return data.leads.filter(l => byPhone.has(l.phone)).map(l => ({ ...l, sales: byPhone.get(l.phone)! }));
+  return data.leads.map(l => ({ ...l, sales: (byPhone.get(l.phone) ?? []).filter(sale => billOnOrAfterLead(sale.date, l.date)) })).filter(l => l.sales.length > 0);
+}
+/** The bills that convert these leads: on a lead's phone, dated on or after that phone's earliest lead date among them. */
+export function leadSales(data: Dataset, leads = data.leads): Sale[] {
+  const first = new Map<string, string>();
+  for (const lead of leads) if (lead.date && (!first.has(lead.phone) || lead.date < first.get(lead.phone)!)) first.set(lead.phone, lead.date);
+  return data.sales.filter(sale => billOnOrAfterLead(sale.date, first.get(sale.phone)));
 }
 /** A lead leaves every calling queue as soon as its first call is logged. */
 /** How a lead is identified on screen: its Lead ID, plus the Customer ID once they have bought. */
@@ -217,8 +225,7 @@ export function filterLeads(leads: Lead[], filters: LeadFilters): Lead[] {
   return leads.filter(l => (!filters.store || l.preferredStore === filters.store) && (!filters.source || l.acquisitions.some(a => a.source === filters.source)) && (!filters.from || (!!l.date && l.date >= filters.from)) && (!filters.to || (!!l.date && l.date <= filters.to)) && `${l.id} ${l.leadCode ?? ''} ${l.customerCode ?? ''} ${l.name} ${l.phone} ${l.email} ${l.acquisitions.map(a => `${a.source} ${a.campaignId}`).join(' ')}`.toLowerCase().includes(filters.search.toLowerCase()));
 }
 export function metrics(data: Dataset, leads = data.leads) {
-  const phones = new Set(leads.map(l => l.phone));
-  const sales = data.sales.filter(s => phones.has(s.phone));
+  const sales = leadSales(data, leads);
   const converted = new Set(sales.map(s => s.phone)).size;
   const costs = leads.flatMap(l => l.acquisitions).filter(a => a.cost !== null);
   const spend = costs.reduce((n, a) => n + (a.cost ?? 0), 0);
@@ -374,7 +381,7 @@ export function callsForSync(d: Dataset) {
 export type CampaignConversion = { source: string; campaign: string; leads: number; converted: number; rate: number };
 /** Leads and converted leads per source and campaign. A lead from several campaigns counts once in each. */
 export function conversionsByCampaign(data: Dataset, leads = data.leads): CampaignConversion[] {
-  const converted = new Set(data.sales.map(sale => sale.phone));
+  const converted = new Set(leadSales(data, leads).map(sale => sale.phone));
   const groups = new Map<string, { source: string; campaign: string; phones: Set<string> }>();
   for (const lead of leads) for (const acquisition of lead.acquisitions) {
     const campaign = acquisition.campaignId.trim();
