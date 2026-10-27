@@ -1,10 +1,12 @@
 /**
  * Pulls conversions from the CRM into Marketing Intelligence.
  *
- * A lead counts as converted once its phone has a CRM bill (`sales`, the POS
- * imports and the Hemparshwa sync) dated on or after the lead's date. Those bills
- * are copied into `marketing_sales`, which every Marketing Intelligence view
- * already reads for conversions. Idempotent: a bill is keyed on its voucher number.
+ * Copies CRM bills (`sales`, the POS imports and the Hemparshwa sync) into
+ * `marketing_sales`, which every Marketing Intelligence view reads for conversions:
+ * bills on a lead's phone dated on or after the lead's date, and bills of claimed
+ * calling-list customers dated after their claim day. Which bills count for a
+ * salesperson is decided when they are read (local.ts billAfterClaim).
+ * Idempotent: a bill is keyed on its voucher number.
  */
 
 import { sql } from 'drizzle-orm';
@@ -45,11 +47,32 @@ export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
     ON CONFLICT (invoice) DO NOTHING
     RETURNING invoice
   `));
+  // Claimed calling-list customers (existing and online): bills dated after the day they were claimed
+  // (claimed_at is saved by now() in a UTC session), the rule Team performance counts by.
+  const addedFromLists = rowsOf<{ invoice: string }>(await db.execute(sql`
+    INSERT INTO marketing_sales (invoice, phone, amount, sold_at, store)
+    SELECT DISTINCT ON (s.voucher_no)
+      s.voucher_no,
+      contact.phone,
+      s.bill_amount,
+      to_char(s.billed_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS'),
+      ${STORE_OF}
+    FROM marketing_call_list_contacts contact
+    JOIN customers c ON c.phone_e164 = contact.phone
+    JOIN sales s ON s.customer_id = c.id
+    JOIN stores st ON st.id = s.store_id
+    WHERE s.bill_amount > 0
+      AND contact.claimed_at IS NOT NULL
+      AND (s.billed_at AT TIME ZONE 'Asia/Kolkata')::date > (contact.claimed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date
+    ORDER BY s.voucher_no
+    ON CONFLICT (invoice) DO NOTHING
+    RETURNING invoice
+  `));
   const [summary] = rowsOf<{ converted: number; latest: string | null }>(await db.execute(sql`
     SELECT
       (SELECT count(DISTINCT ml.phone)::int FROM marketing_leads ml JOIN marketing_sales ms ON ms.phone = ml.phone
         WHERE ${shownWhere(sql`ml.doc`)}) AS converted,
       (SELECT to_char(max(billed_at) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') FROM sales) AS latest
   `));
-  return { billsAdded: added.length, convertedLeads: Number(summary?.converted ?? 0), latestBill: summary?.latest ?? null };
+  return { billsAdded: added.length + addedFromLists.length, convertedLeads: Number(summary?.converted ?? 0), latestBill: summary?.latest ?? null };
 }

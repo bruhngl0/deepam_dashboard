@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calledCustomers, callSourceLabel, campaignName, makeLead, openFollowupDue, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry } from './local';
+import { billAfterClaim, calledCustomers, callSourceLabel, campaignName, makeLead, openFollowupDue, convertedLeads, demoData, EMPTY, filterLeads, hasLoggedCall, parseLeadDate, guessMapping, previewRows, readDataset, salespersonPerformance, type CallEntry, type CustomerGroup } from './local';
 
 const mapping = guessMapping(['Name', 'Number', 'Source', 'Invoice', 'Amount']);
 describe('local marketing imports', () => {
@@ -101,6 +101,7 @@ describe('salesperson performance', () => {
     const data = demoData();
     const lead = data.leads[0];
     lead.claimedBy = 'Abhishek Thapa';
+    lead.claimedAt = '2026-09-19T10:00:00';
     const calls: CallEntry[] = [
       { id: 'call-1', at: '2026-10-01T10:00:00', salesperson: 'Abhishek Thapa', outcome: 'No answer', note: '', leadId: lead.id, name: lead.name, phone: lead.phone },
       { id: 'call-2', at: '2026-10-02T10:00:00', salesperson: 'Abhishek Thapa', outcome: 'Connected / interested', note: '', leadId: lead.id, name: lead.name, phone: lead.phone },
@@ -110,10 +111,11 @@ describe('salesperson performance', () => {
     }]);
   });
 
-  it('counts claimed existing customers, converting only on bills from the claim day', () => {
+  it('counts claimed existing customers, converting only on bills after the claim day', () => {
     const data = { ...EMPTY, sales: [
       { phone: '+919000000001', invoice: 'OLD', amount: 900, date: '2026-09-01T12:00:00', store: 'MG' },
-      { phone: '+919000000001', invoice: 'NEW', amount: 500, date: '2026-10-12T12:00:00', store: 'MG' },
+      { phone: '+919000000001', invoice: 'SAME-DAY', amount: 300, date: '2026-10-12T12:00:00', store: 'MG' },
+      { phone: '+919000000001', invoice: 'NEW', amount: 500, date: '2026-10-13T12:00:00', store: 'MG' },
     ] };
     const existing = [1, 2, 3].map(n => ({ leadId: `existing-customer:${n}`, salesperson: 'srinivas g', phone: `+91900000000${n}`, claimedAt: '2026-10-12T09:00:00' }));
     const calls: CallEntry[] = [
@@ -123,6 +125,35 @@ describe('salesperson performance', () => {
     expect(salespersonPerformance(data, calls, ['Srinivas G'], existing)).toEqual([{
       salesperson: 'Srinivas G', claimed: 3, called: 2, pending: 1, interested: 1, converted: 1, revenue: 500,
     }]);
+  });
+});
+
+describe('conversions follow the claim date', () => {
+  const sales = [
+    { phone: '+919000000001', invoice: 'BEFORE', amount: 100, date: '2026-10-09T12:00:00', store: 'MG' },
+    { phone: '+919000000001', invoice: 'SAME', amount: 200, date: '2026-10-10T12:00:00', store: 'MG' },
+    { phone: '+919000000001', invoice: 'AFTER', amount: 400, date: '2026-10-11T12:00:00', store: 'MG' },
+    { phone: '+919000000002', invoice: 'EXISTING', amount: 1000, date: '2026-10-15T12:00:00', store: 'Exhibition' },
+    { phone: '+919000000003', invoice: 'ONLINE', amount: 5000, date: '2026-10-15T12:00:00', store: 'Online' },
+  ];
+  const lead = { ...makeLead({ name: 'Lead', phone: '+919000000001', source: 'Meta', acquiredAt: '2026-10-01T10:00:00' }), claimedBy: 'Asha', claimedAt: '2026-10-10T18:00:00' };
+  const existing = [
+    { leadId: 'existing-customer:2', salesperson: 'Asha', phone: '+919000000002', claimedAt: '2026-10-12T09:00:00', list: 'exhibition-customers' },
+    { leadId: 'existing-customer:3', salesperson: 'Asha', phone: '+919000000003', claimedAt: '2026-10-12T09:00:00', list: 'online-customers' },
+  ];
+  const run = (group: CustomerGroup) => salespersonPerformance({ ...EMPTY, leads: [lead], sales }, [], ['Asha'], existing, { group })[0];
+
+  it('counts only bills dated after the claim day', () => {
+    expect(billAfterClaim('2026-10-11T00:00:00', '2026-10-10T23:59:00')).toBe(true);
+    expect(billAfterClaim('2026-10-10T23:00:00', '2026-10-10T09:00:00')).toBe(false);
+    expect(billAfterClaim('2026-10-11T00:00:00', undefined)).toBe(false);
+    expect(run('leads')).toMatchObject({ claimed: 1, converted: 1, revenue: 400 });
+  });
+
+  it('splits leads, existing customers and online customers, and adds them up for all', () => {
+    expect(run('existing')).toMatchObject({ claimed: 1, converted: 1, revenue: 1000 });
+    expect(run('online')).toMatchObject({ claimed: 1, converted: 1, revenue: 5000 });
+    expect(run('all')).toMatchObject({ claimed: 3, converted: 3, revenue: 6400 });
   });
 });
 

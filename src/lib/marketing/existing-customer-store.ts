@@ -113,6 +113,8 @@ export type ExistingCustomerListRow = {
 };
 
 const PAGE_SIZE = 50;
+/** claimed_at is saved by now() in a UTC session: the India-time day the customer was claimed. */
+const claimedDaySql = sql.raw(`to_char(contact.claimed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD')`);
 const isoSql = (column: string) => sql.raw(`to_char(${column}, 'YYYY-MM-DD"T"HH24:MI:SS')`);
 
 /**
@@ -123,8 +125,9 @@ const isoSql = (column: string) => sql.raw(`to_char(${column}, 'YYYY-MM-DD"T"HH2
  * dates. Called, Interested and Converted count calls and bills dated inside
  * the period, and Follow-ups due counts open follow-ups falling due in it.
  * Connected and Interested go by the latest call in the period. Converted
- * follows Team performance: only bills on or after the day the customer was
- * claimed count, since everyone on this list has bought before.
+ * follows Team performance (local.ts billAfterClaim): only bills dated after the
+ * day the customer was claimed count, in India time, since everyone on this list
+ * has bought before.
  */
 function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
   const from = filters.from || null, to = filters.to || null;
@@ -147,7 +150,7 @@ function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
       SELECT contact.id AS contact_id, sum(sale.amount)::float AS amount
       FROM marketing_call_list_contacts contact
       JOIN marketing_sales sale ON sale.phone = contact.phone
-        AND left(sale.sold_at, 10) >= to_char(contact.claimed_at, 'YYYY-MM-DD')
+        AND left(sale.sold_at, 10) > ${claimedDaySql}
         AND (${from}::text IS NULL OR left(sale.sold_at, 10) >= ${from})
         AND (${to}::text IS NULL OR left(sale.sold_at, 10) <= ${to})
       WHERE contact.list_key = ${listKey} AND contact.claimed_at IS NOT NULL
@@ -247,10 +250,11 @@ export async function existingCustomerPage(view: ExistingCustomerView, search: s
   };
 }
 
-/** Every claimed existing customer, for the Team performance table. */
-export async function existingCustomerClaims(): Promise<{ leadId: string; salesperson: string; phone: string; claimedAt: string; followupDue: string | null }[]> {
+/** Every claimed calling-list customer (existing and online), for the Team performance table. claimedAt is India time. */
+export async function existingCustomerClaims(): Promise<{ leadId: string; salesperson: string; phone: string; claimedAt: string; followupDue: string | null; list: string }[]> {
   const result = await db.execute(sql`
-    SELECT ${leadIdSql} AS lead_id, contact.assigned_to, contact.phone, contact.claimed_at,
+    SELECT ${leadIdSql} AS lead_id, contact.assigned_to, contact.phone, contact.list_key,
+           ${isoSql(`contact.claimed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata'`)} AS claimed_at,
            CASE WHEN contact.followup_completed_at IS NULL THEN ${isoSql('contact.followup_due')} END AS followup_due
     FROM marketing_call_list_contacts contact
     WHERE ${anyCallList}
@@ -261,8 +265,9 @@ export async function existingCustomerClaims(): Promise<{ leadId: string; salesp
     leadId: String(row.lead_id),
     salesperson: String(row.assigned_to),
     phone: String(row.phone),
-    claimedAt: String(row.claimed_at).replace(' ', 'T'),
+    claimedAt: String(row.claimed_at),
     followupDue: row.followup_due ? String(row.followup_due) : null,
+    list: String(row.list_key),
   }));
 }
 
