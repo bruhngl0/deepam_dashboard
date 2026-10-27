@@ -14,6 +14,7 @@ import { syncHemparshwa, type SyncResult } from './hemparshwa';
 import type { CustomerProjectionResult, ProjectionResult } from './hemparshwa-project';
 import type { HemparshwaIdsResult } from './hemparshwa-ids';
 import type { CrmConversionSync } from '@/lib/marketing/crm-conversions';
+import { startWalkInPushScheduler, type WalkInPush } from './hemparshwa-walkins';
 
 export type HemparshwaRun = SyncResult & {
   customers: CustomerProjectionResult | null;
@@ -22,6 +23,8 @@ export type HemparshwaRun = SyncResult & {
   ids: HemparshwaIdsResult | { error: string } | null;
   /** Bills from marketing leads copied into Marketing Intelligence (crm-conversions.ts); an error here never fails the sync. */
   conversions: CrmConversionSync | { error: string } | null;
+  /** WalkTrack walk-ins sent to Hemparshwa (hemparshwa-walkins.ts); an error here never fails the sync. */
+  walkIns: WalkInPush | { error: string } | null;
 };
 
 const state = globalThis as unknown as {
@@ -55,7 +58,13 @@ export function runHemparshwaSync(forceRebuild = false): Promise<HemparshwaRun> 
       console.error('[marketing conversions]', error);
       return { error: error instanceof Error ? error.message : String(error) };
     });
-    return { ...sync, customers, projection, ids, conversions };
+    // And WalkTrack's walk-ins to Hemparshwa, for its MIS footfall (also on its own, faster timer).
+    const { runWalkInPush } = await import('./hemparshwa-walkins');
+    const walkIns = await runWalkInPush().catch((error: unknown) => {
+      console.error('[hemparshwa walk-ins]', error);
+      return { error: error instanceof Error ? error.message : String(error) };
+    });
+    return { ...sync, customers, projection, ids, conversions, walkIns };
   })().finally(() => {
     state.hemparshwaSyncRunning = undefined;
   });
@@ -69,6 +78,7 @@ export function syncIntervalHours(): number {
 
 /** In-process timer for the long-running Node server. */
 export function startHemparshwaSyncScheduler() {
+  startWalkInPushScheduler();
   const hours = syncIntervalHours();
   if (!hours || state.hemparshwaSyncTimer) return;
   if (!process.env.HEMPARSHWA_URL || !process.env.HEMPARSHWA_INTEGRATION_TOKEN) return;
