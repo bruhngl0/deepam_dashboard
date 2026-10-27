@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalStoreCode, parseWalktrackEvent, possibleCustomerCode, possibleNationalPhone } from './events';
+import { canonicalStoreCode, parseWalktrackEvent, possibleCustomerCode, possibleNationalPhone, walktrackClockTime } from './events';
 
 describe('integration event boundary', () => {
   it('canonicalizes the WalkTrack Jayanagar spelling', () => {
@@ -23,5 +23,21 @@ describe('integration event boundary', () => {
 
   it('rejects malformed events', () => {
     expect(parseWalktrackEvent({ source: 'walktrack' })).toBeNull();
+  });
+});
+
+describe('walktrackClockTime', () => {
+  it('reads a time with no offset as IST', () => {
+    expect(walktrackClockTime('2026-10-27T16:08:00')).toBe('2026-10-27T16:08:00+05:30');
+    expect(walktrackClockTime('2026-10-27T16:08:00.000')).toBe('2026-10-27T16:08:00.000+05:30');
+    expect(new Date(walktrackClockTime('2026-10-27T19:00:00')!).toISOString()).toBe('2026-10-27T13:30:00.000Z');
+  });
+  it('leaves a time with an offset as it is', () => {
+    expect(walktrackClockTime('2026-10-27T10:38:00.000Z')).toBe('2026-10-27T10:38:00.000Z');
+    expect(walktrackClockTime('2026-10-27T16:08:00+05:30')).toBe('2026-10-27T16:08:00+05:30');
+  });
+  it('has no time for an empty value', () => {
+    expect(walktrackClockTime(null)).toBeNull();
+    expect(walktrackClockTime('')).toBeNull();
   });
 });

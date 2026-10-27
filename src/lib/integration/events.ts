@@ -42,3 +42,14 @@ export function possibleCustomerCode(value: unknown): string | null {
   const match = /^(?:CUS-?)?(\d{6})$/i.exec(value.trim());
   return match ? `CUS-${match[1]}` : null;
 }
+
+/**
+ * A WalkTrack start or stop time as an instant. WalkTrack keeps the store's clock time (IST) in a
+ * column with no time zone, so its events carry e.g. "2026-10-27T16:08:00" with no offset; read
+ * that as IST. A time that does carry an offset (or Z) is left as it is.
+ */
+export function walktrackClockTime(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const text = String(value).trim();
+  return /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(text) ? `${text.replace(' ', 'T')}+05:30` : text;
+}

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from 'drizzle-orm';
 import { txDb } from '@/db';
 import { isIntegrationAuthorized } from '@/lib/integration/auth';
-import { canonicalStoreCode, parseWalktrackEvent, possibleCustomerCode, possibleNationalPhone } from '@/lib/integration/events';
+import { canonicalStoreCode, parseWalktrackEvent, possibleCustomerCode, possibleNationalPhone, walktrackClockTime } from '@/lib/integration/events';
 import { reconcileStoreVisits } from '@/lib/integration/reconcile';
 
 export const runtime = 'nodejs';
@@ -44,7 +44,9 @@ export async function POST(request: Request) {
       const customerRef = String(event.data.contactNo ?? event.data.customerId ?? '');
       const phone = possibleNationalPhone(customerRef);
       const customerCode = possibleCustomerCode(customerRef);
-      const visitedAt = String(event.data.startTime ?? '');
+      // WalkTrack's times are store clock times (IST) with no offset.
+      const visitedAt = walktrackClockTime(event.data.startTime) ?? '';
+      const stoppedAt = walktrackClockTime(event.data.stopTime);
       const sourceUpdatedAt = String(event.data.updatedAt ?? event.occurredAt);
       if (Number.isNaN(Date.parse(visitedAt)) || Number.isNaN(Date.parse(sourceUpdatedAt))) {
         throw new Error('WalkTrack event has invalid timestamps');
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
           (source_system, external_id, store_id, customer_id, external_customer_ref, visited_at, stopped_at,
            staff_converted, source, shopping_intent, people, driver_code, raw, source_updated_at, deleted_at)
         SELECT 'walktrack', ${event.entityId}, st.id, c.id, ${customerRef},
-          ${visitedAt}::timestamptz, ${event.data.stopTime ? String(event.data.stopTime) : null}::timestamptz,
+          ${visitedAt}::timestamptz, ${stoppedAt}::timestamptz,
           ${event.data.converted === true}, ${event.data.source ? String(event.data.source) : null},
           ${event.data.shoppingIntent ? String(event.data.shoppingIntent) : null}, ${people},
           ${event.data.driverSerial ? String(event.data.driverSerial) : null}, ${dataJson}::jsonb,
