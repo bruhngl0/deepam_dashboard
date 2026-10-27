@@ -9,7 +9,6 @@ import { LeadActions } from './marketing-lead-actions';
 import { ExistingCustomerCallCard, ExistingCustomerCallList } from './existing-customer-call-list';
 import { MarketingConverted } from './marketing-converted';
 import { useLeadTypeConversions } from './lead-type-conversions-panel';
-import { campaignKey } from '@/lib/marketing/campaign-spend';
 
 type Tab = 'Overview' | 'All leads' | 'Existing customers' | 'Online customers' | 'Calling queue' | 'Follow-ups' | 'Converted' | 'Team performance' | 'Campaigns' | 'Import';
 const tabs = [
@@ -85,6 +84,8 @@ export function MarketingWorkspace() {
     <footer className="border-t border-line pt-5 text-xs text-ink-muted"><p>One lead per Contact No. · Multiple acquisition sources · Shared database</p></footer>
   </main>;
 }
+/** Campaign names compared ignoring case and spacing, as in lib/marketing/campaign-spend (not imported: it pulls in the database). */
+const campaignKey = (name: string) => name.toLowerCase().replace(/\s+/g, '');
 function CampaignPerformance({ data, leads }: { data: Dataset; leads: Lead[] }) {
   // Spend typed on a lead wins; otherwise the campaign's total from the Campaign Summary tabs.
   const sheetSpend = useLeadTypeConversions().data?.spend ?? [];
