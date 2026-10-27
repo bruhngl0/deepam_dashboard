@@ -1,24 +1,33 @@
 /**
  * Pulls conversions from the CRM into Marketing Intelligence.
  *
- * A lead counts as converted once its phone has a CRM bill (`sales`, the POS
- * imports and the Hemparshwa sync) dated on or after the lead's date. Those bills
- * are copied into `marketing_sales`, which every Marketing Intelligence view
- * already reads for conversions. Idempotent: a bill is keyed on its voucher number.
+ * Copies CRM bills (`sales`, the POS imports and the Hemparshwa sync) into
+ * `marketing_sales`, which every Marketing Intelligence view reads for conversions:
+ * bills on a lead's phone dated on or after the lead's date, and bills of claimed
+ * calling-list customers dated after their claim day. Which bills count for a
+ * salesperson is decided when they are read (local.ts billAfterClaim).
+ * Idempotent: a bill is keyed on its voucher number.
  */
 
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { VIRTUAL_CALLS_GROUP } from './sheet-routing';
-import { LEADS_FROM } from './store';
-import { EXHB_TAG } from './sheet-routing';
+import { shownWhere } from './store';
 
 export type CrmConversionSync = { billsAdded: number; convertedLeads: number; latestBill: string | null };
 
 const rowsOf = <T>(result: unknown): T[] =>
   Array.isArray(result) ? (result as T[]) : ((result as { rows?: T[] }).rows ?? []);
 
+/** CRM store code → the store value Marketing Intelligence keeps (MG / JAYNAGAR / Online / Exhibition). */
+const STORE_OF = sql.raw(`CASE st.code WHEN 'MG_ROAD' THEN 'MG' WHEN 'JAYANAGAR' THEN 'JAYNAGAR' WHEN 'ONLINE' THEN 'Online' WHEN 'EXHIBITION' THEN 'Exhibition' ELSE '' END`);
+
 export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
+  // Bills copied before a store was mapped (Exhibition) were saved with no store: fill it in.
+  await db.execute(sql`
+    UPDATE marketing_sales ms SET store = ${STORE_OF}
+    FROM sales s JOIN stores st ON st.id = s.store_id
+    WHERE s.voucher_no = ms.invoice AND coalesce(ms.store, '') = '' AND ${STORE_OF} <> ''
+  `);
   const added = rowsOf<{ invoice: string }>(await db.execute(sql`
     INSERT INTO marketing_sales (invoice, phone, amount, sold_at, store)
     SELECT DISTINCT ON (s.voucher_no)
@@ -26,7 +35,7 @@ export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
       ml.phone,
       s.bill_amount,
       to_char(s.billed_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS'),
-      CASE st.code WHEN 'MG_ROAD' THEN 'MG' WHEN 'JAYANAGAR' THEN 'JAYNAGAR' WHEN 'ONLINE' THEN 'Online' ELSE '' END
+      ${STORE_OF}
     FROM marketing_leads ml
     JOIN customers c ON c.phone_e164 = ml.phone
     JOIN sales s ON s.customer_id = c.id
@@ -38,11 +47,32 @@ export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
     ON CONFLICT (invoice) DO NOTHING
     RETURNING invoice
   `));
+  // Claimed calling-list customers (existing and online): bills dated after the day they were claimed
+  // (claimed_at is saved by now() in a UTC session), the rule Team performance counts by.
+  const addedFromLists = rowsOf<{ invoice: string }>(await db.execute(sql`
+    INSERT INTO marketing_sales (invoice, phone, amount, sold_at, store)
+    SELECT DISTINCT ON (s.voucher_no)
+      s.voucher_no,
+      contact.phone,
+      s.bill_amount,
+      to_char(s.billed_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS'),
+      ${STORE_OF}
+    FROM marketing_call_list_contacts contact
+    JOIN customers c ON c.phone_e164 = contact.phone
+    JOIN sales s ON s.customer_id = c.id
+    JOIN stores st ON st.id = s.store_id
+    WHERE s.bill_amount > 0
+      AND contact.claimed_at IS NOT NULL
+      AND (s.billed_at AT TIME ZONE 'Asia/Kolkata')::date > (contact.claimed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date
+    ORDER BY s.voucher_no
+    ON CONFLICT (invoice) DO NOTHING
+    RETURNING invoice
+  `));
   const [summary] = rowsOf<{ converted: number; latest: string | null }>(await db.execute(sql`
     SELECT
       (SELECT count(DISTINCT ml.phone)::int FROM marketing_leads ml JOIN marketing_sales ms ON ms.phone = ml.phone
-        WHERE ml.doc->>'date' >= ${LEADS_FROM} OR ml.doc->>'claimGroup' = ${VIRTUAL_CALLS_GROUP} OR jsonb_exists(ml.doc->'tags', ${EXHB_TAG})) AS converted,
+        WHERE ${shownWhere(sql`ml.doc`)}) AS converted,
       (SELECT to_char(max(billed_at) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') FROM sales) AS latest
   `));
-  return { billsAdded: added.length, convertedLeads: Number(summary?.converted ?? 0), latestBill: summary?.latest ?? null };
+  return { billsAdded: added.length + addedFromLists.length, convertedLeads: Number(summary?.converted ?? 0), latestBill: summary?.latest ?? null };
 }

@@ -1,6 +1,7 @@
 /**
  * Runs the Hemparshwa sync and, when CRM's copy changed, the rebuild — the one
- * entry point for both the sync route and the in-process timer.
+ * entry point for both the sync route and the in-process timer. Every run ends by
+ * copying new conversions (bills from marketing leads) into Marketing Intelligence.
  *
  * The timer runs every `HEMPARSHWA_SYNC_HOURS` (default 5; 0 turns it off)
  * wherever `HEMPARSHWA_URL` and `HEMPARSHWA_INTEGRATION_TOKEN` are set, with a
@@ -12,12 +13,15 @@
 import { syncHemparshwa, type SyncResult } from './hemparshwa';
 import type { CustomerProjectionResult, ProjectionResult } from './hemparshwa-project';
 import type { HemparshwaIdsResult } from './hemparshwa-ids';
+import type { CrmConversionSync } from '@/lib/marketing/crm-conversions';
 
 export type HemparshwaRun = SyncResult & {
   customers: CustomerProjectionResult | null;
   projection: ProjectionResult | null;
   /** Hemparshwa renumbered to CRM's IDs (hemparshwa-ids.ts); an error here never fails the sync. */
   ids: HemparshwaIdsResult | { error: string } | null;
+  /** Bills from marketing leads copied into Marketing Intelligence (crm-conversions.ts); an error here never fails the sync. */
+  conversions: CrmConversionSync | { error: string } | null;
 };
 
 const state = globalThis as unknown as {
@@ -45,7 +49,13 @@ export function runHemparshwaSync(forceRebuild = false): Promise<HemparshwaRun> 
       console.error('[hemparshwa ids]', error);
       return { error: error instanceof Error ? error.message : String(error) };
     });
-    return { ...sync, customers, projection, ids };
+    // Every run too: new bills, or new leads whose phone already has a later bill, become Marketing Intelligence conversions.
+    const { syncConversionsFromCrm } = await import('@/lib/marketing/crm-conversions');
+    const conversions = await syncConversionsFromCrm().catch((error: unknown) => {
+      console.error('[marketing conversions]', error);
+      return { error: error instanceof Error ? error.message : String(error) };
+    });
+    return { ...sync, customers, projection, ids, conversions };
   })().finally(() => {
     state.hemparshwaSyncRunning = undefined;
   });
@@ -65,7 +75,7 @@ export function startHemparshwaSyncScheduler() {
   const tick = () => {
     runHemparshwaSync()
       .then((run) => {
-        if (run.projection) console.log('[hemparshwa sync]', JSON.stringify(run));
+        if (run.projection || (run.conversions && 'billsAdded' in run.conversions && run.conversions.billsAdded > 0)) console.log('[hemparshwa sync]', JSON.stringify(run));
       })
       .catch((error) => console.error('[hemparshwa sync]', error));
   };

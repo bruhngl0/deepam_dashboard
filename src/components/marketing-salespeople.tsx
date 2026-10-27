@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useEffect, useState } from 'react';
-import { calledCustomers, callLog, callSourceLabel, nowLocal, openFollowupDue, OUTCOMES, salespersonPerformance, STORES, storeName, type CallEntry, type Dataset, type ExistingClaim } from '@/lib/marketing/local';
+import { calledCustomers, callLog, callSourceLabel, CUSTOMER_GROUP_LABELS, CUSTOMER_GROUPS, nowLocal, openFollowupDue, OUTCOMES, salespersonPerformance, STORES, storeName, type CallEntry, type CustomerGroup, type Dataset, type ExistingClaim } from '@/lib/marketing/local';
 import { SALESPEOPLE } from '@/lib/salespeople';
 import { button, card, dayMonthYearTimeLabel, Field, input, money } from './marketing-shared';
 
@@ -16,6 +16,7 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
   const [outcome, setOutcome] = useState('');
   const [store, setStore] = useState('');
   const [search, setSearch] = useState('');
+  const [group, setGroup] = useState<CustomerGroup>('all');
   const [open, setOpen] = useState('');
 
   useEffect(() => {
@@ -40,12 +41,13 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
   const query = search.trim().toLowerCase();
   const filteredCalls = all.filter(call => (!from || call.at.slice(0, 10) >= from) && (!to || call.at.slice(0, 10) <= to) && (!outcome || call.outcome === outcome)
     && (!query || call.name.toLowerCase().includes(query) || call.phone.includes(query) || call.note.toLowerCase().includes(query)));
-  const performance = salespersonPerformance(scoped, filteredCalls, person ? [person] : people, scopedExisting, { from, to, allCalls: all });
-  const reset = () => { setPerson(''); setFrom(''); setTo(''); setOutcome(''); setStore(''); setSearch(''); };
+  const performance = salespersonPerformance(scoped, filteredCalls, person ? [person] : people, scopedExisting, { from, to, allCalls: all, group });
+  const reset = () => { setPerson(''); setFrom(''); setTo(''); setOutcome(''); setStore(''); setSearch(''); setGroup('all'); };
 
   return <div className="space-y-5">
     <section aria-label="Salesperson filters" className={`${card} flex flex-wrap items-end gap-3`}>
       <Field label="Salesperson"><select className={input} value={person} onChange={event => setPerson(event.target.value)}><option value="">All salespeople</option>{people.map(name => <option key={name}>{name}</option>)}</select></Field>
+      <Field label="Customers"><select className={input} value={group} onChange={event => setGroup(event.target.value as CustomerGroup)}>{CUSTOMER_GROUPS.map(value => <option key={value} value={value}>{CUSTOMER_GROUP_LABELS[value]}</option>)}</select></Field>
       <Field label="Store"><select className={input} value={store} onChange={event => setStore(event.target.value)}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></Field>
       <Field label="Calls from"><input type="date" className={input} max={to || undefined} value={from} onChange={event => setFrom(event.target.value)} /></Field>
       <Field label="Calls to"><input type="date" className={input} min={from || undefined} value={to} onChange={event => setTo(event.target.value)} /></Field>
@@ -55,7 +57,7 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
       {from && to && from > to && <p role="alert" className="w-full text-sm text-red-600">From must be on or before To.</p>}
     </section>
     <section className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="p-4"><h2 className="text-lg font-semibold text-ink">Performance</h2><p className="text-xs text-ink-muted">Claimed is assigned leads and claimed existing customers, Called is those with a logged call, and Pending is those not yet called. Claimed and Pending are today&apos;s totals; with Calls from or Calls to set, Called, Interested, Converted and Sales count only that period. A store counts only leads whose preferred store it is (existing customers have no store, so they are left out). Select a salesperson to list the customers they called.</p>{loadError && <p role="alert" className="mt-1 text-xs text-red-600">Could not load the shared call records; showing activity stored on current leads.</p>}</div>
+      <div className="p-4"><h2 className="text-lg font-semibold text-ink">Performance</h2><p className="text-xs text-ink-muted">Claimed is assigned leads plus claimed existing and online customers (or one group, with Customers), Called is those with a logged call, and Pending is those not yet called. Converted and Sales count only bills dated after the day the salesperson claimed the customer; a bill on the claim day or before it does not count. Claimed and Pending are today&apos;s totals; with Calls from or Calls to set, Called, Interested, Converted and Sales count only that period. A store counts only leads whose preferred store it is (existing customers have no store, so they are left out). Select a salesperson to list the customers they called.</p>{loadError && <p role="alert" className="mt-1 text-xs text-red-600">Could not load the shared call records; showing activity stored on current leads.</p>}</div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Salesperson name', 'Claimed', 'Called', 'Pending', 'Interested', 'Converted', 'Sales'].map(heading => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead><tbody>{performance.map(row => <Fragment key={row.salesperson}>
         <tr className="border-t border-line text-ink"><td className="px-4 py-3 font-semibold"><button type="button" aria-expanded={open === row.salesperson} className="text-left font-semibold hover:text-accent hover:underline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => setOpen(open === row.salesperson ? '' : row.salesperson)}>{row.salesperson}</button></td><td className="px-4 py-3">{row.claimed}</td><td className="px-4 py-3">{row.called}</td><td className="px-4 py-3">{row.pending}</td><td className="px-4 py-3">{row.interested}</td><td className="px-4 py-3">{row.converted}</td><td className="px-4 py-3">{money(row.revenue)}</td></tr>
         {open === row.salesperson && <tr className="border-t border-line bg-inset"><td colSpan={7} className="p-4"><CalledCustomers salesperson={row.salesperson} calls={filteredCalls} data={scoped} existing={scopedExisting} /></td></tr>}

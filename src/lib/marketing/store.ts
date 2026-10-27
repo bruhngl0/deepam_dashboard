@@ -28,7 +28,9 @@ const MAX_DOC_BYTES = 256 * 1024;
  * them) but are hidden from every page and calling queue.
  */
 export const LEADS_FROM = '2026-10-01';
-const shownWhere = (doc: SQL) => sql`(${doc}->>'date' >= ${LEADS_FROM} OR ${doc}->>'claimGroup' = ${VIRTUAL_CALLS_GROUP} OR jsonb_exists(${doc}->'tags', ${EXHB_TAG}))`;
+// Also shown whatever their date: Virtual calls leads, exhibition-form leads, and leads put on a
+// salesperson's desk by hand (claimPinned), so an older lead assigned to someone shows on their desk.
+export const shownWhere = (doc: SQL) => sql`(${doc}->>'date' >= ${LEADS_FROM} OR ${doc}->>'claimGroup' = ${VIRTUAL_CALLS_GROUP} OR jsonb_exists(${doc}->'tags', ${EXHB_TAG}) OR (${doc}->>'claimPinned' = 'true' AND COALESCE(${doc}->>'claimedBy', '') <> ''))`;
 const shown = shownWhere(sql`ml.doc`);
 
 export type LeadWrite = { lead: Lead; version: number };
