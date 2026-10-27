@@ -106,8 +106,9 @@ describe('sales and master metrics', () => {
   it('counts connected leads, unique visits and conversions once across repeated interactions', () => {
     const first = recordCall(lead(), input);
     first.interactions.push({ id: 'visit-1', type: 'visit', at: '2026-09-21', text: 'MG' }, { id: 'visit-2', type: 'visit', at: '2026-09-22', text: 'MG' });
-    const second = makeLead({ phone: '+919000123411', name: 'Other', source: 'Referral', cost: null });
-    const data = { ...EMPTY, leads: [first, second], sales: [{ phone: first.phone, invoice: '1', amount: 1000, date: '', store: '' }, { phone: first.phone, invoice: '2', amount: 2000, date: '', store: '' }, { phone: '+919000123499', invoice: '3', amount: 9999, date: '', store: '' }] };
+    first.date = '2026-09-20';
+    const second = { ...makeLead({ phone: '+919000123411', name: 'Other', source: 'Referral', cost: null }), date: '2026-09-20' };
+    const data = { ...EMPTY, leads: [first, second], sales: [{ phone: first.phone, invoice: '1', amount: 1000, date: '2026-09-21T10:00:00', store: '' }, { phone: first.phone, invoice: '2', amount: 2000, date: '2026-09-25T10:00:00', store: '' }, { phone: first.phone, invoice: 'before', amount: 500, date: '2026-09-19T10:00:00', store: '' }, { phone: '+919000123499', invoice: '3', amount: 9999, date: '2026-09-25T10:00:00', store: '' }] };
     expect(metrics(data)).toMatchObject({ total: 2, contacted: 1, interested: 1, visits: 1, converted: 1, orders: 2, revenue: 3000, conversion: 50, cpa: 100, costsKnown: 1, costsTotal: 2 });
     expect(metrics(data, [second])).toMatchObject({ revenue: 0, converted: 0, cpa: null });
   });

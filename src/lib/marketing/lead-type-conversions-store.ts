@@ -61,5 +61,5 @@ export async function leadTypeConversions(): Promise<LeadTypeConversions> {
     phone: String(row.phone), invoice: String(row.invoice), amount: Number(row.amount), date: String(row.date),
   }));
   const latestBill = rowsOf<{ latest: string | null }>(latest)[0]?.latest ?? null;
-  return { ...summarizeLeadTypes(acquisitionRows, billRows, spend.value), latestBill, spendError: spend.error };
+  return { ...summarizeLeadTypes(acquisitionRows, billRows, spend.value), latestBill, spendError: spend.error, spend: spend.value };
 }

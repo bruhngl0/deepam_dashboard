@@ -26,7 +26,8 @@ export async function GET(request: Request) {
   if (!Number.isSafeInteger(after) || after < 0) return NextResponse.json({ error: 'Invalid cursor.' }, { status: 400 });
   const part = params.get('part');
   if (part === 'stamp') return NextResponse.json({ stamp: await datasetStamp() });
-  if (part === 'leads') return NextResponse.json(await leadPage(after, LEAD_PAGE, true));
+  // scope=all: every lead, for the team dashboard; otherwise only those Marketing Intelligence shows on desks.
+  if (part === 'leads') return NextResponse.json(await leadPage(after, LEAD_PAGE, params.get('scope') !== 'all'));
   if (part === 'sales') return NextResponse.json(await salePage(after, SALE_PAGE));
   return NextResponse.json({ error: 'part must be stamp, leads or sales.' }, { status: 400 });
 }

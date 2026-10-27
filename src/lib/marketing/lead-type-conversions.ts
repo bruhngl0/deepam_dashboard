@@ -25,7 +25,8 @@ export const CAMPAIGN_KINDS = [...LEAD_KINDS, 'Exhibition', 'Other'] as const;
 export type CampaignKind = typeof CAMPAIGN_KINDS[number];
 export type CampaignRow = Costed & { campaign: string; platform: string; kind: CampaignKind };
 export type LeadKindSummary = { kind: LeadKind; total: Costed; platforms: (Costed & { platform: string })[] };
-export type LeadTypeConversions = { kinds: LeadKindSummary[]; campaigns: CampaignRow[]; latestBill: string | null; spendError: string | null };
+/** `spend` is every Campaign Summary row, for totals across any set of campaigns. */
+export type LeadTypeConversions = { kinds: LeadKindSummary[]; campaigns: CampaignRow[]; latestBill: string | null; spendError: string | null; spend: CampaignSpend[] };
 
 /** Virtual calls wins over Store visit: those leads come in on their own tab whatever their campaign. */
 export function leadKind(row: Pick<LeadAcquisitionRow, 'campaignId' | 'claimGroup' | 'sheetTabs'>): LeadKind | null {
@@ -66,7 +67,7 @@ function costed(rows: LeadAcquisitionRow[], spends: CampaignSpend[], billsByPhon
   };
 }
 
-export function summarizeLeadTypes(acquisitions: LeadAcquisitionRow[], bills: LeadBillRow[], spend: CampaignSpend[] = []): Omit<LeadTypeConversions, 'latestBill' | 'spendError'> {
+export function summarizeLeadTypes(acquisitions: LeadAcquisitionRow[], bills: LeadBillRow[], spend: CampaignSpend[] = []): Omit<LeadTypeConversions, 'latestBill' | 'spendError' | 'spend'> {
   const billsByPhone = new Map<string, LeadBillRow[]>();
   for (const bill of bills) billsByPhone.set(bill.phone, [...(billsByPhone.get(bill.phone) ?? []), bill]);
   const typed = acquisitions.flatMap((row) => { const kind = leadKind(row); return kind ? [{ ...row, kind }] : []; });
