@@ -204,6 +204,13 @@
       "when": 1792663200000,
       "tag": "0028_marketing_campaign_spend",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792666800000,
+      "tag": "0029_exhibition_store",
+      "breakpoints": true
     }
   ]
 }

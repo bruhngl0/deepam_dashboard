@@ -21,6 +21,9 @@
  *
  * The export has no bill time, so a new bill is stamped 12:00 IST on its date.
  * Customers follow CRM's rule: identity is a valid Indian phone, nothing else.
+ *
+ * A Hemparshwa store is matched by its Store ID (STR-001) or, for one CRM cannot
+ * number that way, by CRM's store code (EXHIBITION).
  */
 
 import { sql } from 'drizzle-orm';
@@ -90,7 +93,7 @@ export async function projectHemparshwaCustomers(): Promise<CustomerProjectionRe
         FROM hemparshwa_customers c
         JOIN hemparshwa_imports i ON i.import_id = c.import_id
         JOIN hp_master_phone p ON p.phone = c.phone
-        LEFT JOIN stores st ON st.store_code = c.store_id
+        LEFT JOIN stores st ON st.store_code = c.store_id OR st.code = c.store_id
         ORDER BY p.e164, c.import_id DESC, c.row_number DESC
         ON CONFLICT (phone_e164) DO UPDATE SET
           full_name = CASE WHEN name_trust_rank(customers.name_source) = 0 THEN COALESCE(EXCLUDED.full_name, customers.full_name) ELSE customers.full_name END,
@@ -184,7 +187,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
                count(*) AS lines
         FROM hemparshwa_sales_lines l
         JOIN hemparshwa_imports i ON i.import_id = l.import_id
-        JOIN stores st ON st.store_code = l.store_id
+        JOIN stores st ON st.store_code = l.store_id OR st.code = l.store_id
         LEFT JOIN hp_phone p ON p.phone = l.customer_phone
         GROUP BY st.id, st.voucher_prefix, st.store_code, l.invoice_id, l.invoice_date, l.sales_type
       `);
@@ -261,7 +264,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
                (jsonb_agg(l.details))->0
         FROM hemparshwa_sales_lines l
         JOIN hemparshwa_imports i ON i.import_id = l.import_id
-        JOIN stores st ON st.store_code = l.store_id
+        JOIN stores st ON st.store_code = l.store_id OR st.code = l.store_id
         JOIN sales s ON s.voucher_no = COALESCE(st.voucher_prefix, st.store_code || '-') || l.invoice_id || '@' || l.invoice_date || CASE WHEN l.sales_type IN ('', 'sales') THEN '' ELSE '-' || l.sales_type END
         GROUP BY l.invoice_date, l.invoice_id, l.sku_code
         ON CONFLICT (voucher_date_raw, voucher_no_raw, barcode) DO UPDATE SET
@@ -282,7 +285,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
       `);
 
       const unmappedStoreLines = count(await t.execute(sql`
-        SELECT count(*) AS n FROM hemparshwa_sales_lines l WHERE NOT EXISTS (SELECT 1 FROM stores st WHERE st.store_code = l.store_id)
+        SELECT count(*) AS n FROM hemparshwa_sales_lines l WHERE NOT EXISTS (SELECT 1 FROM stores st WHERE st.store_code = l.store_id OR st.code = l.store_id)
       `));
       const bills = count(await t.execute(sql`SELECT count(*) AS n FROM hp_bills`));
 
