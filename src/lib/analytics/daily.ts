@@ -6,7 +6,7 @@
 
 import { aq } from './db';
 import { storeName } from '@/lib/marketing/local';
-import type { DailyCrm } from '@/lib/queries/daily';
+import { shiftDay, type DailyCrm, type DailyStockValue } from '@/lib/queries/daily';
 import type { RcDaily, StockAlerts } from '@/lib/integration/apps';
 
 const RULES = { agedDays: 90, fastSellerDays: 30, fastSellerMinSold: 3, lowStockMax: 1 };
@@ -16,7 +16,8 @@ export async function dailyFromAnalytics(date: string): Promise<{ crm: DailyCrm;
   const stores = await aq<{ store_code: string; name: string }>('SELECT store_code, name FROM analytics.dim_store ORDER BY store_code');
   if (!stores) return null;
 
-  const [day, through, calls, followups, unassigned, owed, snap] = await Promise.all([
+  const monthStart = `${date.slice(0, 8)}01`;
+  const [day, through, calls, followups, unassigned, owed, snap, totals, lines, stockRows] = await Promise.all([
     aq<Record<string, unknown>>('SELECT * FROM analytics.kpi_store_day WHERE day = $1', [date]),
     aq<{ through: Date | null }>('SELECT max(billed_at) AS through FROM analytics.fact_bill'),
     aq<{ caller: string; calls: string; connected: string; interested: string }>(`
@@ -36,6 +37,14 @@ export async function dailyFromAnalytics(date: string): Promise<{ crm: DailyCrm;
     aq<{ snap_day: string; stock_as_of: string | null }>(`
       SELECT snap_day::text, max(stock_as_of)::text AS stock_as_of FROM analytics.fact_stock_day
       WHERE snap_day = (SELECT max(snap_day) FROM analytics.fact_stock_day WHERE snap_day <= $1) GROUP BY snap_day`, [date]),
+    aq<{ store_code: string; prev_sales: string; mtd_sales: string }>(`
+      SELECT store_code, coalesce(sum(total_sales) FILTER (WHERE day = $2), 0) AS prev_sales,
+             coalesce(sum(total_sales) FILTER (WHERE day >= $3), 0) AS mtd_sales
+      FROM analytics.kpi_store_day WHERE day BETWEEN LEAST($2::date, $3::date) AND $1 GROUP BY 1`, [date, shiftDay(date, -1), monthStart]),
+    aq<{ store_code: string; units: string; cost: string }>(`
+      SELECT b.store_code, coalesce(sum(l.qty), 0) AS units, coalesce(sum(l.cost), 0) AS cost
+      FROM analytics.fact_bill b JOIN analytics.fact_bill_line l USING (bill_id) WHERE b.day = $1 GROUP BY 1`, [date]),
+    stockValueRows(date),
   ]);
 
   const byStore = new Map((day ?? []).map((r) => [String(r.store_code), r]));
@@ -46,7 +55,12 @@ export async function dailyFromAnalytics(date: string): Promise<{ crm: DailyCrm;
     date,
     stores: stores.map((s) => {
       const r = byStore.get(s.store_code);
-      return { storeCode: s.store_code, name: s.name, walkIns: n(r?.walk_ins), people: n(r?.people), converted: n(r?.converted), bills: n(r?.bills), sales: n(r?.total_sales) };
+      const t = (totals ?? []).find((x) => x.store_code === s.store_code);
+      const l = (lines ?? []).find((x) => x.store_code === s.store_code);
+      return {
+        storeCode: s.store_code, name: s.name, walkIns: n(r?.walk_ins), people: n(r?.people), converted: n(r?.converted), bills: n(r?.bills), sales: n(r?.total_sales),
+        units: n(l?.units), soldCost: n(l?.cost), prevSales: n(t?.prev_sales), mtdSales: n(t?.mtd_sales),
+      };
     }),
     salesThrough: through?.[0]?.through ? new Date(through[0].through).toISOString() : null,
     calls: {
@@ -60,6 +74,7 @@ export async function dailyFromAnalytics(date: string): Promise<{ crm: DailyCrm;
       overdue: followupRows.reduce((t, r) => t + r.overdue, 0),
       byStore: followupRows,
     },
+    stockValue: stockValue(stockRows),
   };
 
   const rcDay: RcDaily['day'] = stores.flatMap((s) => {
@@ -101,4 +116,43 @@ export async function dailyFromAnalytics(date: string): Promise<{ crm: DailyCrm;
     stock = { asOf, salesThrough: salesThrough?.[0]?.through ?? asOf, rules: RULES, stores: [...map.values()].sort((a, b) => a.storeCode.localeCompare(b.storeCode)) };
   }
   return { crm, rc, stock };
+}
+
+type StockValueRow = { as_of: string; store_code: string; report_cost: string; sold_after: string; sold_before: string; sold_today: string };
+
+/**
+ * Per store: the latest stock report's value at cost (the report dated on or before this day, else the
+ * latest one), and the cost of goods sold after the report up to this day, between this day and the
+ * report, and on this day. Only stores the report covers.
+ */
+function stockValueRows(date: string) {
+  return aq<StockValueRow>(`
+    WITH snap AS (
+      SELECT snap_day, max(stock_as_of) AS as_of FROM analytics.fact_stock_day GROUP BY snap_day
+      ORDER BY (max(stock_as_of) <= $1::date) DESC, snap_day DESC LIMIT 1
+    ), report AS (
+      SELECT store_code, sum(cost) AS cost FROM analytics.fact_stock_day WHERE snap_day = (SELECT snap_day FROM snap) GROUP BY 1
+    ), sold AS (
+      SELECT b.store_code,
+             coalesce(sum(l.cost) FILTER (WHERE b.day > s.as_of AND b.day <= $1::date), 0) AS after,
+             coalesce(sum(l.cost) FILTER (WHERE b.day > $1::date AND b.day <= s.as_of), 0) AS before,
+             coalesce(sum(l.cost) FILTER (WHERE b.day = $1::date), 0) AS today
+      FROM analytics.fact_bill b JOIN analytics.fact_bill_line l USING (bill_id) CROSS JOIN snap s
+      WHERE b.day > LEAST(s.as_of, $1::date) - 1 GROUP BY 1
+    )
+    SELECT (SELECT as_of FROM snap)::text AS as_of, r.store_code, r.cost AS report_cost,
+           coalesce(so.after, 0) AS sold_after, coalesce(so.before, 0) AS sold_before, coalesce(so.today, 0) AS sold_today
+    FROM report r LEFT JOIN sold so USING (store_code)`, [date]);
+}
+
+/** Closing = report − sold after it up to this day + sold between this day and the report; opening = closing + sold this day. */
+export function stockValue(rows: StockValueRow[] | null): DailyStockValue | null {
+  if (!rows?.length) return null;
+  return {
+    asOf: rows[0].as_of,
+    stores: rows.map((r) => {
+      const closing = n(r.report_cost) - n(r.sold_after) + n(r.sold_before);
+      return { storeCode: r.store_code, opening: closing + n(r.sold_today), sold: n(r.sold_today), closing };
+    }),
+  };
 }

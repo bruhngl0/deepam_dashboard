@@ -19,6 +19,22 @@ export type DailyStore = {
   converted: number;
   bills: number;
   sales: number;
+  /** Units on this day's bills, and what they cost (the bills' purchase value). */
+  units: number;
+  soldCost: number;
+  /** Sales the day before, and from the 1st of the month to this day. */
+  prevSales: number;
+  mtdSales: number;
+};
+
+/**
+ * Stock at cost for the day, per store, rolled from the latest stock report: closing = the report's
+ * value, less the cost of what sold after it up to this day (or plus what sold between this day and
+ * the report, for a day before it). Stock received is not connected yet, so it is not added.
+ */
+export type DailyStockValue = {
+  asOf: string;
+  stores: { storeCode: string; opening: number; sold: number; closing: number }[];
 };
 
 export type DailyCalls = {
@@ -41,6 +57,8 @@ export type DailyCrm = {
   salesThrough: string | null;
   calls: DailyCalls;
   followups: DailyFollowups;
+  /** Null when no stock report is available (CRM holds no stock of its own). */
+  stockValue: DailyStockValue | null;
 };
 
 export const isDay = (value: unknown): value is string =>
@@ -57,7 +75,8 @@ export const shiftDay = (day: string, by: number) => {
 
 export async function getDailyCrm(date: string): Promise<DailyCrm> {
   if (!isDay(date)) throw new Error(`Invalid day: ${date}`);
-  const [stores, walkIns, sales, through, calls, followups] = await Promise.all([
+  const monthStart = `${date.slice(0, 8)}01`;
+  const [stores, walkIns, sales, through, calls, followups, totals, lines] = await Promise.all([
     query(sql`SELECT id, store_code, name FROM stores WHERE store_code IS NOT NULL ORDER BY store_code`),
     query(sql`
       SELECT store_id, count(*)::int AS walk_ins, COALESCE(sum(people), 0)::int AS people,
@@ -83,11 +102,25 @@ export async function getDailyCrm(date: string): Promise<DailyCrm> {
       FROM marketing_call_list_contacts
       WHERE followup_due IS NOT NULL AND followup_completed_at IS NULL AND followup_due::date <= ${date}::date
       GROUP BY 1 ORDER BY 1`),
+    query(sql`
+      SELECT store_id,
+             COALESCE(sum(bill_amount) FILTER (WHERE (billed_at AT TIME ZONE 'Asia/Kolkata')::date = ${shiftDay(date, -1)}::date), 0)::float8 AS prev_sales,
+             COALESCE(sum(bill_amount) FILTER (WHERE (billed_at AT TIME ZONE 'Asia/Kolkata')::date >= ${monthStart}::date), 0)::float8 AS mtd_sales
+      FROM sales WHERE (billed_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN LEAST(${monthStart}::date, ${shiftDay(date, -1)}::date) AND ${date}::date
+      GROUP BY store_id`),
+    // purc_value is the line's whole purchase value (Hemparshwa sums it per line), not a unit cost.
+    query(sql`
+      SELECT s.store_id, COALESCE(sum(li.qty), 0)::float8 AS units, COALESCE(sum(li.purc_value), 0)::float8 AS cost
+      FROM sale_line_items li JOIN sales s ON s.id = li.sale_id
+      WHERE (s.billed_at AT TIME ZONE 'Asia/Kolkata')::date = ${date}::date
+      GROUP BY s.store_id`),
   ]);
 
   const byStore = <T extends Record<string, unknown>>(rows: T[]) => new Map(rows.map((r) => [num(r.store_id), r]));
   const w = byStore(walkIns);
   const s = byStore(sales);
+  const t = byStore(totals);
+  const l = byStore(lines);
   const callRows = calls.map((r) => ({ name: String(r.salesperson), calls: num(r.calls), connected: num(r.connected), interested: num(r.interested) }));
   const followupRows = followups.map((r) => ({ store: storeName(String(r.store)) || 'No store recorded', dueToday: num(r.due_today), overdue: num(r.overdue) }));
 
@@ -104,6 +137,10 @@ export async function getDailyCrm(date: string): Promise<DailyCrm> {
         converted: num(wi?.converted),
         bills: num(sa?.bills),
         sales: num(sa?.sales),
+        units: num(l.get(num(st.id))?.units),
+        soldCost: num(l.get(num(st.id))?.cost),
+        prevSales: num(t.get(num(st.id))?.prev_sales),
+        mtdSales: num(t.get(num(st.id))?.mtd_sales),
       };
     }),
     salesThrough: through[0]?.through ? new Date(str(through[0].through)!).toISOString() : null,
@@ -118,5 +155,6 @@ export async function getDailyCrm(date: string): Promise<DailyCrm> {
       overdue: followupRows.reduce((n, r) => n + r.overdue, 0),
       byStore: followupRows,
     },
+    stockValue: null,
   };
 }

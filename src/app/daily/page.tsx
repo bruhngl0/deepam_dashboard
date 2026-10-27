@@ -14,6 +14,7 @@ import { getDailyCrm, isDay, shiftDay, todayIst, type DailyCrm, type DailyStore 
 import { getRcDaily, getStockAlerts, type RcDaily, type StockAlerts } from '@/lib/integration/apps';
 import { dailyFromAnalytics } from '@/lib/analytics/daily';
 import { Finding, Note } from '@/components/finding-card';
+import { WhatsAppShare } from '@/components/whatsapp-share';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,11 @@ const UNAVAILABLE = 'Not available right now';
 type Column = DailyStore & {
   rc: { visits: number; people: number; commission: number; owed: number; owedVisits: number } | null;
   stock: { agedUnits: number; agedCost: number; low: number } | null;
+  /** Stock at cost from the stock report; null for a store the report does not cover. */
+  value: { opening: number; sold: number; closing: number } | null;
 };
+
+const NOT_CONNECTED = 'Not connected yet';
 
 function Cell({ children, strong }: { children: React.ReactNode; strong?: boolean }) {
   return <td className={`tnum whitespace-nowrap px-3 py-2 text-right ${strong ? 'font-semibold text-ink' : 'text-ink-2'}`}>{children}</td>;
@@ -67,7 +72,7 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
   // Stock history in analytics starts on the day it was built; before that, the live stock alerts as before.
   if (fromAnalytics) ({ crm, rc, stock } = { ...fromAnalytics, stock: fromAnalytics.stock ?? (await getStockAlerts()) });
   else [crm, rc, stock] = await Promise.all([getDailyCrm(date), getRcDaily(date), getStockAlerts()]);
-  const allColumns = buildColumns(crm.stores, rc, stock);
+  const allColumns = buildColumns(crm.stores, rc, stock, crm.stockValue);
   // A picked store narrows the table, its totals and the stock alerts to that store; calls and follow-ups stay company-wide.
   const store = allColumns.some((c) => c.storeCode === pickedStore) ? pickedStore : null;
   const columns = store ? allColumns.filter((c) => c.storeCode === store) : allColumns;
@@ -78,6 +83,38 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
   const converted = sum((c) => c.converted);
   const bills = sum((c) => c.bills);
   const sales = sum((c) => c.sales);
+  const units = sum((c) => c.units);
+  const prevSales = sum((c) => c.prevSales);
+  const mtdSales = sum((c) => c.mtdSales);
+  const valued = columns.filter((c) => c.value);
+  const stockTotal = valued.length
+    ? { opening: valued.reduce((t, c) => t + c.value!.opening, 0), sold: valued.reduce((t, c) => t + c.value!.sold, 0), closing: valued.reduce((t, c) => t + c.value!.closing, 0) }
+    : null;
+  const stockAsOf = crm.stockValue ? formatDate(`${crm.stockValue.asOf}T12:00:00+05:30`) : null;
+  const summary: [string, string][] = [
+    ['Total sales', formatCurrency(sales)],
+    ['Previous day sales', formatCurrency(prevSales)],
+    ['MTD sales', formatCurrency(mtdSales)],
+    ['Average bill value', bills ? formatCurrency(sales / bills) : '—'],
+    ['Total footfall', formatNumber(walkIns)],
+    ['Conversion rate', walkIns ? formatPercent(converted, walkIns) : '—'],
+    ['Total units sold', formatNumber(units)],
+  ];
+  const stockSummary: [string, string][] = [
+    ['Opening stock value', stockTotal ? formatCurrency(stockTotal.opening) : '—'],
+    ['Stock received', NOT_CONNECTED],
+    ['Stock sold (cost)', stockTotal ? formatCurrency(stockTotal.sold) : '—'],
+    ['Closing stock', stockTotal ? formatCurrency(stockTotal.closing) : '—'],
+  ];
+  const whatsappText = [
+    `*Deepam daily · ${formatDate(`${date}T12:00:00+05:30`)}*`,
+    store ? `${columns[0].name} (${store})` : 'All stores',
+    '',
+    ...summary.map(([k, v]) => `${k}: ${v}`),
+    '',
+    `*Stock at cost*${stockAsOf ? ` (from the stock report of ${stockAsOf})` : ''}`,
+    ...stockSummary.map(([k, v]) => `${k}: ${v}`),
+  ].join('\n');
   const unassignedRc = rc && !store ? rc.day.filter((d) => !d.storeCode).reduce((n, d) => n + d.visits, 0) : 0;
   const rcDay = rc ? rc.day.filter((d) => inStore(d.storeCode)) : [];
   const rcOwed = rc ? rc.owed.filter((d) => inStore(d.storeCode)) : [];
@@ -115,8 +152,22 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
             <button className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Show</button>
           </form>
           {date < today && <Link href={dayLink(shiftDay(date, 1))} className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Next day →</Link>}
+          <WhatsAppShare text={whatsappText} to={process.env.DAILY_WHATSAPP_TO?.replace(/[^0-9]/g, '') || null} label="WhatsApp export" />
         </nav>
       </header>
+
+      <section aria-label="Summary" className="mb-3 space-y-2.5">
+        {[{ items: summary, cols: 'lg:grid-cols-7' }, { items: stockSummary, cols: 'lg:grid-cols-4' }].map(({ items, cols }, i) => (
+          <div key={i} className={`grid grid-cols-2 gap-2.5 sm:grid-cols-4 ${cols}`}>
+            {items.map(([k, v]) => (
+              <div key={k} className="rounded-xl bg-inset px-3 py-2.5">
+                <div className="text-xs text-ink-muted">{k}</div>
+                <div className={`tnum mt-1 text-base font-semibold tracking-tight ${v === NOT_CONNECTED ? 'text-ink-muted' : 'text-ink'}`}>{v}</div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </section>
 
       <section className="card overflow-hidden rounded-2xl border border-line bg-surface">
         <div className="overflow-x-auto">
@@ -134,15 +185,24 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
             </thead>
             <tbody>
               <Section label="Walk-ins (WalkTrack)" colSpan={colSpan} />
-              <Row label="Walk-ins" columns={columns} value={(c) => formatNumber(c.walkIns)} total={formatNumber(walkIns)} />
+              <Row label="Total footfall (walk-ins)" columns={columns} value={(c) => formatNumber(c.walkIns)} total={formatNumber(walkIns)} />
               <Row label="People" columns={columns} value={(c) => formatNumber(c.people)} total={formatNumber(sum((c) => c.people))} />
               <Row label="Converted" columns={columns} value={(c) => formatNumber(c.converted)} total={formatNumber(converted)} />
               <Row label="Conversion rate" columns={columns} value={(c) => (c.walkIns ? formatPercent(c.converted, c.walkIns) : '—')} total={walkIns ? formatPercent(converted, walkIns) : '—'} />
 
               <Section label="Sales (billing)" colSpan={colSpan} />
               <Row label="Total sales" columns={columns} value={(c) => formatCurrency(c.sales)} total={formatCurrency(sales)} />
+              <Row label="Previous day sales" columns={columns} value={(c) => formatCurrency(c.prevSales)} total={formatCurrency(prevSales)} />
+              <Row label="MTD sales" columns={columns} value={(c) => formatCurrency(c.mtdSales)} total={formatCurrency(mtdSales)} />
               <Row label="Bills" columns={columns} value={(c) => formatNumber(c.bills)} total={formatNumber(bills)} />
               <Row label="Average bill value" columns={columns} value={(c) => (c.bills ? formatCurrency(c.sales / c.bills) : '—')} total={bills ? formatCurrency(sales / bills) : '—'} />
+              <Row label="Total units sold" columns={columns} value={(c) => formatNumber(c.units)} total={formatNumber(units)} />
+
+              <Section label={`Stock value at cost${stockAsOf ? ` · from the stock report of ${stockAsOf}` : ' · no stock report'}`} colSpan={colSpan} />
+              <Row label="Opening stock value" columns={columns} value={(c) => (c.value ? formatCurrency(c.value.opening) : '—')} total={stockTotal ? formatCurrency(stockTotal.opening) : '—'} />
+              <Row label="Stock received" columns={columns} value={() => '—'} total={NOT_CONNECTED} strong={false} />
+              <Row label="Stock sold (cost)" columns={columns} value={(c) => (c.value ? formatCurrency(c.value.sold) : '—')} total={stockTotal ? formatCurrency(stockTotal.sold) : '—'} />
+              <Row label="Closing stock" columns={columns} value={(c) => (c.value ? formatCurrency(c.value.closing) : '—')} total={stockTotal ? formatCurrency(stockTotal.closing) : '—'} />
 
               <Section label={`Driver visits (RC Dashboard)${rc ? '' : ` · ${UNAVAILABLE}`}`} colSpan={colSpan} />
               <Row label="Visits" columns={columns} value={rcCell((r) => formatNumber(r.visits))} total={rcTotal ? formatNumber(rcTotal.visits) : '—'} />
@@ -158,6 +218,7 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
           </table>
         </div>
         <div className="border-t border-grid px-4 py-3 text-xs leading-relaxed text-ink-muted">
+          {stockAsOf && <p>Stock value at cost starts from the stock report of {stockAsOf} and takes off the purchase value of everything billed since (or adds back what was billed between this day and the report). Stock received is not connected yet, so goods received after the report are not in it; a new stock report in Hemparshwa resets it. Stores the report does not cover show —.</p>}
           <p>Sales arrive from Hemparshwa OS every few hours{crm.salesThrough ? `; the latest bill loaded is from ${formatDateTime(crm.salesThrough)}` : ''}. Walk-ins arrive from WalkTrack within a minute.</p>
           {rc && <p>Commission not yet paid: commission on visits up to this day that is not marked Paid in RC, and how many visits. {unassignedRc ? `${formatNumber(unassignedRc)} visit${unassignedRc === 1 ? '' : 's'} this day had no store recorded and count only in the Total.` : ''}</p>}
           {stock && <p>Fast sellers: products that sold at least {stock.rules.fastSellerMinSold} units across all stores in the {stock.rules.fastSellerDays} days to {formatDate(`${stock.salesThrough}T12:00:00+05:30`)}, with {stock.rules.lowStockMax} unit or fewer left in that store. Sales are not recorded per store.</p>}
@@ -216,8 +277,9 @@ function StockDetail({ stock, names }: { stock: StockAlerts; names: Map<string, 
   );
 }
 
-function buildColumns(stores: DailyStore[], rc: RcDaily | null, stock: StockAlerts | null): Column[] {
+function buildColumns(stores: DailyStore[], rc: RcDaily | null, stock: StockAlerts | null, value: DailyCrm['stockValue']): Column[] {
   return stores.map((s) => {
+    const v = value?.stores.find((x) => x.storeCode === s.storeCode);
     const day = rc?.day.find((d) => d.storeCode === s.storeCode);
     const owed = rc?.owed.find((d) => d.storeCode === s.storeCode);
     const alerts = stock?.stores.find((a) => a.storeCode === s.storeCode);
@@ -225,6 +287,7 @@ function buildColumns(stores: DailyStore[], rc: RcDaily | null, stock: StockAler
       ...s,
       rc: rc ? { visits: day?.visits ?? 0, people: day?.people ?? 0, commission: day?.commission ?? 0, owed: owed?.commission ?? 0, owedVisits: owed?.visits ?? 0 } : null,
       stock: stock ? { agedUnits: alerts?.aged.units ?? 0, agedCost: alerts?.aged.cost ?? 0, low: alerts?.lowFastSellers.length ?? 0 } : null,
+      value: v ? { opening: v.opening, sold: v.sold, closing: v.closing } : null,
     };
   });
 }
