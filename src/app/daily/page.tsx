@@ -121,7 +121,6 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
   const whatsappText = dailyText({
     date, scope: store ? `${columns[0].name} (${store})` : 'All stores', columns, summary, stockTotal, stockAsOf,
     rc: rc && rcTotal ? { total: rcTotal, unassigned: unassignedRc } : null,
-    stock: stock ? { ...stock, stores: stock.stores.filter((s) => inStore(s.storeCode)) } : null,
     calls: crm.calls, followups: crm.followups,
   });
   const colSpan = columns.length + 2;
@@ -298,14 +297,12 @@ function dailyText(d: {
   stockTotal: { opening: number; sold: number; closing: number } | null;
   stockAsOf: string | null;
   rc: { total: { visits: number; people: number; commission: number; owed: number; owedVisits: number }; unassigned: number } | null;
-  stock: StockAlerts | null;
   calls: DailyCrm['calls'];
   followups: DailyCrm['followups'];
 }): string {
   const cur = formatCurrency;
   const pct = (part: number, whole: number) => (whole ? formatPercent(part, whole) : '—');
   const many = d.columns.length > 1;
-  const name = (code: string) => d.columns.find((c) => c.storeCode === code)?.name ?? code;
   const out: string[] = [`*Deepam daily · ${formatDate(`${d.date}T12:00:00+05:30`)}*`, d.scope, ''];
   const section = (title: string, lines: string[]) => { if (lines.length) out.push(`*${title}*`, ...lines, ''); };
 
@@ -337,17 +334,6 @@ function dailyText(d: {
         `Stock received: ${NOT_CONNECTED}`,
       ]
     : ['No stock report']);
-
-  if (d.stock) {
-    const lines: string[] = [];
-    for (const s of d.stock.stores) {
-      if (!s.aged.units && !s.lowFastSellers.length) continue;
-      lines.push(`${name(s.storeCode)}: aged over ${d.stock.rules.agedDays} days ${formatNumber(s.aged.units)} units (${cur(s.aged.cost)}), ${formatNumber(s.lowFastSellers.length)} fast sellers running low`);
-      for (const r of s.lowFastSellers) lines.push(`  • Low: ${r.vendor} · ${r.item}, ${formatNumber(r.left)} left, ${formatNumber(r.soldLast30Days)} sold in ${d.stock.rules.fastSellerDays} days`);
-      for (const r of s.aged.items) lines.push(`  • Aged: ${r.vendor} · ${r.item}, ${formatNumber(r.units)} units, ${cur(r.cost)}`);
-    }
-    section(`Stock alerts (Vendor Intelligence, stock as of ${formatDate(`${d.stock.asOf}T12:00:00+05:30`)})`, lines.length ? lines : ['No alerts']);
-  }
 
   section(`Calls (all stores): ${formatNumber(d.calls.calls)}, ${formatNumber(d.calls.connected)} connected, ${formatNumber(d.calls.interested)} interested`,
     d.calls.bySalesperson.length ? d.calls.bySalesperson.map((r) => `${r.name}: ${formatNumber(r.calls)} calls, ${formatNumber(r.connected)} connected, ${formatNumber(r.interested)} interested`) : ['No calls logged']);
