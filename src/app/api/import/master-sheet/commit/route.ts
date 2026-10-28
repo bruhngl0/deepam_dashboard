@@ -16,7 +16,7 @@
  *
  * `ALLOW_MASTER_SHEET_IMPORT` stays as a second, independent gate on top of
  * both. It predates auth (D-89) and was the only barrier before it existed;
- * now it is defense in depth — a Vercel environment variable that has to be
+ * now it is defense in depth — a server environment variable that has to be
  * deliberately set, so this route can't fire just because someone's session
  * cookie happened to be valid and they clicked the wrong button.
  */
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       {
         error:
           'Import commit is disabled. This deletes and reloads the entire lead layer — set ' +
-          'ALLOW_MASTER_SHEET_IMPORT=true in the Vercel project to enable it.',
+          'ALLOW_MASTER_SHEET_IMPORT=true on the server to enable it.',
       },
       { status: 403 },
     );

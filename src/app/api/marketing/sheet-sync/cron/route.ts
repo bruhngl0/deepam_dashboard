@@ -2,7 +2,7 @@
  * Scheduled trigger for the Google Sheet import, for hosts where an
  * in-process timer cannot be relied on (serverless, or a container whose CPU
  * is throttled between requests). Point any scheduler at this URL with
- * `Authorization: Bearer $CRON_SECRET`; Vercel Cron sends that header itself.
+ * `Authorization: Bearer $CRON_SECRET`.
  */
 
 import { timingSafeEqual } from 'node:crypto';
