@@ -22,8 +22,7 @@ const nextConfig: NextConfig = {
     // `proxy.ts` (Clerk's middleware) clones every request body for
     // inspection, capped independently of any route handler's own limit —
     // the default (10mb) rejects the existing-customer loyalty export
-    // before `existing-customers/route.ts` ever sees it. Raised to match
-    // Vercel Functions' own 100mb request-body ceiling, not invented.
+    // before `existing-customers/route.ts` ever sees it, so it is raised to 100mb.
     proxyClientMaxBodySize: "100mb",
   },
 };

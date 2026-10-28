@@ -7,7 +7,6 @@ coverage
 .env
 .env.*
 !.env.example
-.vercel
 .agents
 .codex
 .scratch
