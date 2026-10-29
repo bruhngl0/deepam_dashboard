@@ -259,8 +259,8 @@ export async function existingCustomerPage(view: ExistingCustomerView, search: s
   };
 }
 
-/** Every claimed calling-list customer (existing and online), for the Team performance table. claimedAt is India time. */
-export async function existingCustomerClaims(): Promise<{ leadId: string; salesperson: string; phone: string; claimedAt: string; followupDue: string | null; list: string }[]> {
+/** Every claimed calling-list customer (existing and online), or one salesperson's, for Team performance and My performance. claimedAt is India time. */
+export async function existingCustomerClaims(salesperson?: string): Promise<{ leadId: string; salesperson: string; phone: string; claimedAt: string; followupDue: string | null; list: string }[]> {
   const result = await db.execute(sql`
     SELECT ${leadIdSql} AS lead_id, contact.assigned_to, contact.phone, contact.list_key,
            ${isoSql(`contact.claimed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata'`)} AS claimed_at,
@@ -269,6 +269,7 @@ export async function existingCustomerClaims(): Promise<{ leadId: string; salesp
     WHERE ${anyCallList}
       AND contact.assigned_to IS NOT NULL
       AND contact.claimed_at IS NOT NULL
+      AND (${salesperson ?? null}::text IS NULL OR lower(contact.assigned_to) = lower(${salesperson ?? null}))
   `);
   return rowsOf<Record<string, unknown>>(result).map(row => ({
     leadId: String(row.lead_id),

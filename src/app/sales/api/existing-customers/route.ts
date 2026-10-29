@@ -1,5 +1,5 @@
 import { getAuthenticatedSalesperson } from '@/lib/salesperson-auth';
-import { existingCustomerDesk } from '@/lib/marketing/existing-customer-store';
+import { existingCustomerClaims, existingCustomerDesk } from '@/lib/marketing/existing-customer-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,5 +10,7 @@ export async function GET(req: Request) {
   const salesperson = await getAuthenticatedSalesperson();
   if (!salesperson) return Response.json({ error: 'Unauthorized' }, { status: 401 });
   const params = new URL(req.url).searchParams;
-  return Response.json(await existingCustomerDesk(salesperson.name, { from: day(params.get('from')), to: day(params.get('to')) }));
+  const [desk, claims] = await Promise.all([existingCustomerDesk(salesperson.name, { from: day(params.get('from')), to: day(params.get('to')) }), existingCustomerClaims(salesperson.name)]);
+  // claims feed My performance, so it counts the same customers as Team performance.
+  return Response.json({ ...desk, claims });
 }
