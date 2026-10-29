@@ -29,7 +29,16 @@ const leadIdSql = sql`'existing-customer:' || contact.id::text`;
 /** A salesperson's desk spans every calling list; the lists themselves are viewed one at a time. */
 const anyCallList = sql`contact.list_key IN (${sql.join(CALL_LIST_KEYS.map(key => sql`${key}`), sql`, `)})`;
 
-export async function existingCustomerDesk(salesperson: string) {
+/**
+ * Called counts customers with a call on record; with from/to (YYYY-MM-DD), only calls made in that period.
+ * Assigned, waiting and open stay today's totals.
+ */
+export async function existingCustomerDesk(salesperson: string, range: { from?: string; to?: string } = {}) {
+  const callInRange = sql.join([
+    sql`call.lead_id = ${leadIdSql}`,
+    ...(range.from ? [sql`call.called_at >= ${range.from}::date`] : []),
+    ...(range.to ? [sql`call.called_at < ${range.to}::date + 1`] : []),
+  ], sql` AND `);
   const [summaryResult, queueResult, followupResult] = await Promise.all([
     db.execute(sql`
       SELECT count(*)::int AS assigned_total,
@@ -40,7 +49,7 @@ export async function existingCustomerDesk(salesperson: string) {
           SELECT 1 FROM marketing_calls call WHERE call.lead_id = ${leadIdSql}
         ))::int AS open,
         count(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM marketing_calls call WHERE call.lead_id = ${leadIdSql}
+          SELECT 1 FROM marketing_calls call WHERE ${callInRange}
         ))::int AS called
       FROM marketing_call_list_contacts contact
       WHERE ${anyCallList}

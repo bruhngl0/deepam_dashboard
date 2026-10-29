@@ -27,6 +27,23 @@ function LeadHeader({ lead }: { lead: Lead }) {
   </div>;
 }
 
+/** One salesperson's lead performance; with from/to, calls, interested, conversions and sales count only that period. */
+function performanceFor(data: Dataset, salesperson: string, from: string, to: string) {
+  const all = callLog([data]);
+  const calls = all.filter(call => (!from || call.at.slice(0, 10) >= from) && (!to || call.at.slice(0, 10) <= to));
+  return salespersonPerformance(data, calls, [salesperson], [], { from, to, allCalls: all })[0];
+}
+
+function PerformanceDates({ from, to, setFrom, setTo }: { from: string; to: string; setFrom: (value: string) => void; setTo: (value: string) => void }) {
+  return <section aria-label="Performance dates" className={`${card} flex flex-wrap items-end gap-3`}>
+    <Field label="From"><input type="date" className={input} max={to || undefined} value={from} onChange={event => setFrom(event.target.value)} /></Field>
+    <Field label="To"><input type="date" className={input} min={from || undefined} value={to} onChange={event => setTo(event.target.value)} /></Field>
+    {(from || to) && <button className={button} onClick={() => { setFrom(''); setTo(''); }}>All time</button>}
+    <p className="w-full text-xs text-ink-muted">{from || to ? 'Called, Interested, Converted and Sales count only this period. Claimed, Assigned and Pending are today\'s totals.' : 'Showing all time. Pick dates to see one period.'}</p>
+    {from && to && from > to && <p role="alert" className="w-full text-sm text-red-600">From must be on or before To.</p>}
+  </section>;
+}
+
 export function SalespersonMarketingWorkspace({ salespersonName, logoutAction }: { salespersonName: string; logoutAction: () => Promise<void> }) {
   const { data, save, message, refresh } = useMarketing();
   const [existingDesk, setExistingDesk] = useState<ExistingCustomerDesk | null>(null);
@@ -38,6 +55,8 @@ export function SalespersonMarketingWorkspace({ salespersonName, logoutAction }:
   const [page, setPage] = useState(0);
   const [claiming, setClaiming] = useState(false);
   const [claimMessage, setClaimMessage] = useState('');
+  const [perfFrom, setPerfFrom] = useState('');
+  const [perfTo, setPerfTo] = useState('');
   async function refreshExistingCustomers() {
     const response = await fetch('/sales/api/existing-customers', { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -70,7 +89,7 @@ export function SalespersonMarketingWorkspace({ salespersonName, logoutAction }:
   const currentLead = queue[0];
   const myFollowupsDue = pending.filter(({ followup }) => followup.due <= now).length;
   const callsToday = data.leads.reduce((total, lead) => total + lead.interactions.filter(interaction => interaction.type === 'call' && interaction.at.startsWith(today) && (interaction.by === salespersonName || interaction.text.endsWith(`Logged by ${salespersonName}`))).length, 0);
-  const performance = salespersonPerformance(data, callLog([data]), [salespersonName])[0];
+  const performance = performanceFor(data, salespersonName, perfFrom, perfTo);
   const update = (lead: Lead) => save({ ...data, leads: data.leads.map(l => l.id === lead.id ? lead : l) });
 
   async function claimTenLeads() {
@@ -115,7 +134,7 @@ export function SalespersonMarketingWorkspace({ salespersonName, logoutAction }:
       const entries = pending.filter(p => bucket === 'Overdue' ? p.followup.due < now : bucket === 'Today' ? p.followup.due >= now && p.followup.due.startsWith(today) : p.followup.due.slice(0, 10) > today);
       return <section key={bucket} className={card}><h2 className="text-lg font-semibold text-ink">{bucket} <span className="text-ink-muted">{entries.length}</span></h2><div className="mt-3 space-y-2">{entries.map(({ lead, followup: f }) => <div key={f.id} className="rounded-xl border border-line px-3 py-2.5"><LeadHeader lead={lead} /><p className="mt-1.5 text-xs text-ink-2"><span className="font-medium">Due {timeAgo(f.due)}</span> · {f.note || 'Follow up with customer'}</p><div className="mt-2 flex flex-wrap items-center gap-2"><LeadActions lead={lead} update={update} salespersonName={salespersonName} salespersonView /><button className={button} onClick={() => update({ ...lead, followups: lead.followups.map(x => x.id === f.id ? { ...x, completedAt: nowLocal() } : x), interactions: [...lead.interactions, { id: crypto.randomUUID(), at: nowLocal(), type: 'followup', text: `Follow-up completed: ${f.note}` }] })}>Complete</button></div></div>)}{!entries.length && <p className="text-sm text-ink-muted">No follow-ups.</p>}</div></section>;
     })}</div>}
-    {tab === 'My performance' && <section className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['Claimed', performance.claimed], ['Called', performance.called], ['Pending', performance.pending], ['Interested', performance.interested], ['Converted', performance.converted], ['Sales', money(performance.revenue)]].map(([label, value]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p></div>)}</div></section>}
+    {tab === 'My performance' && <section className="space-y-4"><PerformanceDates from={perfFrom} to={perfTo} setFrom={setPerfFrom} setTo={setPerfTo} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['Claimed', performance.claimed], ['Called', performance.called], ['Pending', performance.pending], ['Interested', performance.interested], ['Converted', performance.converted], ['Sales', money(performance.revenue)]].map(([label, value]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p></div>)}</div></section>}
   </main>;
 }
 
@@ -124,6 +143,21 @@ function ExistingCustomerSalesDesk({ salespersonName, logoutAction, initial, ref
   const [tab, setTab] = useState<SalesTab>('My queue');
   const [claiming, setClaiming] = useState(false);
   const [status, setStatus] = useState('');
+  const [perfFrom, setPerfFrom] = useState('');
+  const [perfTo, setPerfTo] = useState('');
+  const [calledInRange, setCalledInRange] = useState<number | null>(null);
+  const dated = !!(perfFrom || perfTo) && !(perfFrom && perfTo && perfFrom > perfTo);
+  // Existing-customer calls live on the server, so a dated count is fetched for the chosen period.
+  useEffect(() => {
+    if (!dated) return;
+    let active = true;
+    const query = new URLSearchParams({ ...(perfFrom && { from: perfFrom }), ...(perfTo && { to: perfTo }) });
+    void fetch(`/sales/api/existing-customers?${query}`, { cache: 'no-store' })
+      .then(response => response.ok ? response.json() as Promise<ExistingCustomerDesk> : Promise.reject())
+      .then(value => { if (active) setCalledInRange(value.called); })
+      .catch(() => { if (active) setCalledInRange(null); });
+    return () => { active = false; setCalledInRange(null); };
+  }, [dated, perfFrom, perfTo, desk.called]);
   const previousLeads = data.leads.filter(lead => lead.claimedBy === salespersonName);
   // Campaign leads routed to them with no call yet go ahead of the existing customers: AdOnMo first, then Shubh Convention.
   const convertedPhones = new Set(convertedLeads(data).map(lead => lead.phone));
@@ -131,7 +165,7 @@ function ExistingCustomerSalesDesk({ salespersonName, logoutAction, initial, ref
     .filter(lead => !hasLoggedCall(lead) && !convertedPhones.has(lead.phone) && !['Connected / not interested', 'Wrong number'].includes(lead.status))
     .sort((a, b) => queuePriority(b) - queuePriority(a) || a.acquiredAt.localeCompare(b.acquiredAt));
   const previousFollowups = previousLeads.flatMap(lead => lead.followups.filter(followup => !followup.completedAt).map(followup => ({ lead, followup }))).sort((a, b) => a.followup.due.localeCompare(b.followup.due));
-  const previousPerformance = salespersonPerformance(data, callLog([data]), [salespersonName])[0];
+  const previousPerformance = performanceFor(data, salespersonName, perfFrom, perfTo);
   const updateLead = (lead: Lead) => save({ ...data, leads: data.leads.map(value => value.id === lead.id ? lead : value) });
   async function reload() {
     await refreshDesk();
@@ -158,7 +192,7 @@ function ExistingCustomerSalesDesk({ salespersonName, logoutAction, initial, ref
     {tab === 'My queue' && <section className="overflow-hidden rounded-2xl border border-line bg-surface"><div className="p-4"><h2 className="text-lg font-semibold text-ink">My existing customer queue</h2><p className="text-xs text-ink-muted">These are existing customers, not campaign leads.</p></div><div className="space-y-3 border-t border-line p-3 sm:p-4">{desk.rows.map(customer => <ExistingCustomerCallCard key={customer.id} customer={customer} salespersonName={salespersonName} onSaved={reload} />)}{!desk.rows.length && <p className="p-8 text-center text-sm text-ink-muted">Claim your next 10 existing customers to begin calling.</p>}</div></section>}
     {tab === 'Previous leads' && <section className="overflow-hidden rounded-2xl border border-line bg-surface"><div className="p-4"><h2 className="text-lg font-semibold text-ink">Previous lead records</h2><p className="text-xs text-ink-muted">Your earlier campaign, walk-in, call and outcome data remains available here.</p></div><div className="space-y-3 border-t border-line p-3 sm:p-4">{previousLeads.map(lead => { const calls = lead.interactions.filter(interaction => interaction.type === 'call'); return <article key={lead.id} className="rounded-xl border border-line p-4"><LeadHeader lead={lead} />{calls.length > 0 && <div className="mt-3 space-y-1 text-xs text-ink-2">{calls.map(call => <p key={call.id}>{call.at.replace('T', ' ').slice(0, 16)} · {call.outcome || 'Call logged'} · {call.text}</p>)}</div>}<div className="mt-3 flex flex-wrap gap-2"><LeadActions lead={lead} update={updateLead} salespersonName={salespersonName} salespersonView /><LeadActions lead={lead} update={updateLead} variant="call-only" salespersonName={salespersonName} salespersonView /></div></article>; })}{!previousLeads.length && <p className="p-8 text-center text-sm text-ink-muted">No previous lead records.</p>}</div></section>}
     {tab === 'Follow-ups' && <div className="space-y-5"><div><h2 className="text-lg font-semibold text-ink">Existing customer follow-ups</h2><div className="mt-3 grid items-start gap-4 lg:grid-cols-3">{['Overdue', 'Today', 'Upcoming'].map(bucket => { const today = nowLocal().slice(0, 10); const rows = desk.followups.filter(customer => bucket === 'Overdue' ? customer.followupDue!.slice(0, 10) < today : bucket === 'Today' ? customer.followupDue!.startsWith(today) : customer.followupDue!.slice(0, 10) > today); return <section key={bucket} className={card}><h3 className="font-semibold text-ink">{bucket} <span className="text-ink-muted">{rows.length}</span></h3><div className="mt-3 space-y-3">{rows.map(customer => <ExistingCustomerCallCard key={customer.id} customer={customer} salespersonName={salespersonName} onSaved={reload} followup />)}{!rows.length && <p className="text-sm text-ink-muted">No follow-ups.</p>}</div></section>; })}</div></div><div><h2 className="text-lg font-semibold text-ink">Previous lead follow-ups</h2><div className="mt-3 space-y-3">{previousFollowups.map(({ lead, followup }) => <article key={followup.id} className={card}><LeadHeader lead={lead} /><p className="mt-2 text-xs text-ink-2">Due {timeAgo(followup.due)} · {followup.note || 'Follow up with customer'}</p><div className="mt-3 flex flex-wrap gap-2"><LeadActions lead={lead} update={updateLead} salespersonName={salespersonName} salespersonView /><button className={button} onClick={() => updateLead({ ...lead, followups: lead.followups.map(value => value.id === followup.id ? { ...value, completedAt: nowLocal() } : value) })}>Complete</button></div></article>)}{!previousFollowups.length && <p className={`${card} text-sm text-ink-muted`}>No previous lead follow-ups.</p>}</div></div></div>}
-    {tab === 'My performance' && <div className="space-y-5"><section><h2 className="mb-3 text-lg font-semibold text-ink">Existing customer calls</h2><div className="grid gap-3 sm:grid-cols-3"><div className={card}><p className="text-sm text-ink-2">Assigned</p><p className="mt-3 text-3xl font-semibold text-ink">{desk.assignedTotal}</p></div><div className={card}><p className="text-sm text-ink-2">Called</p><p className="mt-3 text-3xl font-semibold text-ink">{desk.called}</p></div><div className={card}><p className="text-sm text-ink-2">Pending</p><p className="mt-3 text-3xl font-semibold text-ink">{desk.remaining + desk.open}</p></div></div></section><section><h2 className="mb-3 text-lg font-semibold text-ink">Previous lead performance</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['Claimed', previousPerformance.claimed], ['Called', previousPerformance.called], ['Pending', previousPerformance.pending], ['Interested', previousPerformance.interested], ['Converted', previousPerformance.converted], ['Sales', money(previousPerformance.revenue)]].map(([label, value]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold text-ink">{value}</p></div>)}</div></section></div>}
+    {tab === 'My performance' && <div className="space-y-5"><PerformanceDates from={perfFrom} to={perfTo} setFrom={setPerfFrom} setTo={setPerfTo} /><section><h2 className="mb-3 text-lg font-semibold text-ink">Existing customer calls</h2><div className="grid gap-3 sm:grid-cols-3"><div className={card}><p className="text-sm text-ink-2">Assigned</p><p className="mt-3 text-3xl font-semibold text-ink">{desk.assignedTotal}</p></div><div className={card}><p className="text-sm text-ink-2">Called</p><p className="mt-3 text-3xl font-semibold text-ink">{dated ? calledInRange ?? '…' : desk.called}</p></div><div className={card}><p className="text-sm text-ink-2">Pending</p><p className="mt-3 text-3xl font-semibold text-ink">{desk.remaining + desk.open}</p></div></div></section><section><h2 className="mb-3 text-lg font-semibold text-ink">Previous lead performance</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['Claimed', previousPerformance.claimed], ['Called', previousPerformance.called], ['Pending', previousPerformance.pending], ['Interested', previousPerformance.interested], ['Converted', previousPerformance.converted], ['Sales', money(previousPerformance.revenue)]].map(([label, value]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold text-ink">{value}</p></div>)}</div></section></div>}
   </main>;
 }
 
