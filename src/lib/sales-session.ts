@@ -39,3 +39,6 @@ export async function verifySalesSessionToken(token: string | undefined) {
   for (let i = 0; i < expected.length && i < mac.length; i++) diff |= expected.charCodeAt(i) ^ mac.charCodeAt(i);
   return diff === 0 ? employeeNumber : undefined;
 }
+
+/** Set by the proxy (never trusted from the browser) when a request got in on a salesperson login alone: the employee number. */
+export const SALES_ONLY_HEADER = 'x-deepam-sales-only';

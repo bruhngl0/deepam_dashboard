@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
-import { SALES_SESSION_COOKIE, verifySalesSessionToken } from '@/lib/sales-session';
+import { SALES_ONLY_HEADER, SALES_SESSION_COOKIE, verifySalesSessionToken } from '@/lib/sales-session';
 import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from '@/lib/store-manager-session';
 
 // One password per module on the hub. The hub itself, the sales and store-manager
@@ -41,10 +41,21 @@ const gate: GateConfig = {
 const SALES_APIS = ['/api/marketing/dataset', '/api/marketing/calls'];
 
 export default async function proxy(req: NextRequest) {
-  if (SALES_APIS.includes(req.nextUrl.pathname) && (await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value))) {
-    return NextResponse.next();
+  // Only this proxy may say a request came in on a salesperson login alone; a header the browser sent is dropped.
+  const headers = new Headers(req.headers);
+  headers.delete(SALES_ONLY_HEADER);
+  const pass = () => NextResponse.next({ request: { headers } });
+  const gated = await siteGate(req, gate);
+  if (!gated) return pass();
+  if (SALES_APIS.includes(req.nextUrl.pathname)) {
+    const employeeNumber = await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value);
+    if (employeeNumber) {
+      // Signed in only as a salesperson (not as an admin): the APIs limit what they return to this person.
+      headers.set(SALES_ONLY_HEADER, employeeNumber);
+      return pass();
+    }
   }
-  return (await siteGate(req, gate)) ?? NextResponse.next();
+  return gated;
 }
 
 export const config = {
