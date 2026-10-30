@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { storeName, callLog, campaignName, convertedLeads, filterLeads, hasLoggedCall, nowLocal, OUTCOMES, salespersonPerformance, STORES, timeAgo, type CallEntry, type Dataset, type ExistingClaim, type Lead } from '@/lib/marketing/local';
+import { storeName, campaignName, convertedLeads, filterLeads, hasLoggedCall, nowLocal, OUTCOMES, STORES, timeAgo, type CallEntry, type Dataset, type ExistingClaim, type Lead } from '@/lib/marketing/local';
 import { ADONMO_TAG, CHENNAI_GROUP, VIRTUAL_CALLS_GROUP } from '@/lib/marketing/sheet-routing';
 import { button, CampaignTag, card, Field, input, money, primary, useMarketing } from './marketing-shared';
 import { LeadActions } from './marketing-lead-actions';
+import { performanceFor } from '@/lib/marketing/my-performance';
 
 type SalesTab = 'My queue' | 'Previous leads' | 'Follow-ups' | 'My performance';
 type ExistingCustomerRow = { id: number; name: string; phone: string; branch: string; city: string; customerCode: string | null; claimedAt: string; preferredStore: string; product: string; category: string; followupDue: string | null; followupNote: string };
@@ -25,17 +26,6 @@ function LeadHeader({ lead }: { lead: Lead }) {
     </div>
     <div className="flex shrink-0 flex-wrap justify-end gap-1.5"><CampaignTag lead={lead} /><span className="rounded-full bg-inset px-2.5 py-1 text-[11px] font-medium text-ink-2">{lead.status}</span></div>
   </div>;
-}
-
-/**
- * One salesperson's performance, worked out exactly as Team performance does: the shared call records plus calls on
- * the leads, their campaign leads plus their claimed existing and online customers. With from/to, calls, interested,
- * conversions and sales count only that period.
- */
-function performanceFor(data: Dataset, salesperson: string, from: string, to: string, stored: CallEntry[], claims: ExistingClaim[]) {
-  const all = callLog([data], stored);
-  const calls = all.filter(call => (!from || call.at.slice(0, 10) >= from) && (!to || call.at.slice(0, 10) <= to));
-  return salespersonPerformance(data, calls, [salesperson], claims, { from, to, allCalls: all })[0];
 }
 
 /** The shared call records Team performance reads; until they load (or if they fail), calls on the leads still count. */
