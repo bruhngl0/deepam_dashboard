@@ -83,7 +83,7 @@ export function spendByCampaign(weeks: CampaignSpendWeek[]): CampaignSpend[] {
 
 /**
  * Saves the weeks of spend read from the sheets (replacing what was saved before), for the analytics
- * database's cost-per-lead and payback figures. Called by the sheet sync whenever the sheets change.
+ * database's cost-per-lead and payback figures. Called by scripts/import-meta-spend.ts.
  */
 export async function saveCampaignSpend(weeks: CampaignSpendWeek[]): Promise<number> {
   const { db } = await import('@/db');
