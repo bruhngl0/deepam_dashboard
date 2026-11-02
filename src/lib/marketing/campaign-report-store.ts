@@ -118,7 +118,7 @@ export async function campaignReport(name: string): Promise<CampaignReport | nul
     savedSettings(),
     venues(),
     campaignSpend().then((value) => ({ value, error: null as string | null }), (error: unknown) => ({
-      value: [], error: error instanceof Error ? error.message : 'Could not read the Campaign Summary tabs.',
+      value: [], error: error instanceof Error ? error.message : 'Could not read the Meta ad spend.',
     })),
     db.execute(sql`SELECT to_char(max(billed_at) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS latest FROM sales`),
   ]);

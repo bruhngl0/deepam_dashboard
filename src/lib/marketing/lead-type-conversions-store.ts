@@ -1,29 +1,31 @@
 /**
- * Loads every lead acquisition, CRM bill and Campaign Summary spend row and
+ * Loads every lead acquisition, CRM bill and Meta Ads Manager spend row and
  * summarizes them with `summarizeLeadTypes`.
  */
 
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { campaignSpendFromWorkbooks, spendByCampaign, type CampaignSpend } from './campaign-spend';
-import { readWorkbook } from './google-sheets';
+import { spendByCampaign, type CampaignSpend } from './campaign-spend';
 import { summarizeLeadTypes, type LeadTypeConversions } from './lead-type-conversions';
-import { getSheetConfig } from './sheet-sync';
 
-const SPEND_TTL_MS = 5 * 60_000;
+const SPEND_TTL_MS = 60_000;
 // On globalThis so route bundles share one cache, like the sheet sync's own state.
 const holder = globalThis as typeof globalThis & { __campaignSpend?: { at: number; value: CampaignSpend[] } };
 
 const rowsOf = <T>(result: unknown): T[] =>
   Array.isArray(result) ? (result as T[]) : ((result as { rows?: T[] }).rows ?? []);
 
-/** Spend per campaign from the connected sheets, read at most every five minutes. */
+/**
+ * Spend per campaign from the last Meta Ads Manager export loaded with
+ * scripts/import-meta-spend.ts (lib/marketing/meta-spend-export). The lead
+ * sheets' Campaign Summary tabs are not read. Cached for a minute.
+ */
 export async function campaignSpend(): Promise<CampaignSpend[]> {
   const cached = holder.__campaignSpend;
   if (cached && Date.now() - cached.at < SPEND_TTL_MS) return cached.value;
-  const config = await getSheetConfig();
-  const workbooks = await Promise.all((config?.sheets ?? []).map((sheet) => readWorkbook(sheet.spreadsheetId)));
-  const value = spendByCampaign(campaignSpendFromWorkbooks(workbooks));
+  const rows = rowsOf<{ campaign: string; platform: string; month: string; week: string; spend: number; leads: number | null }>(await db.execute(sql`
+    SELECT campaign, platform, month, week, spend::float AS spend, leads FROM marketing_campaign_spend`));
+  const value = spendByCampaign(rows.map((row) => ({ ...row, spend: Number(row.spend), leads: row.leads === null ? null : Number(row.leads) })));
   holder.__campaignSpend = { at: Date.now(), value };
   return value;
 }
@@ -49,7 +51,7 @@ export async function leadTypeConversions(): Promise<LeadTypeConversions> {
     // A sheet that cannot be read hides the spend columns, not the conversions.
     campaignSpend().then((value) => ({ value, error: null }), (error: unknown) => {
       console.error('marketing/campaign-spend', error);
-      return { value: [] as CampaignSpend[], error: error instanceof Error ? error.message : 'Could not read the Campaign Summary tabs.' };
+      return { value: [] as CampaignSpend[], error: error instanceof Error ? error.message : 'Could not read the Meta ad spend.' };
     }),
   ]);
   const acquisitionRows = rowsOf<Record<string, unknown>>(acquisitions).map((row) => ({
