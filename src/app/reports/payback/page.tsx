@@ -24,7 +24,7 @@ export default async function PaybackPage({ searchParams }: { searchParams: Prom
             formatCurrency(d.commission), times(d.commission > 0 ? d.sales / d.commission : null), formatCurrency(d.owed),
           ])} minWidth="60rem" />
       </Card>
-      <Card title="Campaigns" note="Leads that arrived in the period (for the picked store) and what they did since. Spend, cost per lead and sales per ₹1 are each campaign's all-time figures: spend comes as campaign totals from the Meta Ads Manager export, so it cannot be split by date or store. Sales = bills by its leads after they became a lead.">
+      <Card title="Campaigns" note="Leads that arrived in the period (for the picked store) and what they did since. Spend, cost per lead and sales per ₹1 are each campaign's all-time figures: spend comes as campaign totals from the Campaign Summary tabs, so it cannot be split by date or store. Sales = bills by its leads after they became a lead.">
         <Table head={['Campaign', 'Spend (all time)', 'Leads', 'Cost per lead (all time)', 'Called', 'Walked in', 'Bought', 'Total sales', 'Sales per ₹1 spent (all time)']}
           rows={campaigns.map((c) => [
             <span key="n">{c.name}{c.channel && <span className="block text-xs font-normal text-ink-muted">{c.channel}</span>}</span>,

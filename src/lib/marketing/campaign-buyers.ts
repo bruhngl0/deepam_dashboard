@@ -22,7 +22,7 @@ export type CampaignBuyers = {
   /** The name the campaign report page takes for this row. */
   reportName: string;
   leads: number; contacted: number; interested: number; converted: number; rate: number; bills: number; sales: number;
-  /** null when spend isn't known for this row (no Meta Ads Manager export match, or spend hidden by a filter). */
+  /** null when spend isn't known for this row (no Campaign Summary match, or spend hidden by a filter). */
   spend: number | null; costPerBuyer: number | null; salesPerRupee: number | null;
 };
 

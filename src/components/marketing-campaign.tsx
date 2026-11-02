@@ -82,7 +82,7 @@ export function MarketingCampaign({ campaign }: { campaign: string }) {
       { label: 'Customer acquisition cost', value: rupees(k.acquisitionCost), note: 'Total investment ÷ new customers' },
     ] },
     { title: 'Cost', items: [
-      { label: 'Total marketing spend', value: k.spendFound ? money(k.marketingSpend) : '—', note: report.spendError ? `Spend unavailable: ${report.spendError}` : k.spendFound ? 'Meta Ads Manager export' : 'No row for this campaign in the Meta Ads Manager export' },
+      { label: 'Total marketing spend', value: k.spendFound ? money(k.marketingSpend) : '—', note: report.spendError ? `Spend unavailable: ${report.spendError}` : k.spendFound ? 'Campaign Summary tab of the lead sheet' : 'No row for this campaign in the Campaign Summary tabs' },
       { label: 'Total exhibition expense', value: money(k.exhibitionExpense), note: 'Entered below' },
       { label: 'Total investment', value: money(k.investment), note: 'Marketing spend + exhibition expense' },
       { label: 'Cost per lead', value: rupees(k.costPerLead), note: 'Marketing spend ÷ leads' },

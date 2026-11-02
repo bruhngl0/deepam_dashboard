@@ -51,7 +51,7 @@ export async function leadTypeConversions(): Promise<LeadTypeConversions> {
     // A sheet that cannot be read hides the spend columns, not the conversions.
     campaignSpend().then((value) => ({ value, error: null }), (error: unknown) => {
       console.error('marketing/campaign-spend', error);
-      return { value: [] as CampaignSpend[], error: error instanceof Error ? error.message : 'Could not read the Meta ad spend.' };
+      return { value: [] as CampaignSpend[], error: error instanceof Error ? error.message : 'Could not read the Campaign Summary tabs.' };
     }),
   ]);
   const acquisitionRows = rowsOf<Record<string, unknown>>(acquisitions).map((row) => ({

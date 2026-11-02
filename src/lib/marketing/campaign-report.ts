@@ -51,7 +51,7 @@ export type CampaignInputs = {
   convertedLeads: number;
   bills: ReportBill[];
   visits: ReportVisit[];
-  /** Meta Ads Manager spend; null when the sheets have no row for this campaign. */
+  /** Campaign Summary spend; null when the sheets have no row for this campaign. */
   spend: number | null;
   settings: CampaignSettings;
 };

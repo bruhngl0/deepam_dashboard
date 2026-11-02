@@ -6,7 +6,7 @@
  * own bills (`sales`), not the `marketing_sales` copy. A lead counts as
  * converted when its phone has a bill dated on or after the lead date, the
  * same rule as `syncConversionsFromCrm`. Spend comes from the sheets'
- * Meta Ads Manager export (see ./campaign-spend).
+ * Campaign Summary tabs (see ./campaign-spend).
  */
 
 import { VIRTUAL_CALLS_GROUP } from './sheet-routing';
@@ -20,13 +20,13 @@ export const PLATFORMS = ['Meta ads', 'Google ads'] as const;
 export type LeadAcquisitionRow = { phone: string; date: string; source: string; campaignId: string; claimGroup: string; sheetTabs: string[] };
 export type LeadBillRow = { phone: string; invoice: string; amount: number; date: string };
 export type LeadKindStats = { leads: number; converted: number; bills: number; sales: number; firstLead: string | null; lastLead: string | null };
-/** `spend` is null when no Meta export row matches; `sheetLeads` is the sheet's own "No of leads" total. */
+/** `spend` is null when no Campaign Summary row matches; `sheetLeads` is the sheet's own "No of leads" total. */
 export type Costed = { stats: LeadKindStats; spend: number | null; sheetLeads: number | null };
 export const CAMPAIGN_KINDS = [...LEAD_KINDS, 'Exhibition', 'Other'] as const;
 export type CampaignKind = typeof CAMPAIGN_KINDS[number];
 export type CampaignRow = Costed & { campaign: string; platform: string; kind: CampaignKind };
 export type LeadKindSummary = { kind: LeadKind; total: Costed; platforms: (Costed & { platform: string })[] };
-/** `spend` is every Meta export row, for totals across any set of campaigns. */
+/** `spend` is every Campaign Summary row, for totals across any set of campaigns. */
 export type LeadTypeConversions = { kinds: LeadKindSummary[]; campaigns: CampaignRow[]; latestBill: string | null; spendError: string | null; spend: CampaignSpend[] };
 
 /** Virtual calls wins over Store visit: those leads come in on their own tab whatever their campaign. */
@@ -84,7 +84,7 @@ export function summarizeLeadTypes(acquisitions: LeadAcquisitionRow[], bills: Le
     };
   });
 
-  // One row per campaign named on a lead or in a Meta Ads Manager export, typed by
+  // One row per campaign named on a lead or in a Campaign Summary tab, typed by
   // its own name: a Storevisit campaign's lead that landed on a Virtual calls tab
   // does not make the campaign a Virtual calls one. Each row counts all of the campaign's leads.
   // Campaigns reported as one (the three Varamahalakshmi campaigns) are one row.

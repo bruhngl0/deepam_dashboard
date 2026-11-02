@@ -18,7 +18,7 @@ function cells(row: Costed) {
 const th = 'whitespace-nowrap px-4 py-3';
 const td = 'whitespace-nowrap px-4 py-3';
 
-/** Loads the campaign figures (conversions from the CRM's sales, spend from the Meta Ads Manager export) once per page. */
+/** Loads the campaign figures (conversions from the CRM's sales, spend from the Campaign Summary tabs) once per page. */
 export function useLeadTypeConversions() {
   const [data, setData] = useState<LeadTypeConversions | null>(null);
   const [error, setError] = useState('');
@@ -32,10 +32,10 @@ export function useLeadTypeConversions() {
   return { data, error };
 }
 
-/** Store visit and Virtual calls leads, conversions from the CRM's sales and spend from the Meta Ads Manager export. Not affected by the page filters. */
+/** Store visit and Virtual calls leads, conversions from the CRM's sales and spend from the Campaign Summary tabs. Not affected by the page filters. */
 export function LeadTypeConversionsPanel({ data, error }: { data: LeadTypeConversions | null; error: string }) {
 
-  const intro = <div className="p-4"><h2 className="text-lg font-semibold text-ink">Store-visit and virtual-call campaigns</h2><p className="text-xs text-ink-muted">Every Store visit and Virtual calls lead from the Meta and Google lead sheets, of any date. Converted: a CRM bill on the lead’s phone dated on or after the lead date{data?.latestBill ? `; sales are recorded up to ${day(data.latestBill)}` : ''}. Spend and cost per lead come from the Meta Ads Manager export (Meta only; Google spend is not recorded). Not affected by the filters above.</p></div>;
+  const intro = <div className="p-4"><h2 className="text-lg font-semibold text-ink">Store-visit and virtual-call campaigns</h2><p className="text-xs text-ink-muted">Every Store visit and Virtual calls lead from the Meta and Google lead sheets, of any date. Converted: a CRM bill on the lead’s phone dated on or after the lead date{data?.latestBill ? `; sales are recorded up to ${day(data.latestBill)}` : ''}. Spend and cost per lead come from the sheets’ Campaign Summary tabs. Not affected by the filters above.</p></div>;
   if (!data) return <section className="overflow-hidden rounded-2xl border border-line bg-surface">{intro}<p role="status" className="px-4 pb-4 text-sm text-ink-2">{error || 'Loading…'}</p></section>;
 
   return <section aria-label="Store-visit and virtual-call campaigns" className="space-y-4">
@@ -54,8 +54,8 @@ export function LeadTypeConversionsPanel({ data, error }: { data: LeadTypeConver
         ])}</tbody></table></div>
     </div>
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="p-4"><h2 className="text-lg font-semibold text-ink">Spend and conversions by campaign</h2><p className="text-xs text-ink-muted">Every campaign on a lead or in the Meta Ads Manager export. Spend and Meta’s own lead count from the Meta Ads Manager export (— when a campaign has no spend there); cost per lead uses Meta’s lead count. Leads and conversions from the CRM, any date.</p></div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Campaign', 'Type', 'Source', 'Meta leads', ...headings].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
+      <div className="p-4"><h2 className="text-lg font-semibold text-ink">Spend and conversions by campaign</h2><p className="text-xs text-ink-muted">Every campaign on a lead or in the Campaign Summary tabs. Spend and sheet leads from the Campaign Summary tabs (— when a campaign has no spend there); cost per lead uses the sheet’s lead count. Leads and conversions from the CRM, any date.</p></div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Campaign', 'Type', 'Source', 'Sheet leads', ...headings].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
         <tbody>{data.campaigns.length ? data.campaigns.map((c) => <tr key={c.campaign} className="border-t border-line text-ink"><td className={`${td} font-medium`}>{c.campaign}</td><td className={td}>{c.kind}</td><td className={td}>{c.platform}</td><td className={td}>{c.sheetLeads ?? '—'}</td>{cells(c).map((v, i) => <td key={i} className={td}>{v}</td>)}</tr>)
           : <tr><td colSpan={headings.length + 4} className="px-4 py-6 text-center text-ink-muted">No campaigns yet.</td></tr>}</tbody></table></div>
     </div>

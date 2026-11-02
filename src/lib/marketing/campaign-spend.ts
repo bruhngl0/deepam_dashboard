@@ -1,9 +1,5 @@
 /**
- * Ad spend rows and their totals per campaign. Spend now comes only from the
- * Meta Ads Manager export (./meta-spend-export); the parser below for the lead
- * sheets' "Campaign Summary" tab is kept but no longer used to load spend.
- *
- * The Campaign Summary tab format:
+ * Ad spend from the "Campaign Summary" tab of each lead sheet.
  *
  * The tab has a heading row (Campaign name, Platform, Start date, End date,
  * then "Week N spend", "No of leads", "Cost per lead" per week), followed by
@@ -86,8 +82,8 @@ export function spendByCampaign(weeks: CampaignSpendWeek[]): CampaignSpend[] {
 }
 
 /**
- * Replaces all saved spend with these rows: the CRM's campaign pages and the analytics database's
- * cost-per-lead and payback figures read it. Called by scripts/import-meta-spend.ts.
+ * Saves the weeks of spend read from the sheets (replacing what was saved before), for the analytics
+ * database's cost-per-lead and payback figures. Called by scripts/import-meta-spend.ts.
  */
 export async function saveCampaignSpend(weeks: CampaignSpendWeek[]): Promise<number> {
   const { db } = await import('@/db');

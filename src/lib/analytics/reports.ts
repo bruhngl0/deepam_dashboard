@@ -90,7 +90,7 @@ export type CampaignRow = { name: string; channel: string | null; spend: number 
 
 /**
  * Leads that arrived in the period (at the store, when one is picked) and what they did afterwards, per campaign.
- * Spend comes as campaign totals from the Meta Ads Manager export, so spend, cost per lead and sales per rupee stay
+ * Spend comes as campaign totals from the Campaign Summary tabs, so spend, cost per lead and sales per rupee stay
  * all-time figures: they cannot be split by date or store.
  */
 export async function campaignPayback(period: Period): Promise<CampaignRow[]> {
