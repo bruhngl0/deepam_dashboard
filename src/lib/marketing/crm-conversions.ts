@@ -3,9 +3,9 @@
  *
  * Copies CRM bills (`sales`, the POS imports and the Hemparshwa sync) into
  * `marketing_sales`, which every Marketing Intelligence view reads for conversions:
- * bills on a lead's phone dated on or after the lead's date, and bills of claimed
- * calling-list customers dated after their claim day. Which bills count for a
- * salesperson is decided when they are read (local.ts billAfterClaim).
+ * bills on a lead's phone dated on or after the lead's date, and bills of called
+ * calling-list customers dated on or after their first logged call. Which bills
+ * count for a salesperson is decided when they are read (local.ts creditSalesToCalls).
  * Idempotent: a bill is keyed on its voucher number.
  */
 
@@ -47,8 +47,8 @@ export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
     ON CONFLICT (invoice) DO NOTHING
     RETURNING invoice
   `));
-  // Claimed calling-list customers (existing and online): bills dated after the day they were claimed
-  // (claimed_at is saved by now() in a UTC session), the rule Team performance counts by.
+  // Called calling-list customers (existing and online): bills dated on or after the day of their first
+  // logged call (called_at is India wall-clock time), the rule Team performance counts by.
   const addedFromLists = rowsOf<{ invoice: string }>(await db.execute(sql`
     INSERT INTO marketing_sales (invoice, phone, amount, sold_at, store)
     SELECT DISTINCT ON (s.voucher_no)
@@ -61,9 +61,10 @@ export async function syncConversionsFromCrm(): Promise<CrmConversionSync> {
     JOIN customers c ON c.phone_e164 = contact.phone
     JOIN sales s ON s.customer_id = c.id
     JOIN stores st ON st.id = s.store_id
+    JOIN (SELECT lead_id, min(called_at)::date AS first_day FROM marketing_calls GROUP BY lead_id) first_call
+      ON first_call.lead_id = 'existing-customer:' || contact.id::text
     WHERE s.bill_amount > 0
-      AND contact.claimed_at IS NOT NULL
-      AND (s.billed_at AT TIME ZONE 'Asia/Kolkata')::date > (contact.claimed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date
+      AND (s.billed_at AT TIME ZONE 'Asia/Kolkata')::date >= first_call.first_day
     ORDER BY s.voucher_no
     ON CONFLICT (invoice) DO NOTHING
     RETURNING invoice

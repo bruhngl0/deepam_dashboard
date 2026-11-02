@@ -122,8 +122,6 @@ export type ExistingCustomerListRow = {
 };
 
 const PAGE_SIZE = 50;
-/** claimed_at is saved by now() in a UTC session: the India-time day the customer was claimed. */
-const claimedDaySql = sql.raw(`to_char(contact.claimed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD')`);
 const isoSql = (column: string) => sql.raw(`to_char(${column}, 'YYYY-MM-DD"T"HH24:MI:SS')`);
 
 /**
@@ -134,9 +132,9 @@ const isoSql = (column: string) => sql.raw(`to_char(${column}, 'YYYY-MM-DD"T"HH2
  * dates. Called, Interested and Converted count calls and bills dated inside
  * the period, and Follow-ups due counts open follow-ups falling due in it.
  * Connected and Interested go by the latest call in the period. Converted
- * follows Team performance (local.ts billAfterClaim): only bills dated after the
- * day the customer was claimed count, in India time, since everyone on this list
- * has bought before.
+ * follows Team performance (local.ts creditSalesToCalls): only bills dated on or
+ * after the day of the customer's first logged call count, in India time, since
+ * everyone on this list has bought before.
  */
 function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
   const from = filters.from || null, to = filters.to || null;
@@ -148,6 +146,7 @@ function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
              max(call.called_at) AS last_at,
              (array_agg(call.outcome ORDER BY call.called_at DESC))[1] AS last_outcome,
              (array_agg(call.note ORDER BY call.called_at DESC))[1] AS last_note,
+             to_char(min(call.called_at), 'YYYY-MM-DD') AS first_day,
              count(*) FILTER (WHERE ${called})::int AS calls,
              max(call.called_at) FILTER (WHERE ${called}) AS called_at,
              (array_agg(call.outcome ORDER BY call.called_at DESC) FILTER (WHERE ${called}))[1] AS outcome,
@@ -158,11 +157,12 @@ function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
     ), bills AS (
       SELECT contact.id AS contact_id, sum(sale.amount)::float AS amount
       FROM marketing_call_list_contacts contact
+      JOIN calls first_call ON first_call.lead_id = ${leadIdSql}
       JOIN marketing_sales sale ON sale.phone = contact.phone
-        AND left(sale.sold_at, 10) > ${claimedDaySql}
+        AND left(sale.sold_at, 10) >= first_call.first_day
         AND (${from}::text IS NULL OR left(sale.sold_at, 10) >= ${from})
         AND (${to}::text IS NULL OR left(sale.sold_at, 10) <= ${to})
-      WHERE contact.list_key = ${listKey} AND contact.claimed_at IS NOT NULL
+      WHERE contact.list_key = ${listKey}
       GROUP BY contact.id
     )`;
   const joined = sql`

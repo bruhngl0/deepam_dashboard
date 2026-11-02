@@ -2,8 +2,8 @@ import { callLog, salespersonPerformance, type CallEntry, type Dataset, type Exi
 
 /**
  * One salesperson's performance, worked out exactly as Team performance does: the shared call records plus calls on
- * the leads, their campaign leads plus their claimed existing and online customers. With from/to, calls, interested,
- * conversions and sales count only that period.
+ * the leads, their campaign leads plus their claimed existing and online customers; conversions and sales are the
+ * bills their own logged calls earned. With from/to, calls, interested, conversions and sales count only that period.
  */
 export function performanceFor(data: Dataset, salesperson: string, from: string, to: string, stored: CallEntry[], claims: ExistingClaim[]) {
   const all = callLog([data], stored);
