@@ -8,7 +8,7 @@ import { MarketingImport } from './marketing-import';
 import { LeadActions } from './marketing-lead-actions';
 import { ExistingCustomerCallCard, ExistingCustomerCallList } from './existing-customer-call-list';
 import { MarketingConverted } from './marketing-converted';
-import { campaignGroup } from '@/lib/marketing/campaign-groups';
+import { campaignBuyers } from '@/lib/marketing/campaign-buyers';
 import { useLeadTypeConversions } from './lead-type-conversions-panel';
 
 type Tab = 'Overview' | 'All leads' | 'Existing customers' | 'Online customers' | 'Calling queue' | 'Follow-ups' | 'Converted' | 'Team performance' | 'Campaigns' | 'Import';
@@ -80,30 +80,28 @@ export function MarketingWorkspace() {
     })}</div>}
     {tab === 'Converted' && <MarketingConverted data={data} leads={scope} search={search} page={page} onSearch={setSearch} onPage={setPage} />}
     {tab === 'Team performance' && <MarketingSalespeople data={data} />}
-    {tab === 'Campaigns' && <CampaignPerformance data={data} leads={scope} />}
+    {tab === 'Campaigns' && <CampaignPerformance filters={{ from, to, store, source }} />}
     {tab === 'Import' && <MarketingImport data={data} save={save} refresh={refresh} />}
     <footer className="border-t border-line pt-5 text-xs text-ink-muted"><p>One lead per Contact No. · Multiple acquisition sources · Shared database</p></footer>
   </main>;
 }
-/** Campaign names compared ignoring case and spacing, as in lib/marketing/campaign-spend (not imported: it pulls in the database). */
-const campaignKey = (name: string) => name.toLowerCase().replace(/\s+/g, '');
-function CampaignPerformance({ data, leads }: { data: Dataset; leads: Lead[] }) {
-  // Spend typed on a lead wins; otherwise the campaign's total from the Campaign Summary tabs.
-  const sheetSpend = useLeadTypeConversions().data?.spend ?? [];
-  // Campaigns reported as one (the three Varamahalakshmi campaigns) are one row.
-  const groupOf = (campaignId: string) => campaignGroup(campaignId);
-  const campaigns = [...new Set(leads.flatMap(lead => lead.acquisitions.map(acquisition => groupOf(acquisition.campaignId)).filter(Boolean)))];
-  const rows = campaigns.map(campaign => {
-    const campaignLeads = leads.filter(lead => lead.acquisitions.some(acquisition => groupOf(acquisition.campaignId) === campaign));
-    const acquisitions = campaignLeads.flatMap(lead => lead.acquisitions.filter(acquisition => groupOf(acquisition.campaignId) === campaign));
-    const sources = [...new Set(acquisitions.map(acquisition => acquisition.source))];
-    const knownCosts = acquisitions.filter(acquisition => acquisition.cost !== null);
-    const sheetRows = sheetSpend.filter(row => campaignKey(campaignGroup(row.campaign)) === campaignKey(campaign));
-    const totalSpend = knownCosts.length ? knownCosts.reduce((total, acquisition) => total + (acquisition.cost ?? 0), 0) : sheetRows.reduce((total, row) => total + row.spend, 0);
-    return { campaign, sources, stats: metrics(data, campaignLeads), totalSpend, hasSpend: knownCosts.length > 0 || sheetRows.length > 0 };
-  }).sort((a, b) => b.stats.total - a.stats.total || a.campaign.localeCompare(b.campaign));
+/**
+ * Campaign performance over every lead of any date, with the same figures as the
+ * marketing team dashboard (lib/marketing/campaign-buyers): one row per campaign
+ * number, the three Varamahalakshmi campaigns as one, spend summed from the
+ * Campaign Summary tabs. It loads every lead itself; desks still show only theirs.
+ */
+function CampaignPerformance({ filters }: { filters: { from: string; to: string; store: string; source: string } }) {
+  const { data, message } = useMarketing({ allLeads: true });
+  const conversions = useLeadTypeConversions().data;
+  if (!data) return <section className={card}><h2 className="text-xl font-semibold text-ink">Campaign performance</h2><p role="status" className="mt-2 text-sm text-ink-2">{message || 'Loading every lead…'}</p></section>;
+  const leads = filterLeads(data.leads, { ...filters, search: '' });
+  // Spend is recorded by campaign and week, not by store or day, so a date or store filter hides it.
+  const spendShown = !filters.from && !filters.to && !filters.store && !!conversions && !conversions.spendError;
+  const rows = campaignBuyers(data, leads, filters.source, spendShown ? conversions.spend : null);
+  const per = (spend: number | null, count: number) => spend === null || !count ? '—' : money(spend / count);
 
-  return <section className={card}><h2 className="text-xl font-semibold text-ink">Campaign performance</h2><p className="mt-2 text-sm text-ink-2">CPL is spend ÷ leads, CAC is spend ÷ converted customers, and ROAS is sales ÷ spend. Spend comes from the Campaign Summary tabs; a dash means none is recorded. Open a campaign for its full report.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Campaign ID', 'Source', 'Leads', 'Contacted', 'Interested', 'Converted', 'Sales', 'Total spend', 'CPL', 'CAC', 'ROAS'].map(heading => <th className="whitespace-nowrap p-3" key={heading}>{heading}</th>)}</tr></thead><tbody>{rows.map(({ campaign, sources, stats, totalSpend, hasSpend }) => <tr key={campaign} className="border-t border-line text-ink"><td className="min-w-64 p-3 font-medium"><Link href={`/marketing/campaign?name=${encodeURIComponent(campaign)}`} className="text-accent hover:underline">{campaign}</Link></td><td className="p-3 text-ink-2">{sources.join(', ') || '—'}</td><td className="p-3">{stats.total}</td><td className="p-3">{stats.contacted}</td><td className="p-3">{stats.interested}</td><td className="p-3">{stats.converted}</td><td className="p-3">{money(stats.revenue)}</td><td className="p-3">{hasSpend ? money(totalSpend) : '—'}</td><td className="p-3">{hasSpend && stats.total ? money(totalSpend / stats.total) : '—'}</td><td className="p-3">{hasSpend && stats.converted ? money(totalSpend / stats.converted) : '—'}</td><td className="p-3">{hasSpend && totalSpend > 0 ? `${(stats.revenue / totalSpend).toFixed(2)}×` : '—'}</td></tr>)}</tbody></table>{!rows.length && <p className="p-8 text-center text-ink-muted">No campaigns match the selected filters.</p>}</div></section>;
+  return <section className={card}><h2 className="text-xl font-semibold text-ink">Campaign performance</h2><p className="mt-2 text-sm text-ink-2">Every lead of any date, as on the marketing team dashboard. One row per campaign number (a campaign’s lead form and exhibition are one row; the three Varamahalakshmi campaigns are one row), each person counted once. Converted: a CRM bill on or after the lead date. Spend comes from the Campaign Summary tabs{spendShown ? '' : '; clear the date and store filters to see it'}. CPL is spend ÷ leads, CAC is spend ÷ converted, ROAS is sales ÷ spend. Open a campaign for its full report.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Campaign', 'Source', 'Leads', 'Contacted', 'Interested', 'Converted', 'Sales', 'Total spend', 'CPL', 'CAC', 'ROAS'].map(heading => <th className="whitespace-nowrap p-3" key={heading}>{heading}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.key} className="border-t border-line text-ink"><td className="min-w-64 p-3 font-medium">{row.reportName ? <Link href={`/marketing/campaign?name=${encodeURIComponent(row.reportName)}`} className="text-accent hover:underline">{row.campaign}</Link> : row.campaign}</td><td className="p-3 text-ink-2">{row.source || '—'}</td><td className="p-3">{row.leads}</td><td className="p-3">{row.contacted}</td><td className="p-3">{row.interested}</td><td className="p-3">{row.converted}</td><td className="p-3">{money(row.sales)}</td><td className="p-3">{row.spend === null ? '—' : money(row.spend)}</td><td className="p-3">{per(row.spend, row.leads)}</td><td className="p-3">{per(row.spend, row.converted)}</td><td className="p-3">{row.spend ? `${(row.sales / row.spend).toFixed(2)}×` : '—'}</td></tr>)}</tbody></table>{!rows.length && <p className="p-8 text-center text-ink-muted">No campaigns match the selected filters.</p>}</div></section>;
 }
 function AddLead({ data, save, close }: { data: Dataset; save: (d: Dataset) => boolean; close: () => void }) {
   const [error, setError] = useState('');

@@ -12,13 +12,16 @@
 
 import { billOnOrAfterLead, type Dataset, type Lead } from './local';
 import type { CampaignSpend } from './campaign-spend';
+import { campaignGroup } from './campaign-groups';
 
 /** Campaign numbers that show as one row. */
 const MERGED = [{ source: 'Meta ads', codes: ['0006', '0007', '0008'], name: 'Varamahalakshmi (0006, 0007, 0008)' }];
 
 export type CampaignBuyers = {
   key: string; campaign: string; source: string;
-  leads: number; converted: number; rate: number; bills: number; sales: number;
+  /** The name the campaign report page takes for this row. */
+  reportName: string;
+  leads: number; contacted: number; interested: number; converted: number; rate: number; bills: number; sales: number;
   /** null when spend isn't known for this row (no Campaign Summary match, or spend hidden by a filter). */
   spend: number | null; costPerBuyer: number | null; salesPerRupee: number | null;
 };
@@ -45,14 +48,17 @@ export function campaignBuyers(data: Dataset, leads: Lead[], source: string, spe
   const bills = new Map<string, Dataset['sales']>();
   for (const sale of data.sales) bills.set(sale.phone, [...(bills.get(sale.phone) ?? []), sale]);
 
-  const groups = new Map<string, { source: string; codes: string[]; names: string[]; first: Map<string, string> }>();
+  const groups = new Map<string, { source: string; codes: string[]; names: string[]; raw: string[]; first: Map<string, string>; contacted: Set<string>; interested: Set<string> }>();
   for (const lead of leads) {
     if (!lead.date) continue;
     for (const acquisition of lead.acquisitions) {
       if (source && acquisition.source !== source) continue;
       const g = groupOf(acquisition.source, acquisition.campaignId.trim());
-      const row = groups.get(g.key) ?? { source: acquisition.source, codes: g.codes, names: [] as string[], first: new Map<string, string>() };
+      const row = groups.get(g.key) ?? { source: acquisition.source, codes: g.codes, names: [] as string[], raw: [] as string[], first: new Map<string, string>(), contacted: new Set<string>(), interested: new Set<string>() };
       row.names.push(g.name);
+      row.raw.push(acquisition.campaignId.trim());
+      if (lead.interactions.some((i) => i.type === 'call' && !!i.outcome?.startsWith('Connected'))) row.contacted.add(lead.phone);
+      if (lead.status === 'Connected / interested') row.interested.add(lead.phone);
       const seen = row.first.get(lead.phone);
       if (!seen || lead.date < seen) row.first.set(lead.phone, lead.date);
       groups.set(g.key, row);
@@ -77,7 +83,9 @@ export function campaignBuyers(data: Dataset, leads: Lead[], source: string, spe
       key, source: row.source,
       // The shortest name a row's leads carry: the campaign's own, not a "| Lead Gen" variant.
       campaign: [...new Set(row.names)].sort((a, b) => a.length - b.length)[0],
-      leads: leadCount, converted, rate: leadCount ? converted / leadCount : 0, bills: invoices.size, sales,
+      // The report matches a merged group by its own name, and any other campaign by one of its full names.
+      reportName: campaignGroup([...new Set(row.raw)].sort((a, b) => a.length - b.length)[0] ?? ''),
+      leads: leadCount, contacted: row.contacted.size, interested: row.interested.size, converted, rate: leadCount ? converted / leadCount : 0, bills: invoices.size, sales,
       spend: cost, costPerBuyer: cost && converted ? cost / converted : null, salesPerRupee: cost ? sales / cost : null,
     };
   }).sort((a, b) => b.converted - a.converted || b.leads - a.leads);

@@ -38,6 +38,17 @@ describe('campaignBuyers', () => {
     expect(campaignBuyers(data, data.leads, '', null)).toHaveLength(2);
   });
 
+  it('counts contacted and interested leads and names the report to open', () => {
+    const a = lead('+911', '2026-07-20', ['Meta ads', VML6]);
+    a.status = 'Connected / interested';
+    a.interactions.push({ id: 'c1', at: '2026-07-21T10:00:00', type: 'call', text: '', outcome: 'Connected / interested' });
+    const b = lead('+912', '2026-10-11', ['Meta ads', SHUBH_FORM]);
+    const data: Dataset = { version: 2, demo: false, leads: [a, b], sales: [] };
+    const rows = campaignBuyers(data, data.leads, '', null);
+    expect(rows.find((r) => r.campaign.includes('Varamahalakshmi'))).toMatchObject({ contacted: 1, interested: 1, reportName: 'Meta | Varamahalakshmi (0006, 0007, 0008)' });
+    expect(rows.find((r) => r.campaign.includes('0010'))).toMatchObject({ contacted: 0, interested: 0, reportName: SHUBH_FORM });
+  });
+
   it('reads campaign numbers', () => {
     expect(campaignCode(GOOGLE)).toBe('0001');
     expect(campaignCode('Online Chennai')).toBeNull();
