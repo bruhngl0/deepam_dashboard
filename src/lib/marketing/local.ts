@@ -195,7 +195,7 @@ export function commitPreview(data: Dataset, preview: Preview): Dataset {
   for (const lead of preview.leads) leads.set(lead.phone, lead);
   return { ...data, leads: [...leads.values()], sales: [...data.sales, ...preview.sales] };
 }
-/** A bill counts as a lead's conversion when it is dated on or after the lead date (the campaign rule; salespeople use billAfterClaim). */
+/** A bill counts as a lead's conversion when it is dated on or after the lead date (the campaign rule; salespeople use creditSalesToCalls). */
 export const billOnOrAfterLead = (billDate: string, leadDate: string | null | undefined) => !!leadDate && billDate.slice(0, 10) >= leadDate.slice(0, 10);
 export function convertedLeads(data: Dataset) {
   const byPhone = new Map<string, Sale[]>();
@@ -287,12 +287,25 @@ export type CustomerGroup = (typeof CUSTOMER_GROUPS)[number];
 export const CUSTOMER_GROUP_LABELS: Record<CustomerGroup, string> = { all: 'All customers', leads: 'Leads', existing: 'Existing customers', online: 'Online customers' };
 const claimGroup = (claim: ExistingClaim): CustomerGroup => (claim.list === 'online-customers' ? 'online' : 'existing');
 
+/** A bill credited to the salesperson whose logged call earned it, with the called record (lead or calling-list customer). */
+export type CreditedSale = { sale: Sale; salesperson: string; leadId: string };
+
 /**
- * The conversion rule: a bill counts for a salesperson only when it is dated after
- * the day they claimed the customer (both India time). A bill on the claim day or
- * before it does not count, nor does any bill for a customer with no claim date.
+ * The conversion rule: a bill counts for the salesperson who logged the latest call
+ * to that phone on or before the bill's day (India time). A customer nobody called
+ * converts for nobody, whoever claimed them; each bill counts for one salesperson.
  */
-export const billAfterClaim = (billDate: string, claimedAt: string | null | undefined) => !!claimedAt && billDate.slice(0, 10) > claimedAt.slice(0, 10);
+export function creditSalesToCalls(sales: Sale[], calls: CallEntry[]): CreditedSale[] {
+  const byPhone = new Map<string, CallEntry[]>();
+  for (const call of calls) byPhone.set(call.phone, [...(byPhone.get(call.phone) ?? []), call]);
+  const credited: CreditedSale[] = [];
+  for (const sale of sales) {
+    const day = sale.date.slice(0, 10);
+    const latest = (byPhone.get(sale.phone) ?? []).filter(call => call.at.slice(0, 10) <= day).sort((a, b) => b.at.localeCompare(a.at))[0];
+    if (latest) credited.push({ sale, salesperson: latest.salesperson, leadId: latest.leadId });
+  }
+  return credited;
+}
 
 /** What a called record came from: "Existing customer", the lead's campaign names, else its sources. */
 export function callSourceLabel(leadId: string, lead: Lead | undefined): string {
@@ -311,20 +324,21 @@ export function openFollowupDue(leadId: string, lead: Lead | undefined, existing
 /**
  * Claimed leads plus claimed calling-list customers (existing and online), or one
  * of those groups with `range.group`. A calling-list customer counts as interested
- * by their latest call's outcome. Converted and Revenue follow `billAfterClaim`:
- * only bills dated after the day the salesperson claimed the customer count.
+ * by their latest call's outcome. Converted and Revenue follow `creditSalesToCalls`:
+ * bills earned by the salesperson's own logged calls, claimed or not.
  *
  * `calls` may be narrowed by the page's filters. Claimed and Pending describe
  * the salesperson's list as it stands today, so Pending is worked out from
- * `range.allCalls`. With a date range, Called, Interested, Converted and
+ * `range.allCalls`, and so is who earned each bill (a call before the range can
+ * earn a bill inside it). With a date range, Called, Interested, Converted and
  * Revenue cover only calls and bills dated inside it.
  */
 export function salespersonPerformance(data: Dataset, calls: CallEntry[], salespeople: string[], existing: ExistingClaim[] = [], range: { from?: string; to?: string; allCalls?: CallEntry[]; group?: CustomerGroup } = {}): SalespersonPerformance[] {
   const dated = !!(range.from || range.to);
   const group = range.group ?? 'all';
-  const salesByPhone = new Map<string, Sale[]>();
-  for (const sale of data.sales) salesByPhone.set(sale.phone, [...(salesByPhone.get(sale.phone) ?? []), sale]);
-  const salesAfter = (phone: string, claimedAt: string | null | undefined) => (salesByPhone.get(phone) ?? []).filter(sale => billAfterClaim(sale.date, claimedAt));
+  const listOf = new Map(existing.map(claim => [claim.leadId, claimGroup(claim)]));
+  const groupOf = (leadId: string): CustomerGroup => (leadId.startsWith('existing-customer:') ? listOf.get(leadId) ?? 'existing' : 'leads');
+  const credited = creditSalesToCalls(data.sales, range.allCalls ?? calls);
   const inRange = (at: string) => (!range.from || at.slice(0, 10) >= range.from) && (!range.to || at.slice(0, 10) <= range.to);
   return salespeople.map(salesperson => {
     const personCalls = calls.filter(call => call.salesperson === salesperson).sort((a, b) => b.at.localeCompare(a.at));
@@ -332,10 +346,8 @@ export function salespersonPerformance(data: Dataset, calls: CallEntry[], salesp
     const everCalledIds = new Set((range.allCalls ?? calls).filter(call => call.salesperson === salesperson).map(call => call.leadId));
     const interestedInCalls = (id: string) => personCalls.find(call => call.leadId === id)?.outcome === 'Connected / interested';
     const claimedLeads = group === 'all' || group === 'leads' ? data.leads.filter(lead => lead.claimedBy === salesperson) : [];
-    const leadSales = claimedLeads.flatMap(lead => salesAfter(lead.phone, lead.claimedAt));
     const customers = existing.filter(claim => claim.salesperson.toLowerCase() === salesperson.toLowerCase() && (group === 'all' || claimGroup(claim) === group));
-    const customerSales = customers.flatMap(claim => salesAfter(claim.phone, claim.claimedAt));
-    const sales = [...new Set([...leadSales, ...customerSales])].filter(sale => inRange(sale.date));
+    const sales = credited.filter(credit => credit.salesperson === salesperson && (group === 'all' || groupOf(credit.leadId) === group) && inRange(credit.sale.date)).map(credit => credit.sale);
     const claimedIds = [...claimedLeads.map(lead => lead.id), ...customers.map(claim => claim.leadId)];
     return {
       salesperson,
