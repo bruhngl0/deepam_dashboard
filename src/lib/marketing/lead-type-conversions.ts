@@ -10,6 +10,7 @@
  */
 
 import { VIRTUAL_CALLS_GROUP } from './sheet-routing';
+import { campaignGroup } from './campaign-groups';
 import { campaignKey, type CampaignSpend } from './campaign-spend';
 
 export const LEAD_KINDS = ['Store visit', 'Virtual calls'] as const;
@@ -86,14 +87,20 @@ export function summarizeLeadTypes(acquisitions: LeadAcquisitionRow[], bills: Le
   // One row per campaign named on a lead or in a Campaign Summary tab, typed by
   // its own name: a Storevisit campaign's lead that landed on a Virtual calls tab
   // does not make the campaign a Virtual calls one. Each row counts all of the campaign's leads.
+  // Campaigns reported as one (the three Varamahalakshmi campaigns) are one row.
+  const keyOf = (campaign: string) => campaignKey(campaignGroup(campaign));
   const names = new Map<string, { campaign: string; platform: string; kind: CampaignKind }>();
-  for (const { campaignId: campaign, source: platform } of acquisitions) {
-    if (campaign.trim() && !names.has(campaignKey(campaign))) names.set(campaignKey(campaign), { campaign, platform, kind: campaignKind(campaign) });
+  for (const { campaignId, source: platform } of acquisitions) {
+    const campaign = campaignGroup(campaignId);
+    if (campaign && !names.has(keyOf(campaign))) names.set(keyOf(campaign), { campaign, platform, kind: campaignKind(campaign) });
   }
-  for (const s of spend) if (!names.has(campaignKey(s.campaign))) names.set(campaignKey(s.campaign), { campaign: s.campaign, platform: s.platform, kind: campaignKind(s.campaign) });
+  for (const s of spend) {
+    const campaign = campaignGroup(s.campaign);
+    if (!names.has(keyOf(campaign))) names.set(keyOf(campaign), { campaign, platform: s.platform, kind: campaignKind(campaign) });
+  }
   const campaigns = [...names.entries()].map(([key, meta]) => ({
     ...meta,
-    ...costed(acquisitions.filter((row) => campaignKey(row.campaignId) === key), spend.filter((s) => campaignKey(s.campaign) === key), billsByPhone),
+    ...costed(acquisitions.filter((row) => keyOf(row.campaignId) === key), spend.filter((s) => keyOf(s.campaign) === key), billsByPhone),
   })).sort((a, b) => CAMPAIGN_KINDS.indexOf(a.kind) - CAMPAIGN_KINDS.indexOf(b.kind) || (b.spend ?? 0) - (a.spend ?? 0) || b.stats.leads - a.stats.leads);
 
   return { kinds, campaigns };

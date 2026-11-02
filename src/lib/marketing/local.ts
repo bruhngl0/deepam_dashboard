@@ -1,3 +1,4 @@
+import { campaignGroup } from './campaign-groups';
 import { normalizePhone } from '@/lib/phone';
 
 export const SOURCES = ['Meta ads', 'Google ads', 'Website', 'WhatsApp', 'Instagram DM', 'Influencer', 'Events', 'Referral', 'Walkin', 'AdOnMo'] as const;
@@ -55,7 +56,7 @@ export function normalizeSource(value: string): string {
  * "Google | 0001 | 2026 | 09 | Storevisit" gives "Storevisit". An ID without that shape gives its last part.
  */
 export function campaignName(value: string): string {
-  const parts = value.split('|').map(part => part.trim()).filter(Boolean);
+  const parts = campaignGroup(value).split('|').map(part => part.trim()).filter(Boolean);
   return parts.length >= 5 && /^\d+$/.test(parts[1]) ? parts.slice(4).join(' ') : parts.at(-1) ?? '';
 }
 /** "friday,_16_october" → "Friday, 16 October"; "2:30_pm_–_4:30_pm" → "2:30 pm – 4:30 pm". */

@@ -6,6 +6,7 @@
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { settings } from '@/db/schema';
+import { campaignGroup, campaignGroupCodes } from './campaign-groups';
 import { campaignKey } from './campaign-spend';
 import { campaignSpend } from './lead-type-conversions-store';
 import { campaignKind, type CampaignKind } from './lead-type-conversions';
@@ -78,15 +79,21 @@ function settingsFor(campaign: string, saved: Record<string, CampaignSettings>, 
   return { value: { ...NO_SETTINGS, venueStoreId: found.id, from: found.firstVisit, to: found.lastVisit }, suggested: true };
 }
 
-export async function campaignReport(campaign: string): Promise<CampaignReport | null> {
+export async function campaignReport(name: string): Promise<CampaignReport | null> {
+  // A campaign reported as one (the three Varamahalakshmi campaigns) covers its members, matched by number.
+  const campaign = campaignGroup(name);
   const key = campaignKey(campaign);
+  const codes = campaignGroupCodes(campaign);
+  const inCampaign = (o: { campaign: string }) => campaignKey(campaignGroup(o.campaign)) === key;
   const leadsCte = sql`
     leads AS (
       SELECT ml.phone, right(regexp_replace(ml.phone, '[^0-9]', '', 'g'), 10) AS p10,
              NULLIF(left(ml.doc->>'date', 10), '')::date AS d
       FROM marketing_leads ml
       WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(ml.doc->'acquisitions', '[]'::jsonb)) a
-                    WHERE lower(regexp_replace(coalesce(a->>'campaignId', ''), '\\s', '', 'g')) = ${key})
+                    WHERE ${codes
+                      ? sql`a->>'campaignId' ~* '^\\s*meta\\s*\\|' AND split_part(regexp_replace(coalesce(a->>'campaignId', ''), '\\s', '', 'g'), '|', 2) = ANY(string_to_array(${codes.join(',')}, ','))`
+                      : sql`lower(regexp_replace(coalesce(a->>'campaignId', ''), '\\s', '', 'g')) = ${key}`})
     ),
     lead_bills AS (
       SELECT s.id, min(l.d) AS since
@@ -117,9 +124,9 @@ export async function campaignReport(campaign: string): Promise<CampaignReport |
   ]);
 
   const all = rowsOf<{ campaign: string; sources: string[]; first_lead: string | null; last_lead: string | null }>(names);
-  const mine = all.filter((row) => campaignKey(row.campaign) === key);
+  const mine = all.filter(inCampaign);
   if (!mine.length) return null;
-  const title = mine.map((row) => row.campaign.trim()).sort()[0];
+  const title = codes ? campaign : mine.map((row) => row.campaign.trim()).sort()[0];
 
   const { value: setting, suggested } = settingsFor(title, saved, places);
   const event = setting.venueStoreId !== null && !!setting.from;
@@ -173,10 +180,11 @@ export async function campaignReport(campaign: string): Promise<CampaignReport |
     id: String(row.id), people: Number(row.people) || 1, converted: row.converted === true,
   }));
   const counts = rowsOf<{ leads: number; converted: number }>(summary)[0] ?? { leads: 0, converted: 0 };
-  const spendRow = spend.value.find((row) => campaignKey(row.campaign) === key);
+  const spendRows = spend.value.filter(inCampaign);
+  const spendRow = spendRows.length ? { spend: spendRows.reduce((total, row) => total + row.spend, 0) } : null;
 
   // Other campaigns at another venue on overlapping dates share the Exhibition till's bills.
-  const overlapping = event ? [...new Set(all.map((row) => row.campaign.trim()))].filter((other) => {
+  const overlapping = event ? [...new Set(all.map((row) => campaignGroup(row.campaign)))].filter((other) => {
     if (campaignKey(other) === key) return false;
     const theirs = settingsFor(other, saved, places).value;
     return theirs.venueStoreId !== null && theirs.venueStoreId !== setting.venueStoreId && overlaps(setting, theirs);
