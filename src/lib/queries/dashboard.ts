@@ -282,13 +282,13 @@ export async function getKpis(range: DateRange = {}): Promise<Kpis> {
         (SELECT COUNT(*)::int FROM loyalty_customers) AS existing_people,
         -- This is deliberately lifetime-based: changing the sales period must
         -- not make a person disappear from the CRM's total-customer count.
+        -- Every buyer off the loyalty list counts, lead sheet or not (new-customers.ts).
         (SELECT COUNT(*)::int
          FROM   customers c
          WHERE  NOT c.is_foreign
            AND  NOT EXISTS (
                   SELECT 1 FROM loyalty_customers lc WHERE lc.customer_id = c.id
                 )
-           AND  EXISTS (SELECT 1 FROM lead_touches lt WHERE lt.customer_id = c.id)
            AND  EXISTS (SELECT 1 FROM sales s WHERE s.customer_id = c.id)
         ) AS new_customer_people,
         COUNT(DISTINCT s.customer_id)::int      AS existing_buyers,

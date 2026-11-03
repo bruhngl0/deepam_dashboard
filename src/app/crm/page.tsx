@@ -33,6 +33,8 @@ import {
   type DateRange,
 } from '@/lib/queries/dashboard';
 import { getCustomers, getFilterOptions } from '@/lib/queries/customers';
+import { getNewCustomerSummary, getSalesBySource } from '@/lib/queries/new-customers';
+import { SalesBySourcePanel } from '@/components/sales-by-source';
 import { KpiRow } from '@/components/stat-tiles';
 import { ChannelPerformance } from '@/components/channel-performance';
 import { CampaignTable } from '@/components/campaign-table';
@@ -111,6 +113,8 @@ export default async function DashboardPage({
     customers,
     options,
     online,
+    newCustomers,
+    salesBySource,
   ] = await Promise.all([
     getKpis(range),
     getChannelBreakdown(range),
@@ -124,6 +128,8 @@ export default async function DashboardPage({
     getCustomers(filters),
     getFilterOptions(),
     getOnlineCustomers(),
+    getNewCustomerSummary(range),
+    getSalesBySource(range),
   ]);
 
   const periodFrom = from ?? dateBounds.earliest;
@@ -139,6 +145,16 @@ export default async function DashboardPage({
     }
     next.set('source', 'shopify');
     return `?${next.toString()}#customers`;
+  })();
+
+  // The New customers tile opens their list with the same period and store.
+  const newCustomersHref = (() => {
+    const next = new URLSearchParams();
+    if (from) next.set('from', from);
+    if (to) next.set('to', to);
+    if (store) next.set('store', store);
+    const qs = next.toString();
+    return `/crm/new-customers${qs ? `?${qs}` : ''}`;
   })();
 
   return (
@@ -165,12 +181,18 @@ export default async function DashboardPage({
         historicalCustomers={kpis.existingPeople}
         reactivatedCustomers={kpis.existingBuyers}
         reactivatedSales={kpis.existingRevenue}
-        newCustomers={kpis.newConverted}
-        newCustomerBills={kpis.newBills}
+        newCustomers={{ ...newCustomers, href: newCustomersHref }}
         grossSales={kpis.grossSales}
         totalBills={kpis.totalBills}
         online={{ ...online, href: onlineHref }}
       />
+
+      <div className="mt-6">
+        <SalesBySourcePanel
+          data={salesBySource}
+          newCustomersHref={(segment) => `${newCustomersHref}${newCustomersHref.includes('?') ? '&' : '?'}segment=${segment}`}
+        />
+      </div>
 
       <div className="mt-6 grid gap-3 lg:grid-cols-2">
         <ChannelPerformance rows={channels} overlap={overlap} />

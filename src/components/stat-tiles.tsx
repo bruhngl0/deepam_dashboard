@@ -17,6 +17,7 @@
 import Link from 'next/link';
 import { formatNumber, formatCurrency, formatCurrencyCompact } from '@/lib/format';
 import type { OnlineCustomers } from '@/lib/queries/dashboard';
+import type { NewCustomerSummary } from '@/lib/queries/new-customers';
 
 export function HeroTile({
   label,
@@ -85,7 +86,6 @@ export function KpiRow({
   reactivatedCustomers,
   reactivatedSales,
   newCustomers,
-  newCustomerBills,
   grossSales,
   totalBills,
   online,
@@ -94,8 +94,8 @@ export function KpiRow({
   historicalCustomers: number;
   reactivatedCustomers: number;
   reactivatedSales: number;
-  newCustomers: number;
-  newCustomerBills: number;
+  /** Buyers in the period off the loyalty list; the tile links to their list. */
+  newCustomers: NewCustomerSummary & { href: string };
   grossSales: number;
   totalBills: number;
   /** Customers added from Shopify; the tile links to the customer table filtered to them. */
@@ -124,12 +124,17 @@ export function KpiRow({
         definition="Historical customers from the loyalty sheet who bought again in this period."
         emphasis
       />
-      <StatTile
-        label="New customers"
-        value={formatNumber(newCustomers)}
-        caption={`${formatNumber(newCustomerBills)} bills from lead-only customers`}
-        definition="Bought after appearing on a lead sheet, but are not on the loyalty customer sheet."
-      />
+      <Link
+        href={newCustomers.href}
+        className="block rounded-2xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-accent"
+      >
+        <StatTile
+          label="New customers"
+          value={formatNumber(newCustomers.all.buyers)}
+          caption={`${formatNumber(newCustomers.all.bills)} bills · ${formatCurrencyCompact(newCustomers.all.sales)} in sales`}
+          definition={`Bought in this period and not on the loyalty customer sheet: ${formatNumber(newCustomers.lead.buyers)} from lead sheets, ${formatNumber(newCustomers.walkin.buyers)} walk-ins, ${formatNumber(newCustomers.other.buyers)} other new buyers. Click to list them.`}
+        />
+      </Link>
       <StatTile
         label="Total sales"
         value={formatCurrencyCompact(grossSales)}
