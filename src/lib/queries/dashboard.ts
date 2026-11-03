@@ -840,37 +840,33 @@ export async function getFollowupOutcomes(): Promise<FollowupRow[]> {
 }
 
 export interface OnlineCustomers {
+  /** Distinct customers with an online bill in the period. */
   customers: number;
-  paid: number;
-  shopifySales: number;
-  storeBuyers: number;
-  storeSales: number;
+  bills: number;
+  sales: number;
+  /** Online bills with no phone number, so no customer. */
+  phonelessBills: number;
 }
 
 /**
- * Customers who came in from the Shopify export (`name_source = 'shopify'`,
- * scripts/import-shopify-customers.ts). They carry no lead touch, so no
- * channel figure above counts them. Paid buyers and their online sales come
- * from the loyalty row the import writes; store bills are the CRM's own
- * `sales`. Lifetime, like the Customer value panel: the Shopify figures have
- * no per-order dates to window.
+ * Online customers are whoever the sales report marks as online: Hemparshwa's
+ * `location` ONLINE, which the sync files under the Online store
+ * (`stores.code = 'ONLINE'`). Bills and sales follow the dashboard's dates;
+ * the store filter does not apply, since this tile is one store by definition.
  */
-export async function getOnlineCustomers(): Promise<OnlineCustomers> {
+export async function getOnlineCustomers(range: DateRange = {}): Promise<OnlineCustomers> {
   const [r] = await query(`
-    SELECT COUNT(*)::int AS customers,
-           COUNT(lc.id) FILTER (WHERE lc.loyalty_type = 'shopify_online')::int AS paid,
-           COALESCE(SUM(lc.total_bill_amount) FILTER (WHERE lc.loyalty_type = 'shopify_online'), 0)::float AS shopify_sales,
-           COUNT(*) FILTER (WHERE s.customer_id IS NOT NULL)::int AS store_buyers,
-           COALESCE(SUM(s.revenue), 0)::float AS store_sales
-    FROM   customers c
-    LEFT   JOIN loyalty_customers lc ON lc.customer_id = c.id
-    LEFT   JOIN (SELECT customer_id, SUM(bill_amount) AS revenue FROM sales GROUP BY customer_id) s ON s.customer_id = c.id
-    WHERE  c.name_source = 'shopify'`);
+    SELECT COUNT(DISTINCT s.customer_id)::int AS customers,
+           COUNT(*)::int AS bills,
+           COALESCE(SUM(s.bill_amount), 0)::float AS sales,
+           COUNT(*) FILTER (WHERE s.customer_id IS NULL)::int AS phoneless_bills
+    FROM   sales s
+    JOIN   stores st ON st.id = s.store_id
+    WHERE  st.code = 'ONLINE'${dateCondition('s', range)}`);
   return {
     customers: Number(r?.customers ?? 0),
-    paid: Number(r?.paid ?? 0),
-    shopifySales: Number(r?.shopify_sales ?? 0),
-    storeBuyers: Number(r?.store_buyers ?? 0),
-    storeSales: Number(r?.store_sales ?? 0),
+    bills: Number(r?.bills ?? 0),
+    sales: Number(r?.sales ?? 0),
+    phonelessBills: Number(r?.phoneless_bills ?? 0),
   };
 }

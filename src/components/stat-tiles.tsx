@@ -98,7 +98,7 @@ export function KpiRow({
   newCustomers: NewCustomerSummary & { href: string };
   grossSales: number;
   totalBills: number;
-  /** Customers added from Shopify; the tile links to the customer table filtered to them. */
+  /** Customers with online bills (the sales report's Online location); the tile links to them on Buyers. */
   online: OnlineCustomers & { href: string };
 }) {
   const averageBill = totalBills ? grossSales / totalBills : 0;
@@ -154,8 +154,8 @@ export function KpiRow({
         <StatTile
           label="Online customers"
           value={formatNumber(online.customers)}
-          caption={`${formatNumber(online.paid)} paid · ${formatCurrencyCompact(online.shopifySales)} online sales`}
-          definition="Added from Shopify, all time. They are on no lead sheet, so the channel figures leave them out. Click to list them below."
+          caption={`${formatNumber(online.bills)} bills · ${formatCurrencyCompact(online.sales)} online sales`}
+          definition={`Bills the sales report marks as online, in the selected period${online.phonelessBills ? ` (${formatNumber(online.phonelessBills)} of them with no phone number)` : ''}. Click to list them.`}
         />
       </Link>
     </div>

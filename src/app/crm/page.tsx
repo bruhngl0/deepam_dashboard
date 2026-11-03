@@ -127,7 +127,7 @@ export default async function DashboardPage({
     getSalesDateBounds(),
     getCustomers(filters),
     getFilterOptions(),
-    getOnlineCustomers(),
+    getOnlineCustomers(range),
     getNewCustomerSummary(range),
     getSalesBySource(range),
   ]);
@@ -136,15 +136,12 @@ export default async function DashboardPage({
   const periodTo = to ?? dateBounds.latest;
   const isFullPeriod = !from && !to;
   const storeName = store ? options.stores.find((s) => s.code === store)?.name : null;
-  // The Online customers tile's link keeps every other filter and narrows the table to online customers.
+  // The Online customers tile opens Buyers narrowed to the Online store, for the same dates.
   const onlineHref = (() => {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      const v = one(value);
-      if (v && key !== 'page') next.set(key, v);
-    }
-    next.set('source', 'shopify');
-    return `?${next.toString()}#customers`;
+    const next = new URLSearchParams({ store: 'ONLINE' });
+    if (from) next.set('from', from);
+    if (to) next.set('to', to);
+    return `/crm/buyers?${next.toString()}`;
   })();
 
   // The New customers tile opens their list with the same period and store.
