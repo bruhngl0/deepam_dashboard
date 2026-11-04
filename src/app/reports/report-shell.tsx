@@ -2,17 +2,10 @@ import Link from 'next/link';
 import { analyticsAsOf, analyticsConfigured } from '@/lib/analytics/db';
 import { formatDateTime } from '@/lib/format';
 
-export const REPORTS = [
-  { href: '/reports/funnel', label: 'Funnel' },
-  { href: '/reports/salespeople', label: 'Salespeople' },
-  { href: '/reports/payback', label: 'Payback' },
-  { href: '/reports/cohorts', label: 'Cohorts' },
-  { href: '/reports/stock', label: 'Stock' },
-  { href: '/reports/salespeople/match', label: 'Salesperson matching' },
-] as const;
+export { REPORTS } from '@/lib/report-tabs';
 
-/** Header for every report: title, the "Data as of" line, and links between the reports. */
-export async function ReportShell({ title, intro, current, actions, children }: { title: string; intro: string; current: string; actions?: React.ReactNode; children: React.ReactNode }) {
+/** Header for every report: title and the "Data as of" line. The links between reports are tabs in the site header. */
+export async function ReportShell({ title, intro, actions, children }: { title: string; intro: string; /** The report's address; its tab in the site header is lit from the URL. */ current?: string; actions?: React.ReactNode; children: React.ReactNode }) {
   const asOf = await analyticsAsOf().catch(() => null);
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
@@ -25,14 +18,6 @@ export async function ReportShell({ title, intro, current, actions, children }: 
         </div>
         {actions}
       </header>
-      <nav aria-label="Reports" className="mb-6 flex flex-wrap gap-2 text-sm">
-        {REPORTS.map((r) => (
-          <Link key={r.href} href={r.href} aria-current={r.href === current ? 'page' : undefined}
-            className={`rounded-lg px-3 py-1.5 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${r.href === current ? 'bg-inset text-ink' : 'text-ink-2 hover:bg-inset hover:text-ink'}`}>
-            {r.label}
-          </Link>
-        ))}
-      </nav>
       {analyticsConfigured() ? children : <NotConfigured />}
     </main>
   );

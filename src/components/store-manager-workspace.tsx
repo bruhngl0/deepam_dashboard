@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
+import { HeaderTabs } from './header-tabs';
 import { storeName, campaignName, convertedLeads, filterLeads, hasLoggedCall, metrics, nowLocal, STORES, type Lead } from '@/lib/marketing/local';
-import { button, CampaignTag, card, dateLabel, dayMonthYearLabel, Field, input, LeadMeta, money, primary, useMarketing } from './marketing-shared';
+import { button, CampaignTag, card, dateLabel, dayMonthYearLabel, Field, input, LeadMeta, money, useMarketing } from './marketing-shared';
 import { MarketingSalespeople } from './marketing-salespeople';
 
 type ManagerTab = 'Overview' | 'All leads' | 'Team queue' | 'Follow-ups' | 'Team performance';
@@ -48,7 +49,7 @@ export function StoreManagerWorkspace({ logoutAction }: { logoutAction: () => Pr
       <p className="w-full text-xs text-ink-muted">By the date the lead arrived and the store they prefer.</p>
       {from && to && from > to && <p role="alert" className="w-full text-sm text-red-600">From must be on or before To.</p>}
     </section>}
-    <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Store manager sections">{tabs.map(value => <button key={value} className={tab === value ? primary : button} aria-current={tab === value ? 'page' : undefined} onClick={() => changeTab(value)}>{value}{value === 'Team queue' ? ` (${queue.length})` : value === 'Follow-ups' ? ` (${pending.length})` : ''}</button>)}</nav>
+    <HeaderTabs label="Store manager sections" tabs={tabs} current={tab} onChange={changeTab} count={value => value === 'Team queue' ? queue.length : value === 'Follow-ups' ? pending.length : null} />
     {tab === 'Overview' && <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
       ['Total leads', stats.total], ['Team queue', queue.length], ['Pending follow-ups', pending.length], ['Interested', stats.interested], ['Converted', stats.converted], ['Sales', money(stats.revenue)], ['Contacted', stats.contacted], ['Walk-ins', stats.visits],
     ].map(([label, value]) => <section className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p></section>)}</div>

@@ -22,6 +22,8 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { MARKETING_MODULES, marketingModuleHref, marketingModuleOf } from '@/lib/marketing/modules';
+import { currentReport, REPORTS } from '@/lib/report-tabs';
+import { headerTabClass } from '@/components/header-tabs';
 
 const CARRIED_PARAMS = ['from', 'to', 'store'];
 
@@ -48,6 +50,20 @@ const VENDOR_TABS = [
 export function NavTabs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // CRM reports: one tab per report (lib/report-tabs).
+  if (pathname === '/reports' || pathname.startsWith('/reports/')) {
+    const current = currentReport(pathname);
+    return (
+      <nav aria-label="Reports" className="flex min-w-0 items-center gap-1 overflow-x-auto">
+        {REPORTS.map((r) => (
+          <Link key={r.href} href={r.href} aria-current={r.href === current ? 'page' : undefined} className={headerTabClass(r.href === current)}>
+            {r.label}
+          </Link>
+        ))}
+      </nav>
+    );
+  }
 
   // Marketing Intelligence: its four sections, kept in the URL (lib/marketing/modules).
   if (pathname === '/marketing' || pathname.startsWith('/marketing/')) {
