@@ -7,6 +7,13 @@ import { MarketingProfile } from '@/components/marketing-profile';
 import { MarketingImport } from '@/components/marketing-import';
 import { MarketingTeamWorkspace } from '@/components/marketing-team-workspace';
 import { MarketingConverted } from '@/components/marketing-converted';
+import { NavTabs } from '@/components/nav-tabs';
+const navigation = vi.hoisted(() => ({ pathname: '/marketing', search: '' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => navigation.pathname,
+  useSearchParams: () => new URLSearchParams(navigation.search),
+  useRouter: () => ({ push: () => {}, replace: () => {}, prefetch: () => {} }),
+}));
 vi.mock('@/components/marketing-shared', async importOriginal => {
   const actual = await importOriginal<typeof import('@/components/marketing-shared')>();
   return { ...actual, useMarketing: () => ({ data: demoData(), save: () => true, message: '', setMessage: () => {}, refresh: async () => {} }) };
@@ -15,11 +22,23 @@ describe('marketing page rendering', () => {
   it('renders dashboard metrics and navigation with demo data', () => {
     const html = renderToStaticMarkup(createElement(MarketingWorkspace));
     for (const label of ['Marketing performance', 'Total marketing spend', 'Cost per lead', 'Converted leads', 'Sales generated', 'CAC', 'ROAS', 'Leads funnel', 'Calling and follow-up summary', 'New leads awaiting first call', 'Calls due today', 'Overdue follow-ups', 'Leads contacted today', 'Leads converted today', 'Date-Time From']) expect(html).toContain(label);
-    // The header has only the four modules.
-    const navigation = html.match(/<nav[^>]*aria-label="Marketing modules"[\s\S]*?<\/nav>/)?.[0] ?? '';
-    expect([...navigation.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(m => m[1])).toEqual(['Overview', 'Leads', 'Campaigns', 'Team performance']);
+    // The four sections are tabs in the site header now, not buttons on the page.
+    expect(html).not.toContain('aria-label="Marketing modules"');
     expect(html).toContain('shared by every desk');
     expect(html).not.toContain('Clear local data');
+  });
+  it('puts the four sections in the site header, with the one in the URL lit', () => {
+    const links = (search: string, pathname = '/marketing') => {
+      Object.assign(navigation, { pathname, search });
+      const html = renderToStaticMarkup(createElement(NavTabs));
+      return [...html.matchAll(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map(m => ({ href: m[1].replace(/&amp;/g, '&'), label: m[2], current: m[0].includes('aria-current="page"') }));
+    };
+    expect(links('').map(l => [l.label, l.href])).toEqual([['Overview', '/marketing'], ['Leads', '/marketing?module=leads'], ['Campaigns', '/marketing?module=campaigns'], ['Team performance', '/marketing?module=team']]);
+    expect(links('').find(l => l.current)?.label).toBe('Overview');
+    expect(links('module=team').find(l => l.current)?.label).toBe('Team performance');
+    expect(links('', '/marketing/campaign').find(l => l.current)?.label).toBe('Campaigns');
+    expect(links('', '/marketing-team')).toEqual([]);
+    Object.assign(navigation, { pathname: '/marketing', search: '' });
   });
   it('renders converted customer KPIs, sources and profile links', () => {
     const data = demoData();
