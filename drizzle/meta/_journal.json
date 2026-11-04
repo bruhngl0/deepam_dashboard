@@ -225,6 +225,13 @@
       "when": 1792674000000,
       "tag": "0031_walktrack_ist_times_again",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792760400000,
+      "tag": "0032_internal_accounts",
+      "breakpoints": true
     }
   ]
 }
