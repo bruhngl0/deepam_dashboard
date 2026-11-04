@@ -266,6 +266,16 @@ export const customerCodesRetired = pgTable(
   (t) => [index('customer_codes_retired_customer_idx').on(t.customerId)],
 );
 
+/**
+ * The store's own, staff and test numbers (drizzle/0032). Triggers keep their bills off any customer and
+ * keep them out of marketing_sales and marketing_call_list_contacts.
+ */
+export const internalAccounts = pgTable('internal_accounts', {
+  phoneE164: text('phone_e164').primaryKey(),
+  label: text('label').notNull(),
+  addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Lead touches ─────────────────────────────────────────────────────────────
 
 /**

@@ -37,7 +37,7 @@ export function DataQualityPanel({ quality }: { quality: DataQuality }) {
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
         <Item
           value={formatCurrency(quality.unmatchedBuyerRevenue)}
-          label={`${formatNumber(quality.unmatchedBuyers)} buyers match no lead list`}
+          label={`${formatNumber(quality.unmatchedBuyers)} customers match no lead list`}
           note="They bought, but their number appears on no sheet in the master workbook. Most came through the store directly. This is the ceiling on what lead attribution can ever be shown to explain."
         />
         <Item

@@ -96,7 +96,7 @@ export function ChannelPerformance({
             </p>
             <p className="tnum mt-0.5 text-xs text-ink-muted">
               {formatCurrency(row.averageBill)} avg bill ·{' '}
-              {formatCurrency(row.revenuePerBuyer)} per buyer
+              {formatCurrency(row.revenuePerBuyer)} per customer
             </p>
             {funnelDiffers && (
               <p className="tnum mt-0.5 text-xs text-ink-muted">

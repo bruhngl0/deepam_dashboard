@@ -21,12 +21,13 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { MARKETING_MODULES, marketingModuleHref, marketingModuleOf } from '@/lib/marketing/modules';
 
 const CARRIED_PARAMS = ['from', 'to', 'store'];
 
 const CRM_TABS = [
   { href: '/crm', label: 'Home' },
-  { href: '/crm/buyers', label: 'Buyers' },
+  { href: '/crm/buyers', label: 'Customers' },
   { href: '/crm/insights', label: 'Insights' },
   { href: '/crm/analysis', label: 'Analysis' },
   { href: '/crm/import', label: 'Import' },
@@ -47,6 +48,23 @@ const VENDOR_TABS = [
 export function NavTabs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Marketing Intelligence: its four sections, kept in the URL (lib/marketing/modules).
+  if (pathname === '/marketing' || pathname.startsWith('/marketing/')) {
+    const current = marketingModuleOf(pathname, searchParams.get('module'));
+    return (
+      <nav aria-label="Sections" className="flex items-center gap-1 overflow-x-auto">
+        {MARKETING_MODULES.map(({ label }) => (
+          <Link key={label} href={marketingModuleHref(label)} scroll={false} aria-current={current === label ? 'page' : undefined}
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              current === label ? 'bg-inset text-ink' : 'text-ink-2 hover:bg-inset hover:text-ink'
+            }`}>
+            {label}
+          </Link>
+        ))}
+      </nav>
+    );
+  }
 
   const tabs = pathname.startsWith('/crm')
     ? CRM_TABS

@@ -166,7 +166,7 @@ export default async function BuyerProfilePage({
     return (
       <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
         <Link href={backHref} className="text-sm font-medium text-accent underline-offset-2 hover:underline">
-          ← All buyers
+          ← All customers
         </Link>
         <header className="mt-3 mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-ink">{orNotProvided(customer.fullName)}</h1>
@@ -194,7 +194,7 @@ export default async function BuyerProfilePage({
         href={backHref}
         className="text-sm font-medium text-accent underline-offset-2 hover:underline"
       >
-        ← All buyers
+        ← All customers
       </Link>
 
       <header className="mt-3 mb-6">
@@ -218,7 +218,7 @@ export default async function BuyerProfilePage({
         <Stat
           label="Total spend"
           value={formatCurrency(p.totalSpend)}
-          caption={`Outspends ${p.spendPercentile.toFixed(1)}% of buyers. Average buyer: ${formatCurrency(p.peerAvgSpend)}.`}
+          caption={`Outspends ${p.spendPercentile.toFixed(1)}% of customers. Average customer: ${formatCurrency(p.peerAvgSpend)}.`}
         />
         <Stat
           label="Average bill value"
@@ -264,7 +264,7 @@ export default async function BuyerProfilePage({
         <Stat
           label="Value tier"
           value={VALUE_TIER_LABEL[p.valueTier]}
-          caption={`Rank ${formatNumber(p.spendRank)} of ${formatNumber(p.buyerCount)} buyers, ranked on live sales.`}
+          caption={`Rank ${formatNumber(p.spendRank)} of ${formatNumber(p.buyerCount)} customers, ranked on live sales.`}
         />
       </div>
 
@@ -372,7 +372,7 @@ export default async function BuyerProfilePage({
           {p.prior && p.prior.bills > 0 && (
             <Note>
               This is the evidence that makes them a returning customer rather than a first-time
-              one. It is not read from the customer lifecycle field, which labels every buyer
+              one. It is not read from the customer lifecycle field, which labels every customer
               &ldquo;existing&rdquo; the moment they place any bill at all.
             </Note>
           )}
@@ -426,8 +426,8 @@ export default async function BuyerProfilePage({
             </>
           ) : (
             <Note>
-              This buyer appears on no lead sheet. 1,853 of the {formatNumber(p.buyerCount)}{' '}
-              buyers are in the same position — which is why the dashboard&rsquo;s customer
+              This customer appears on no lead sheet. 1,853 of the {formatNumber(p.buyerCount)}{' '}
+              customers are in the same position — which is why the dashboard&rsquo;s customer
               table, scoped to leads, cannot show them.
             </Note>
           )}

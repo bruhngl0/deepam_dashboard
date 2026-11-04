@@ -22,7 +22,7 @@ export type NewCustomerSegment = (typeof NEW_CUSTOMER_SEGMENTS)[number];
 export const NEW_CUSTOMER_SEGMENT_INFO: Record<NewCustomerSegment, { label: string; definition: string }> = {
   lead: { label: 'From lead sheets', definition: 'On a Meta, WhatsApp, Google Ads or other lead sheet.' },
   walkin: { label: 'Walk-ins', definition: 'Not on a lead sheet, but logged another way, chiefly as a store walk-in.' },
-  other: { label: 'Other new buyers', definition: 'Not on a lead sheet and not logged as a walk-in: known only from their bill.' },
+  other: { label: 'Other new customers', definition: 'Not on a lead sheet and not logged as a walk-in: known only from their bill.' },
 };
 
 export function newCustomerSegmentParam(value: string | undefined): NewCustomerSegment | undefined {
@@ -164,7 +164,7 @@ export const SALES_SOURCE_INFO: Record<SalesSource, { label: string; definition:
   loyalty: { label: 'Loyalty customers', definition: 'On the loyalty customer sheet: they had bought before.' },
   lead: { label: 'New: from lead sheets', definition: NEW_CUSTOMER_SEGMENT_INFO.lead.definition, segment: 'lead' },
   walkin: { label: 'New: walk-ins', definition: NEW_CUSTOMER_SEGMENT_INFO.walkin.definition, segment: 'walkin' },
-  other: { label: 'New: other buyers', definition: NEW_CUSTOMER_SEGMENT_INFO.other.definition, segment: 'other' },
+  other: { label: 'New: other customers', definition: NEW_CUSTOMER_SEGMENT_INFO.other.definition, segment: 'other' },
   foreign: { label: 'Foreign numbers', definition: 'A non-Indian phone number, not on the loyalty sheet.' },
   no_phone: { label: 'No phone number', definition: 'No number taken at billing, so the bill belongs to no customer.' },
 };

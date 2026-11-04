@@ -54,9 +54,9 @@ export function BuyerTable({ rows }: { rows: BuyerListRow[] }) {
   if (rows.length === 0) {
     return (
       <div className="rounded-2xl border border-line bg-surface p-10 text-center">
-        <p className="text-sm text-ink-2">No buyer matches these filters.</p>
+        <p className="text-sm text-ink-2">No customer matches these filters.</p>
         <p className="mt-1 text-xs text-ink-muted">
-          The date and store window at the top of the page narrows this list too — a buyer with
+          The date and store window at the top of the page narrows this list too — a customer with
           no bill inside it will not appear here.
         </p>
       </div>
@@ -68,7 +68,7 @@ export function BuyerTable({ rows }: { rows: BuyerListRow[] }) {
       <table className="w-full min-w-[64rem] border-collapse text-left">
         <thead>
           <tr className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">
-            <th className="px-4 py-3 font-bold">Buyer</th>
+            <th className="px-4 py-3 font-bold">Customer</th>
             <th className="px-4 py-3 font-bold">Store</th>
             <th className="px-4 py-3 font-bold">Frequency</th>
             <th className="px-4 py-3 text-right font-bold">Units</th>

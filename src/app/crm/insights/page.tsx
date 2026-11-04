@@ -105,7 +105,7 @@ export default async function InsightsPage({
                   <span className="text-ink">
                     {d.decile === 1 ? 'Top 10%' : `${(d.decile - 1) * 10}–${d.decile * 10}%`}
                     <span className="ml-2 text-xs text-ink-muted">
-                      {formatNumber(d.customers)} buyers
+                      {formatNumber(d.customers)} customers
                     </span>
                   </span>
                   <span className="tnum font-semibold text-ink">{d.share.toFixed(1)}%</span>
@@ -120,7 +120,7 @@ export default async function InsightsPage({
           <Note>
             The top fifth — {formatNumber(topTwoCustomers)} people — is{' '}
             {topTwoShare.toFixed(1)}% of all matched revenue, while the bottom half (
-            {formatNumber(bottomHalfCustomers)} buyers) is {bottomHalfShare.toFixed(1)}%. The
+            {formatNumber(bottomHalfCustomers)} customers) is {bottomHalfShare.toFixed(1)}%. The
             dashboard is built almost entirely around volume: lead counts and conversion
             rates. In a business shaped like this, whether a channel converts at 1.3% or 2.5%
             matters far less than whether it reached any of the top{' '}
@@ -141,7 +141,7 @@ export default async function InsightsPage({
                     <th className="pb-2 text-left font-bold">Channel</th>
                     <th className="pb-2 text-right font-bold">Conversion rate</th>
                     <th className="pb-2 text-right font-bold">Average bill value</th>
-                    <th className="pb-2 text-right font-bold">Per buyer</th>
+                    <th className="pb-2 text-right font-bold">Per customer</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -164,7 +164,7 @@ export default async function InsightsPage({
             </div>
             <Note>
               {label(bestRate?.channel ?? '')} converts highest at{' '}
-              {(bestRate?.conversionRate ?? 0).toFixed(2)}%, and its buyers are worth{' '}
+              {(bestRate?.conversionRate ?? 0).toFixed(2)}%, and its customers are worth{' '}
               {formatCurrency(bestRate?.revenuePerBuyer ?? 0)} each — against{' '}
               {formatCurrency(bestValue?.revenuePerBuyer ?? 0)} for{' '}
               {label(bestValue?.channel ?? '')}. Read the rate column alone and you move budget
@@ -211,7 +211,7 @@ export default async function InsightsPage({
             ))}
           </div>
           <Note>
-            That is {((100 * repeatCustomers) / (totalBuyers || 1)).toFixed(0)}% of buyers
+            That is {((100 * repeatCustomers) / (totalBuyers || 1)).toFixed(0)}% of customers
             returning inside a single week, one of them {mostBills} times. Either the festival
             week really is that intense, or some of these are exchanges and returns booked as
             separate bills. Every one of them currently counts as fresh revenue — worth

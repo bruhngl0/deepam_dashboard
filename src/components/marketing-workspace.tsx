@@ -1,6 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { marketingModuleFrom, marketingModuleHref, type MarketingModule } from '@/lib/marketing/modules';
 import { leadIdLabel, storeName, commitPreview, convertedLeads, filterLeads, guessMapping, hasLoggedCall, isContacted, isInterested, leadSales, metrics, nowLocal, previewRows, SOURCES, STORES, uid, type Dataset, type Lead } from '@/lib/marketing/local';
 import { SALESPEOPLE } from '@/lib/salespeople';
 import { button, CampaignTag, card, dateLabel, Field, input, money, primary, useMarketing } from './marketing-shared';
@@ -13,8 +15,7 @@ import { campaignBuyers } from '@/lib/marketing/campaign-buyers';
 import { useLeadTypeConversions } from './lead-type-conversions-panel';
 import { CampaignBreakdown } from './campaign-breakdown';
 
-type Module = 'Overview' | 'Leads' | 'Campaigns' | 'Team performance';
-const MODULES: readonly Module[] = ['Overview', 'Leads', 'Campaigns', 'Team performance'];
+type Module = MarketingModule;
 type LeadsView = 'Lead management' | 'Calling workspace' | 'Existing customers' | 'Online customers' | 'Import';
 const LEADS_VIEWS: readonly LeadsView[] = ['Lead management', 'Calling workspace', 'Existing customers', 'Online customers', 'Import'];
 type CallingView = 'Queue' | 'Follow-ups';
@@ -27,13 +28,19 @@ const pct = (n: number, of: number) => `${of ? (n / of * 100).toFixed(1) : '0.0'
 
 export function MarketingWorkspace() {
   const { data, save, message, refresh } = useMarketing();
-  const [module, setModule] = useState<Module>('Overview');
+  // The section comes from the URL, so the site header's tabs (nav-tabs.tsx) open it.
+  const router = useRouter();
+  const section = marketingModuleFrom(useSearchParams()?.get('module'));
+  const setModule = (next: Module) => { if (next !== section) router.push(marketingModuleHref(next), { scroll: false }); };
   const [leadsView, setLeadsView] = useState<LeadsView>('Lead management');
   const [callingView, setCallingView] = useState<CallingView>('Queue');
   const [status, setStatus] = useState<Status>('All leads');
   const [campaign, setCampaign] = useState(''); const [salesperson, setSalesperson] = useState('');
   const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [store, setStore] = useState(''); const [source, setSource] = useState(''); const [search, setSearch] = useState('');
   const [page, setPage] = useState(0); const [add, setAdd] = useState(false);
+  // A new section starts on its first page, with no search.
+  const [shownModule, setShownModule] = useState(section);
+  if (shownModule !== section) { setShownModule(section); setPage(0); setSearch(''); }
   if (!data) return <p role="status" className="p-8 text-ink-2">{message || 'Loading marketing workspace…'}</p>;
   const scope = filterLeads(data.leads, { from, to, store, source, search: '' });
   const matched = convertedLeads(data); const convertedPhones = new Set(matched.map(l => l.phone));
@@ -45,7 +52,6 @@ export function MarketingWorkspace() {
   const dueToday = pending.filter(p => p.followup.due >= now && p.followup.due.startsWith(today));
   const update = (lead: Lead) => save({ ...data, leads: data.leads.map(l => l.id === lead.id ? lead : l) });
   const resetPage = () => setPage(0);
-  function openModule(next: Module) { setModule(next); setPage(0); setSearch(''); }
   function openLeads(view: LeadsView, nextStatus?: Status) { setModule('Leads'); setLeadsView(view); if (nextStatus) setStatus(nextStatus); setPage(0); setSearch(''); }
 
   // Lead management: the status, campaign and salesperson filters on top of the page filters.
@@ -68,13 +74,12 @@ export function MarketingWorkspace() {
   const contactedToday = scope.filter(l => l.interactions.some(i => i.type === 'call' && i.at.startsWith(today) && !!i.outcome?.startsWith('Connected'))).length;
   const convertedToday = new Set(leadSales(data, scope).filter(sale => sale.date.startsWith(today)).map(sale => sale.phone)).size;
 
-  const showFilters = module !== 'Team performance' && !(module === 'Leads' && ['Existing customers', 'Online customers', 'Import'].includes(leadsView));
+  const showFilters = section !== 'Team performance' && !(section === 'Leads' && ['Existing customers', 'Online customers', 'Import'].includes(leadsView));
   const subNav = <T extends string>(label: string, items: readonly T[], current: T, choose: (item: T) => void, count?: (item: T) => number | null) =>
     <nav className="flex flex-wrap gap-2" aria-label={label}>{items.map(item => { const n = count?.(item); return <button key={item} className={current === item ? primary : button} aria-current={current === item ? 'page' : undefined} onClick={() => choose(item)}>{item}{n === null || n === undefined ? '' : ` (${n})`}</button>; })}</nav>;
 
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
     <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Marketing · Customer relationships</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Every lead. Every conversation.</h1><p className="mt-2 text-sm text-ink-2">One customer profile from acquisition to follow-up and purchase.</p></div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-inset px-3 py-2 text-xs text-ink-2">Shared records · {data.leads.length} leads</span><button className={primary} onClick={() => setAdd(!add)}>Add lead</button><button className={button} onClick={() => openLeads('Import')}>Import Excel</button></div></header>
-    <nav className="flex flex-wrap gap-2 border-b border-line pb-3" aria-label="Marketing modules">{MODULES.map(id => <button key={id} className={module === id ? primary : button} aria-current={module === id ? 'page' : undefined} onClick={() => openModule(id)}>{id}</button>)}</nav>
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
     {add && <AddLead data={data} save={save} close={() => setAdd(false)} />}
     {showFilters && <section aria-label="Marketing filters" className={`${card} flex flex-wrap items-end gap-3`}>
@@ -82,7 +87,7 @@ export function MarketingWorkspace() {
       <Field label="Date-Time To"><input type="date" className={input} min={from || undefined} value={to} onChange={e => { setTo(e.target.value); resetPage(); }} /></Field>
       <Field label="Preferred store"><select className={input} value={store} onChange={e => { setStore(e.target.value); resetPage(); }}><option value="">All stores</option>{STORES.map(s => <option key={s} value={s}>{storeName(s)}</option>)}</select></Field>
       <Field label="Source"><select className={input} value={source} onChange={e => { setSource(e.target.value); resetPage(); }}><option value="">All sources</option>{SOURCES.map(s => <option key={s}>{s}</option>)}</select></Field>
-      {module === 'Leads' && leadsView === 'Lead management' && <>
+      {section === 'Leads' && leadsView === 'Lead management' && <>
         <Field label="Campaign"><select className={input} value={campaign} onChange={e => { setCampaign(e.target.value); resetPage(); }}><option value="">All campaigns</option>{campaigns.map(c => <option key={c}>{c}</option>)}</select></Field>
         <Field label="Status"><select className={input} value={status} onChange={e => { setStatus(e.target.value as Status); resetPage(); }}>{STATUSES.map(s => <option key={s}>{s}</option>)}</select></Field>
         <Field label="Salesperson"><select className={input} value={salesperson} onChange={e => { setSalesperson(e.target.value); resetPage(); }}><option value="">All salespeople</option><option value={UNASSIGNED}>Unassigned</option>{salespeople.map(p => <option key={p}>{p}</option>)}</select></Field>
@@ -92,7 +97,7 @@ export function MarketingWorkspace() {
       {from && to && from > to && <p role="alert" className="text-sm text-red-600">From must be on or before To.</p>}
     </section>}
 
-    {module === 'Overview' && <>
+    {section === 'Overview' && <>
       <OverviewPerformance filters={{ from, to, store, source }} />
       <section className={card}><h2 className="text-lg font-semibold text-ink">Calling and follow-up summary</h2><p className="mt-1 text-xs text-ink-muted">Today, for the leads on the calling desks. Select a figure to open it.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{([
@@ -104,7 +109,7 @@ export function MarketingWorkspace() {
         ] as const).map(([label, value, open]) => { const body = <><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p></>; return open ? <button type="button" key={label} className="rounded-xl border border-line p-4 text-left transition hover:border-accent focus-visible:outline-2 focus-visible:outline-accent" onClick={open}>{body}</button> : <div key={label} className="rounded-xl border border-line p-4">{body}</div>; })}</div></section>
     </>}
 
-    {module === 'Leads' && <>
+    {section === 'Leads' && <>
       {subNav('Leads sections', LEADS_VIEWS, leadsView, view => openLeads(view))}
       {leadsView === 'Lead management' && <>
         {subNav('Lead status', STATUSES, status, s => { setStatus(s); resetPage(); }, s => managed.filter(hasStatus[s]).length)}
@@ -125,8 +130,8 @@ export function MarketingWorkspace() {
       {leadsView === 'Import' && <MarketingImport data={data} save={save} refresh={refresh} />}
     </>}
 
-    {module === 'Campaigns' && <CampaignPerformance filters={{ from, to, store, source }} />}
-    {module === 'Team performance' && <MarketingSalespeople data={data} />}
+    {section === 'Campaigns' && <CampaignPerformance filters={{ from, to, store, source }} />}
+    {section === 'Team performance' && <MarketingSalespeople data={data} />}
     <p className="text-xs text-ink-muted">Leads and bills are shared by every desk and refresh automatically. Leads can arrive from a connected Google Sheet; no live POS sync is connected. Calls, WhatsApp and email open your apps; you record outcomes here. {stats.total} leads match the page filters.</p>
     <footer className="border-t border-line pt-5 text-xs text-ink-muted"><p>One lead per Contact No. · Multiple acquisition sources · Shared database</p></footer>
   </main>;

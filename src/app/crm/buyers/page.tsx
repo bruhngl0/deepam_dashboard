@@ -83,7 +83,7 @@ export default async function BuyersPage({ searchParams }: { searchParams: Searc
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Buyers</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">Customers</h1>
         <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
           Everyone who has placed a bill, whether or not they ever appeared on a lead sheet.
           Open any name for their full profile — spend, cadence, tender, branch, staff and
@@ -93,7 +93,7 @@ export default async function BuyersPage({ searchParams }: { searchParams: Searc
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatTile
-          label="Buyers"
+          label="Customers"
           value={formatNumber(buyers.buyerCount)}
           caption="Distinct people with at least one bill in this window"
           definition="Matched on normalised phone (D-03). Bills with no usable phone are real revenue but cannot be attributed to a person, so they are absent here."
@@ -101,7 +101,7 @@ export default async function BuyersPage({ searchParams }: { searchParams: Searc
         <StatTile
           label="Came back"
           value={formatNumber(repeat.total)}
-          caption={`${formatPercent(repeat.total, buyers.buyerCount)} of buyers made more than one visit`}
+          caption={`${formatPercent(repeat.total, buyers.buyerCount)} of customers made more than one visit`}
           definition="Counted in distinct visit dates, not bills. A second voucher on the same day is one trip split across tills, not a return trip — counting bills would roughly double this figure."
           emphasis
         />
@@ -109,7 +109,7 @@ export default async function BuyersPage({ searchParams }: { searchParams: Searc
           label="Bought here before"
           value={formatNumber(returning.total)}
           caption={`${formatPercent(returning.total, buyers.buyerCount)} have bills predating this window`}
-          definition="Evidence from the loyalty master export, the only source that predates the sales file. Not read from the customer lifecycle field, which classifies every buyer as existing by construction."
+          definition="Evidence from the loyalty master export, the only source that predates the sales file. Not read from the customer lifecycle field, which classifies every customer as existing by construction."
         />
       </div>
 
@@ -118,7 +118,7 @@ export default async function BuyersPage({ searchParams }: { searchParams: Searc
           <BuyerFilterBar total={buyers.total} />
           <p className="tnum text-xs text-ink-muted">
             Showing {formatNumber(buyers.rows.length)} of {formatNumber(buyers.total)} matching
-            buyers · {formatCurrency(pageSpend)} of spend on this page
+            customers · {formatCurrency(pageSpend)} of spend on this page
           </p>
         </div>
 
