@@ -202,7 +202,8 @@ Same five as `.env.example`, now split by where they live:
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Plain env var | `/sign-in` — without it Clerk defaults to its own hosted `*.accounts.dev` page (D-93) |
 | `ALLOW_MASTER_SHEET_IMPORT` | Plain env var | Leave `false` until you deliberately want the lead-layer-replacing commit route live (D-89) |
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | Secrets Manager | Service-account JSON key for reading private Google Sheets in the live lead import (D-94). Optional; without it only sheets shared as "Anyone with the link" can be connected |
-| `CRON_SECRET` | Secrets Manager | Bearer token for `/api/marketing/sheet-sync/cron`. Needed only with the scheduler below |
+| `CRON_SECRET` | Secrets Manager | Bearer token for `/api/marketing/sheet-sync/cron` and `/api/marketing/google-ads-sync`. Needed for the schedulers below |
+| `GOOGLE_ADS_*` | Secrets Manager | Google Ads API access for Google ad spend; see "Google Ads spend" below. Optional; without them Google spend comes from the sheets' Campaign Summary tabs |
 | `MARKETING_SHEET_SYNC_MINUTES` | Plain env var | In-process sync timer interval, default `5`; `0` disables it |
 
 ## Live Google Sheet sync (optional)
@@ -235,6 +236,30 @@ aws events create-api-destination --name deepam-crm-sheet-sync \
 ```
 
 Running both is fine: a sync that finds nothing new writes nothing.
+
+## Google Ads spend (Google Ads API)
+
+Google ad spend comes from the Google Ads API once these are set; leads still come from the
+sheet sync, and Meta spend from the Meta Ads Manager export. Until then Google spend is read from
+the sheets' Campaign Summary tabs. Code: `src/lib/marketing/google-ads-spend.ts`.
+
+1. **Developer token.** In a Google Ads *manager* account (create one at ads.google.com/home/tools/manager-accounts
+   if needed, and link the ad account to it): Admin → API Center → apply. Basic access is enough;
+   approval can take days. Until approved the token works only on test accounts.
+2. **OAuth client.** Google Cloud console → enable "Google Ads API" → APIs & Services → Credentials →
+   Create OAuth client ID, type **Desktop app**. Note the client ID and secret.
+3. **Refresh token.** Sign in as a user who can see the ad account:
+   `GOOGLE_ADS_CLIENT_ID=... GOOGLE_ADS_CLIENT_SECRET=... npx tsx scripts/google-ads-refresh-token.ts`
+4. **Secrets** (Secrets Manager, then add to the service with `SET_SECRETS` on a deploy):
+   `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`,
+   `GOOGLE_ADS_CUSTOMER_ID` (the ad account, e.g. 123-456-7890), `GOOGLE_ADS_LOGIN_CUSTOMER_ID` (the manager
+   account), and `CRON_SECRET` (any long random string, stored as `deepam-crm/cron-secret`).
+   Optional plain env: `GOOGLE_ADS_SPEND_FROM` (first day, default 2026-01-01), `GOOGLE_ADS_API_VERSION` (default v26).
+5. **Check it** before saving anything: `npx tsx scripts/sync-google-ads-spend.ts` (dry run; `--apply` saves).
+6. **Hourly schedule:** `AWS_PROFILE=<admin> bash scripts/google-ads-spend-schedule.sh`.
+
+Spend is matched to leads by campaign number, so name Google campaigns like the Meta ones
+(`Google | 0016 | 2026 | 10 | ...`).
 
 ## After the service is up
 
