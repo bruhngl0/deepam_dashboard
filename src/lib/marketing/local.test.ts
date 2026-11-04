@@ -145,7 +145,7 @@ describe('conversions follow logged calls', () => {
     { leadId: 'existing-customer:2', salesperson: 'Asha', phone: '+919000000002', claimedAt: '2026-10-12T09:00:00', list: 'exhibition-customers' },
     { leadId: 'existing-customer:3', salesperson: 'Asha', phone: '+919000000003', claimedAt: '2026-10-12T09:00:00', list: 'online-customers' },
   ];
-  const call = (id: string, at: string, salesperson: string, leadId: string, phone: string): CallEntry => ({ id, at, salesperson, outcome: 'No answer', note: '', leadId, name: 'A', phone });
+  const call = (id: string, at: string, salesperson: string, leadId: string, phone: string, outcome: CallEntry['outcome'] = 'Connected / interested'): CallEntry => ({ id, at, salesperson, outcome, note: '', leadId, name: 'A', phone });
   const calls = [
     call('l', '2026-10-10T18:00:00', 'Asha', lead.id, '+919000000001'),
     call('e', '2026-10-12T10:00:00', 'Asha', 'existing-customer:2', '+919000000002'),
@@ -173,6 +173,23 @@ describe('conversions follow logged calls', () => {
     const [asha, ravi] = run('all', log);
     expect(asha).toMatchObject({ converted: 3, revenue: 6200 });
     expect(ravi).toMatchObject({ claimed: 0, converted: 1, revenue: 400 });
+  });
+
+  it.each(['No answer', 'Callback required', 'Connected / not interested', 'Wrong number', ''] as const)('gives nothing for a %s call', outcome => {
+    const log = calls.map(c => ({ ...c, outcome }));
+    expect(creditSalesToCalls(sales, log)).toEqual([]);
+    expect(run('all', log)[0]).toMatchObject({ claimed: 3, converted: 0, revenue: 0 });
+  });
+
+  it('counts a follow-up-required call', () => {
+    expect(run('leads', calls.map(c => ({ ...c, outcome: 'Connected / follow-up required' as const })))[0]).toMatchObject({ converted: 1, revenue: 600 });
+  });
+
+  it('keeps the bill with the latest interested call when someone else later gets no answer', () => {
+    const log = [...calls, call('r', '2026-10-11T09:00:00', 'Ravi', lead.id, '+919000000001', 'No answer')];
+    const [asha, ravi] = run('all', log);
+    expect(asha).toMatchObject({ converted: 3, revenue: 6600 });
+    expect(ravi).toMatchObject({ converted: 0, revenue: 0 });
   });
 });
 

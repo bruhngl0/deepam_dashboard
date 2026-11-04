@@ -16,7 +16,7 @@ const data: Dataset = { ...EMPTY, leads: [lead], sales: [
 ] };
 const claims: ExistingClaim[] = [{ leadId: 'existing-customer:1', salesperson: 'srinivas g', phone: '+919000000020', claimedAt: '2026-10-10T09:00:00' }];
 const stored: CallEntry[] = [
-  { id: 'shared', at: '2026-10-11T10:00:00', salesperson: 'Srinivas G', outcome: 'No answer', note: '', leadId: 'existing-customer:1', name: 'Existing', phone: '+919000000020' },
+  { id: 'shared', at: '2026-10-11T10:00:00', salesperson: 'Srinivas G', outcome: 'Connected / follow-up required', note: '', leadId: 'existing-customer:1', name: 'Existing', phone: '+919000000020' },
 ];
 
 /** What Team performance (marketing-salespeople.tsx) shows for this person: everyone's numbers, then this row. */
