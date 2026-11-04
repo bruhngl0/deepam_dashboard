@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { money, parseCampaignSummary, spendByCampaign } from './campaign-spend';
+import { money, parseCampaignSummary, spendByCampaign, spendRowsFor, SPEND_PLATFORMS } from './campaign-spend';
 
 // The top of the Meta sheet's Campaign Summary tab as the export delivers it.
 const grid: unknown[][] = [
@@ -42,5 +42,19 @@ describe('parseCampaignSummary', () => {
   });
   it('returns nothing for a tab without the heading row', () => {
     expect(parseCampaignSummary([['Name', 'Phone']])).toEqual([]);
+  });
+});
+
+describe('spendRowsFor', () => {
+  const week = (campaign: string, platform: string, week = 'w1', spend = 100) => ({ campaign, platform, month: 'Oct', week, spend, leads: null });
+
+  it('keeps only the platform being saved, so Meta and Google never overwrite each other', () => {
+    const rows = [week('Meta | 0001', 'Meta ads'), week('Google | 0002', 'Google ads'), week('Google | 0003', 'Google ads')];
+    expect(spendRowsFor(rows, SPEND_PLATFORMS.google).map((r) => r.campaign)).toEqual(['Google | 0002', 'Google | 0003']);
+    expect(spendRowsFor(rows, SPEND_PLATFORMS.meta).map((r) => r.campaign)).toEqual(['Meta | 0001']);
+  });
+
+  it('drops a repeated campaign week', () => {
+    expect(spendRowsFor([week('Google | 0002', 'Google ads'), week('Google | 0002', 'Google ads')], SPEND_PLATFORMS.google)).toHaveLength(1);
   });
 });
