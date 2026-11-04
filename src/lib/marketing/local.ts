@@ -225,12 +225,18 @@ export type LeadFilters = { from: string; to: string; store: string; source: str
 export function filterLeads(leads: Lead[], filters: LeadFilters): Lead[] {
   return leads.filter(l => (!filters.store || l.preferredStore === filters.store) && (!filters.source || l.acquisitions.some(a => a.source === filters.source)) && (!filters.from || (!!l.date && l.date >= filters.from)) && (!filters.to || (!!l.date && l.date <= filters.to)) && `${l.id} ${l.leadCode ?? ''} ${l.customerCode ?? ''} ${l.name} ${l.phone} ${l.email} ${l.acquisitions.map(a => `${a.source} ${a.campaignId}`).join(' ')}`.toLowerCase().includes(filters.search.toLowerCase()));
 }
+export function isContacted(lead: Lead): boolean {
+  return lead.interactions.some(i => i.type === 'call' && !!i.outcome?.startsWith('Connected'));
+}
+export function isInterested(lead: Lead): boolean {
+  return lead.status === 'Connected / interested';
+}
 export function metrics(data: Dataset, leads = data.leads) {
   const sales = leadSales(data, leads);
   const converted = new Set(sales.map(s => s.phone)).size;
   const costs = leads.flatMap(l => l.acquisitions).filter(a => a.cost !== null);
   const spend = costs.reduce((n, a) => n + (a.cost ?? 0), 0);
-  return { total: leads.length, contacted: leads.filter(l => l.interactions.some(i => i.type === 'call' && i.outcome?.startsWith('Connected'))).length, interested: leads.filter(l => l.status === 'Connected / interested').length, visits: leads.filter(l => l.interactions.some(i => i.type === 'visit')).length, converted, revenue: sales.reduce((n, s) => n + (s.amount ?? 0), 0), conversion: leads.length ? converted / leads.length * 100 : 0, cpa: costs.length && converted ? spend / converted : null, spend, costsKnown: costs.length, costsTotal: leads.flatMap(l => l.acquisitions).length, orders: sales.length };
+  return { total: leads.length, contacted: leads.filter(isContacted).length, interested: leads.filter(isInterested).length, visits: leads.filter(l => l.interactions.some(i => i.type === 'visit')).length, converted, revenue: sales.reduce((n, s) => n + (s.amount ?? 0), 0), conversion: leads.length ? converted / leads.length * 100 : 0, cpa: costs.length && converted ? spend / converted : null, spend, costsKnown: costs.length, costsTotal: leads.flatMap(l => l.acquisitions).length, orders: sales.length };
 }
 function nextDay(date: string) {
   const [year, month, day] = date.split('-').map(Number);

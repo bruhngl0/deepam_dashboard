@@ -14,9 +14,10 @@ vi.mock('@/components/marketing-shared', async importOriginal => {
 describe('marketing page rendering', () => {
   it('renders dashboard metrics and navigation with demo data', () => {
     const html = renderToStaticMarkup(createElement(MarketingWorkspace));
-    for (const label of ['Queue', 'Existing customers', 'Existing customer call list', 'Existing customer', 'Follow-ups', 'Converted', 'Team performance', 'Campaigns', 'Cost per acquisition', 'Converted customers', 'Walk-ins', 'Date-Time From']) expect(html).toContain(label);
-    const navigation = html.match(/<nav[^>]*aria-label="Marketing sections"[\s\S]*?<\/nav>/)?.[0] ?? '';
-    for (const removed of ['>Sales<', '>Insights<', '>Salespeople<', '>Import<']) expect(navigation).not.toContain(removed);
+    for (const label of ['Marketing performance', 'Total marketing spend', 'Cost per lead', 'Converted leads', 'Sales generated', 'CAC', 'ROAS', 'Leads funnel', 'Calling and follow-up summary', 'New leads awaiting first call', 'Calls due today', 'Overdue follow-ups', 'Leads contacted today', 'Leads converted today', 'Date-Time From']) expect(html).toContain(label);
+    // The header has only the four modules.
+    const navigation = html.match(/<nav[^>]*aria-label="Marketing modules"[\s\S]*?<\/nav>/)?.[0] ?? '';
+    expect([...navigation.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(m => m[1])).toEqual(['Overview', 'Leads', 'Campaigns', 'Team performance']);
     expect(html).toContain('shared by every desk');
     expect(html).not.toContain('Clear local data');
   });
@@ -36,7 +37,8 @@ describe('marketing page rendering', () => {
   });
   it('renders the marketing team dashboard and per-source navigation', () => {
     const html = renderToStaticMarkup(createElement(MarketingTeamWorkspace));
-    for (const label of ['Marketing team', 'Total leads', 'Claimed leads', 'Contacted', 'Interested', 'Converted', 'Conversion rate', 'Leads who bought, by campaign', 'Every campaign', 'Sync from Deepam CRM', 'All source dashboards', 'Google ads', 'Meta ads']) expect(html).toContain(label);
+    for (const label of ['Marketing team', 'Total leads', 'Converted', 'Conversion rate', 'Leads who bought, by campaign', 'Every campaign', 'Sync from Deepam CRM', 'All source dashboards', 'Google ads', 'Meta ads']) expect(html).toContain(label);
     expect(html).not.toContain('revenue');
+    for (const removed of ['Claimed leads', '>Contacted<', '>Interested<']) expect(html).not.toContain(removed);
   });
 });
