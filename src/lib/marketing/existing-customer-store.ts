@@ -133,8 +133,8 @@ const isoSql = (column: string) => sql.raw(`to_char(${column}, 'YYYY-MM-DD"T"HH2
  * the period, and Follow-ups due counts open follow-ups falling due in it.
  * Connected and Interested go by the latest call in the period. Converted
  * follows Team performance (local.ts creditSalesToCalls): only bills dated on or
- * after the day of the customer's first logged call count, in India time, since
- * everyone on this list has bought before.
+ * after the day of the customer's first interested or follow-up call count, in
+ * India time, since everyone on this list has bought before.
  */
 function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
   const from = filters.from || null, to = filters.to || null;
@@ -146,7 +146,7 @@ function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
              max(call.called_at) AS last_at,
              (array_agg(call.outcome ORDER BY call.called_at DESC))[1] AS last_outcome,
              (array_agg(call.note ORDER BY call.called_at DESC))[1] AS last_note,
-             to_char(min(call.called_at), 'YYYY-MM-DD') AS first_day,
+             to_char(min(call.called_at) FILTER (WHERE call.outcome IN ('Connected / interested', 'Connected / follow-up required')), 'YYYY-MM-DD') AS first_day,
              count(*) FILTER (WHERE ${called})::int AS calls,
              max(call.called_at) FILTER (WHERE ${called}) AS called_at,
              (array_agg(call.outcome ORDER BY call.called_at DESC) FILTER (WHERE ${called}))[1] AS outcome,

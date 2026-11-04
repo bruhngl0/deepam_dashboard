@@ -10,7 +10,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_BATCH = 500;
-const MAX_ROWS = 5000;
+// The whole log: Team performance credits bills from it, so a cut-off would drop older salespeople's conversions.
+const MAX_ROWS = 20000;
 const IST = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 type Incoming = { id: string; leadId: string; leadName: string; phone: string; salesperson: string; outcome?: string; note?: string; at: string };

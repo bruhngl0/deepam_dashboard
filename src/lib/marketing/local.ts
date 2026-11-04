@@ -290,14 +290,19 @@ const claimGroup = (claim: ExistingClaim): CustomerGroup => (claim.list === 'onl
 /** A bill credited to the salesperson whose logged call earned it, with the called record (lead or calling-list customer). */
 export type CreditedSale = { sale: Sale; salesperson: string; leadId: string };
 
+/** Call outcomes that can earn a conversion: the salesperson reached the customer and they were open to buying. */
+export const CONVERTING_OUTCOMES: readonly Outcome[] = ['Connected / interested', 'Connected / follow-up required'];
+
 /**
- * The conversion rule: a bill counts for the salesperson who logged the latest call
- * to that phone on or before the bill's day (India time). A customer nobody called
- * converts for nobody, whoever claimed them; each bill counts for one salesperson.
+ * The conversion rule: a bill counts for the salesperson who logged the latest
+ * converting call (CONVERTING_OUTCOMES) to that phone on or before the bill's day
+ * (India time). No answer, callback, not interested and wrong number calls earn
+ * nothing. A customer nobody reached converts for nobody, whoever claimed them;
+ * each bill counts for one salesperson.
  */
 export function creditSalesToCalls(sales: Sale[], calls: CallEntry[]): CreditedSale[] {
   const byPhone = new Map<string, CallEntry[]>();
-  for (const call of calls) byPhone.set(call.phone, [...(byPhone.get(call.phone) ?? []), call]);
+  for (const call of calls) if (call.outcome && CONVERTING_OUTCOMES.includes(call.outcome)) byPhone.set(call.phone, [...(byPhone.get(call.phone) ?? []), call]);
   const credited: CreditedSale[] = [];
   for (const sale of sales) {
     const day = sale.date.slice(0, 10);
@@ -325,7 +330,7 @@ export function openFollowupDue(leadId: string, lead: Lead | undefined, existing
  * Claimed leads plus claimed calling-list customers (existing and online), or one
  * of those groups with `range.group`. A calling-list customer counts as interested
  * by their latest call's outcome. Converted and Revenue follow `creditSalesToCalls`:
- * bills earned by the salesperson's own logged calls, claimed or not.
+ * bills earned by the salesperson's own interested or follow-up calls, claimed or not.
  *
  * `calls` may be narrowed by the page's filters. Claimed and Pending describe
  * the salesperson's list as it stands today, so Pending is worked out from
