@@ -1,5 +1,10 @@
 /**
- * Ad spend from the "Campaign Summary" tab of each lead sheet.
+ * Ad spend per campaign. Each platform has one source of truth and owns its rows
+ * of marketing_campaign_spend (saveCampaignSpend replaces one platform at a time):
+ *   - Meta ads: the Meta Ads Manager export (./meta-spend-export, scripts/import-meta-spend.ts)
+ *   - Google ads: the lead sheets' "Campaign Summary" tabs, saved by the sheet sync
+ *
+ * The Campaign Summary tab format:
  *
  * The tab has a heading row (Campaign name, Platform, Start date, End date,
  * then "Week N spend", "No of leads", "Cost per lead" per week), followed by
@@ -81,16 +86,26 @@ export function spendByCampaign(weeks: CampaignSpendWeek[]): CampaignSpend[] {
   return [...map.values()].map((row) => ({ ...row, spend: Math.round(row.spend * 100) / 100 }));
 }
 
+/** Where each platform's spend comes from (see the top of this file). */
+export const SPEND_PLATFORMS = { meta: 'Meta ads', google: 'Google ads' } as const;
+export type SpendPlatform = (typeof SPEND_PLATFORMS)[keyof typeof SPEND_PLATFORMS];
+
+/** The rows of one platform, ready to replace that platform's saved spend. */
+export function spendRowsFor(weeks: CampaignSpendWeek[], platform: SpendPlatform): CampaignSpendWeek[] {
+  return [...new Map(weeks.filter((w) => w.platform === platform).map((w) => [`${w.campaign}|${w.platform}|${w.month}|${w.week}`, w])).values()];
+}
+
 /**
- * Saves the weeks of spend read from the sheets (replacing what was saved before), for the analytics
- * database's cost-per-lead and payback figures. Called by scripts/import-meta-spend.ts.
+ * Replaces one platform's saved spend with these rows (rows of other platforms are ignored), leaving the
+ * other platform's spend as it is. The CRM's campaign pages and the analytics database's cost-per-lead and
+ * payback figures read it. Meta: scripts/import-meta-spend.ts; Google: the sheet sync.
  */
-export async function saveCampaignSpend(weeks: CampaignSpendWeek[]): Promise<number> {
+export async function saveCampaignSpend(weeks: CampaignSpendWeek[], platform: SpendPlatform): Promise<number> {
   const { db } = await import('@/db');
   const { sql } = await import('drizzle-orm');
-  const rows = [...new Map(weeks.map((w) => [`${w.campaign}|${w.platform}|${w.month}|${w.week}`, w])).values()];
+  const rows = spendRowsFor(weeks, platform);
   await db.transaction(async (t) => {
-    await t.execute(sql`DELETE FROM marketing_campaign_spend`);
+    await t.execute(sql`DELETE FROM marketing_campaign_spend WHERE platform = ${platform}`);
     if (rows.length) {
       await t.execute(sql`INSERT INTO marketing_campaign_spend (campaign, platform, month, week, spend, leads)
         SELECT campaign, platform, month, week, spend, leads
