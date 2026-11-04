@@ -19,7 +19,7 @@ const gate: GateConfig = {
   modules: [overview, customer, marketing, vendor],
   moduleFor(pathname) {
     // App Runner's health check, and server-to-server routes that carry their own tokens.
-    if (under(pathname, '/api/health', '/api/integration', '/api/marketing/sheet-sync/cron')) return null;
+    if (under(pathname, '/api/health', '/api/integration', '/api/marketing/sheet-sync/cron', '/api/marketing/google-ads-sync')) return null;
     // Salespeople sign in to their own profiles there instead.
     if (under(pathname, '/sales')) return null;
     // The public exhibition visit form, shared with customers.
