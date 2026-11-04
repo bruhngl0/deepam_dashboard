@@ -55,7 +55,7 @@ const LISTS: { kind: ListKind; label: string; blurb: string }[] = [
     kind: 'second_visit',
     label: 'Second visit',
     blurb:
-      '73% of second visits happen within 14 days of the first, and the tail is thin after 28. These are buyers with exactly one visit, still inside that window. Ranked by what they spent (60) and how close they are to the peak (40).',
+      '73% of second visits happen within 14 days of the first, and the tail is thin after 28. These are customers with exactly one visit, still inside that window. Ranked by what they spent (60) and how close they are to the peak (40).',
   },
 ];
 

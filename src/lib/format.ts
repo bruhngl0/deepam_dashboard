@@ -101,7 +101,7 @@ export type ValueTierCode = 'top10' | 'next20' | 'rest70' | 'none';
 export const VALUE_TIER_LABEL: Record<ValueTierCode, string> = {
   top10: 'Top 10%',
   next20: 'Next 20%',
-  rest70: 'Rest of buyers',
+  rest70: 'Rest of customers',
   none: 'No purchase yet',
 };
 

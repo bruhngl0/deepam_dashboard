@@ -97,7 +97,7 @@ const SEGMENT_META: Record<CustomerSegment['segment'], { label: string; descript
     description: 'One bill so far, but it put them in the top 30% by spend.',
   },
   one_time_low: {
-    label: 'One-time buyers',
+    label: 'One-time customers',
     description: 'A single, smaller bill. The largest group by people, rarely by revenue.',
   },
 };

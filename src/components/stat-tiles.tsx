@@ -110,7 +110,7 @@ export function KpiRow({
         className="xl:row-span-2"
         label="Total customers"
         value={formatNumber(totalCustomers)}
-        caption="Loyalty customers plus new buyers"
+        caption="Loyalty customers plus new customers"
       />
       <StatTile
         label="Historical customers"
@@ -132,7 +132,7 @@ export function KpiRow({
           label="New customers"
           value={formatNumber(newCustomers.all.buyers)}
           caption={`${formatNumber(newCustomers.all.bills)} bills · ${formatCurrencyCompact(newCustomers.all.sales)} in sales`}
-          definition={`Bought in this period and not on the loyalty customer sheet: ${formatNumber(newCustomers.lead.buyers)} from lead sheets, ${formatNumber(newCustomers.walkin.buyers)} walk-ins, ${formatNumber(newCustomers.other.buyers)} other new buyers. Click to list them.`}
+          definition={`Bought in this period and not on the loyalty customer sheet: ${formatNumber(newCustomers.lead.buyers)} from lead sheets, ${formatNumber(newCustomers.walkin.buyers)} walk-ins, ${formatNumber(newCustomers.other.buyers)} other new customers. Click to list them.`}
         />
       </Link>
       <StatTile
@@ -206,20 +206,20 @@ export function RevenueRow({
       <StatTile
         label="New customers"
         value={formatCurrencyCompact(newRevenue)}
-        caption={`${formatNumber(newConverted)} buyers of ${formatNumber(newLeads)} leads · ${formatNumber(newBills)} bills`}
+        caption={`${formatNumber(newConverted)} customers of ${formatNumber(newLeads)} leads · ${formatNumber(newBills)} bills`}
         definition="On a lead sheet but not on the loyalty customer list."
         emphasis
       />
       <StatTile
         label="Loyalty customer list"
         value={formatCurrencyCompact(existingRevenue)}
-        caption={`${formatNumber(existingBuyers)} buyers of ${formatNumber(existingPeople)} · ${formatNumber(existingBills)} bills`}
+        caption={`${formatNumber(existingBuyers)} customers of ${formatNumber(existingPeople)} · ${formatNumber(existingBills)} bills`}
         definition="Matched to the loyalty/CRM customer list by normalized phone number."
       />
       <StatTile
         label="Sales from multiple sources"
         value={formatCurrencyCompact(multiSourceRevenue)}
-        caption={`${formatNumber(multiSourceBuyers)} buyers · ${formatNumber(multiSourceBills)} bills`}
+        caption={`${formatNumber(multiSourceBuyers)} customers · ${formatNumber(multiSourceBills)} bills`}
         definition="Matched to sales, the loyalty list, and at least one lead sheet by normalized phone number."
       />
       <StatTile

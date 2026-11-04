@@ -46,7 +46,7 @@ export function BuyerFilterBar({ total }: { total: number }) {
       <input
         type="search"
         defaultValue={params.get('q') ?? ''}
-        placeholder="Search buyer name, Contact No. or email"
+        placeholder="Search customer name, Contact No. or email"
         onChange={(e) => {
           const value = e.target.value;
           clearTimeout((window as unknown as { __bt?: number }).__bt);
@@ -63,7 +63,7 @@ export function BuyerFilterBar({ total }: { total: number }) {
         onChange={(e) => setParam({ segment: e.target.value || null })}
         className={selectClass}
       >
-        <option value="">Every buyer</option>
+        <option value="">Every customer</option>
         {SEGMENTS.map((s) => (
           <option key={s.value} value={s.value}>
             {s.label}
@@ -107,7 +107,7 @@ export function BuyerFilterBar({ total }: { total: number }) {
         ))}
       </select>
 
-      <span className="tnum text-sm text-ink-muted">{formatNumber(total)} buyers</span>
+      <span className="tnum text-sm text-ink-muted">{formatNumber(total)} customers</span>
 
       {active > 0 && (
         <button

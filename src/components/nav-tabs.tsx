@@ -26,7 +26,7 @@ const CARRIED_PARAMS = ['from', 'to', 'store'];
 
 const CRM_TABS = [
   { href: '/crm', label: 'Home' },
-  { href: '/crm/buyers', label: 'Buyers' },
+  { href: '/crm/buyers', label: 'Customers' },
   { href: '/crm/insights', label: 'Insights' },
   { href: '/crm/analysis', label: 'Analysis' },
   { href: '/crm/import', label: 'Import' },
