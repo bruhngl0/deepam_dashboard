@@ -2,10 +2,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { storeName, callsForSync, campaignName, type Dataset, type Lead, type Sale } from '@/lib/marketing/local';
 import { routeLabel, TAG_LABELS } from '@/lib/marketing/sheet-routing';
-export const button = 'inline-flex items-center justify-center rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-inset focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40';
-export const primary = `${button} !bg-accent !text-white !border-accent`;
-export const input = 'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-2 focus:outline-accent';
-export const card = 'rounded-2xl border border-line bg-surface p-5';
+import { button as uiButton, card as uiCard, control, primaryButton } from './ui';
+// The shared compact look (components/ui.tsx), under the names the marketing screens already use.
+export const button = uiButton;
+export const primary = primaryButton;
+export const input = `w-full ${control}`;
+export const card = `${uiCard} p-5`;
 export const money = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 export const dateLabel = (s: string) => s ? s.replace('T', ' ').slice(0, 16) : 'Not recorded';
 export const dayMonthYearLabel = (s: string) => {
@@ -29,7 +31,7 @@ export function LeadMeta({ lead, className = 'mt-3' }: { lead: Lead; className?:
     <span>{storeName(lead.preferredStore) || 'Store not recorded'}</span>
   </div>;
 }
-export function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="flex min-w-0 flex-col gap-1.5 text-sm text-ink-2">{label}{children}</label>; }
+export function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-ink-muted">{label}{children}</label>; }
 const synced = new Set<string>();
 /** Pushes logged calls to the shared database. Idempotent server-side; failures are retried on the next load or call. */
 export function syncCalls(d: Dataset) {

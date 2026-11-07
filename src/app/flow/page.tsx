@@ -51,8 +51,8 @@ export default async function FlowPage() {
   return (
     <main className="mx-auto w-full max-w-[76rem] px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-8 max-w-2xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Operating model</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">One customer journey, four specialist modules.</h1>
+        <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Operating model</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">One customer journey, four specialist modules.</h1>
         <p className="mt-3 text-sm leading-6 text-ink-2">
           Each product remains the source of truth for its own work. Events move through one integration layer,
           producing a dependable shared view without joining application databases directly.

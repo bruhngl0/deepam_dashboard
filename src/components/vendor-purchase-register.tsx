@@ -6,8 +6,8 @@ export function VendorPurchaseRegister({ rows }: { rows: PurchaseRegisterRow[] }
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[.09em] text-accent">Purchase operations</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-ink">Purchase register</h1>
+          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Purchase operations</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">Purchase register</h1>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">PO, receipt, QC, returns and branch allocation at SKU level.</p>
         </div>
         <a href="/__gate/go?to=https%3A%2F%2Fn7v6pm6bm2.ap-south-1.awsapprunner.com%2F" className="text-sm font-medium text-accent">← Dashboard</a>

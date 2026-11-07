@@ -57,7 +57,7 @@ export function MarketingConverted({
 
   return <div className="space-y-5">
     <section aria-label="Converted customer KPIs" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {kpis.map(([label, value, note]) => <div className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p><p className="mt-2 text-xs text-ink-muted">{note}</p></div>)}
+      {kpis.map(([label, value, note]) => <div className={card} key={label}><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{label}</p><p className="tnum mt-2 text-3xl font-semibold leading-none tracking-tight text-ink">{value}</p><p className="mt-2 text-xs text-ink-muted">{note}</p></div>)}
     </section>
     <section className="overflow-hidden rounded-2xl border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-xl font-semibold text-ink">Converted customer profiles</h2><p className="mt-1 text-xs text-ink-muted">Every lead with a matched bill, with acquisition source, purchase value, and a link to the full customer profile.</p></div><input className={`${input} sm:!w-80`} aria-label="Search converted customers" placeholder="Name, number, source, invoice…" value={search} onChange={event => { onSearch(event.target.value); onPage(0); }} /></div>

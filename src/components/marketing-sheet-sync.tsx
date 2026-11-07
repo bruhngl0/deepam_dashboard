@@ -33,7 +33,7 @@ export function MarketingSheetSync({ onSynced }: { onSynced?: () => void }) {
 
   const status = overview?.status; const sheets = overview?.sheets ?? [];
   return <section className={card} aria-label="Live Google Sheets">
-    <p className="text-xs font-semibold uppercase tracking-widest text-accent">Automatic</p>
+    <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Automatic</p>
     <h2 className="mt-2 text-lg font-semibold text-ink">Live Google Sheets</h2>
     <p className="mt-2 text-sm text-ink-2">New rows in a connected sheet become leads on their own, with the same phone, source and duplicate rules as a file import. Every tab with a contact number and a name column is read, including tabs added later; the headings can sit below a title row. Existing leads keep their ID, calls and follow-ups.</p>
     {!overview && !error && <p role="status" className="mt-4 text-sm text-ink-2">Loading connection…</p>}

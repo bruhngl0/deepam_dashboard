@@ -95,15 +95,15 @@ export function MarketingCampaign({ campaign }: { campaign: string }) {
 
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
     <header className="space-y-2">{header}
-      <p className="text-xs font-semibold uppercase tracking-widest text-accent">Campaign · {report.kind}</p>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{report.campaign}</h1>
+      <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Campaign · {report.kind}</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">{report.campaign}</h1>
       <p className="text-sm text-ink-2">{report.sources.join(', ') || 'No source'} · leads {report.firstLead ?? '—'} to {report.lastLead ?? '—'}{event ? ` · event at ${event}` : ''} · CRM bills up to {report.latestBill ?? '—'}</p>
     </header>
     {groups.map((group) => <section key={group.title} className="space-y-3">
-      <div className="flex items-center gap-3"><h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">{group.title}</h2><div className="h-px flex-1 bg-line" /></div>
+      <div className="flex items-center gap-3"><h2 className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{group.title}</h2><div className="h-px flex-1 bg-line" /></div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{group.items.map((item) => <div key={item.label} className={card}>
-        <p className="text-sm text-ink-2">{item.label}</p>
-        <p className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{item.value}</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{item.label}</p>
+        <p className="tnum mt-2 text-2xl font-semibold leading-none tracking-tight text-ink">{item.value}</p>
         <p className="mt-2 text-xs text-ink-muted">{item.note}</p>
       </div>)}</div>
     </section>)}
