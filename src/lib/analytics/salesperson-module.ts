@@ -186,7 +186,7 @@ export async function salespersonProfile(empCode: string): Promise<SalespersonPr
   return { empCode: String(r.emp_code), name: String(r.name), storeCode: s(r.store_code), storeName: s(r.store_name), aliases: r.aliases as SalespersonProfile['aliases'] };
 }
 
-export type MonthRow = { month: string; bills: number; returns: number; netSales: number; discount: number; salesWithCost: number; cost: number; customers: number; walkIns: number; walkInsShared: number; walkInsBilled: number };
+export type MonthRow = { month: string; bills: number; returns: number; netSales: number; discount: number; salesWithCost: number; cost: number; customers: number; walkIns: number; walkInsShared: number; walkInsConverted: number; walkInsBilled: number };
 
 /** Month by month for one salesperson (billed figures by bill date, walk-ins by visit date). */
 export async function salespersonMonths(empCode: string, period: SalesPeriod): Promise<MonthRow[]> {
@@ -199,14 +199,14 @@ export async function salespersonMonths(empCode: string, period: SalesPeriod): P
                  count(DISTINCT person_id) FILTER (WHERE amount > 0) AS customers
           FROM analytics.fact_bill LEFT JOIN lines l USING (bill_id)
           WHERE emp_code = $4 AND day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code IN (SELECT store_code FROM st)) GROUP BY 1),
-    w AS (SELECT date_trunc('month', w.day)::date AS month, count(*) AS walk_ins, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM analytics.fact_walkin_salesperson o WHERE o.walkin_id = w.walkin_id AND o.emp_code <> ws.emp_code)) AS shared, count(*) FILTER (WHERE fb.amount > 0) AS billed
+    w AS (SELECT date_trunc('month', w.day)::date AS month, count(*) AS walk_ins, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM analytics.fact_walkin_salesperson o WHERE o.walkin_id = w.walkin_id AND o.emp_code <> ws.emp_code)) AS shared, count(*) FILTER (WHERE w.converted) AS converted, count(*) FILTER (WHERE fb.amount > 0) AS billed
           FROM analytics.fact_walkin w JOIN analytics.fact_walkin_salesperson ws USING (walkin_id) LEFT JOIN analytics.fact_bill fb ON fb.bill_id = w.bill_id
           WHERE ws.emp_code = $4 AND w.day BETWEEN $1 AND $2 AND ($3::text IS NULL OR w.store_code IN (SELECT store_code FROM st)) GROUP BY 1)
-    SELECT to_char(coalesce(b.month, w.month), 'YYYY-MM') AS month, b.bills, b.returns, b.net_sales, b.discount, b.sales_with_cost, b.cost, b.customers, w.walk_ins, w.shared, w.billed
+    SELECT to_char(coalesce(b.month, w.month), 'YYYY-MM') AS month, b.bills, b.returns, b.net_sales, b.discount, b.sales_with_cost, b.cost, b.customers, w.walk_ins, w.shared, w.converted, w.billed
     FROM b FULL JOIN w USING (month) ORDER BY 1 DESC`, [period.from, period.to, period.store, empCode]);
   return (rows ?? []).map((r) => ({
     month: String(r.month), bills: n(r.bills), returns: n(r.returns), netSales: n(r.net_sales), discount: n(r.discount),
-    salesWithCost: n(r.sales_with_cost), cost: n(r.cost), customers: n(r.customers), walkIns: n(r.walk_ins), walkInsShared: n(r.shared), walkInsBilled: n(r.billed),
+    salesWithCost: n(r.sales_with_cost), cost: n(r.cost), customers: n(r.customers), walkIns: n(r.walk_ins), walkInsShared: n(r.shared), walkInsConverted: n(r.converted), walkInsBilled: n(r.billed),
   }));
 }
 

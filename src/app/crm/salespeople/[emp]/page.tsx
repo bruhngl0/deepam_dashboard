@@ -56,7 +56,7 @@ export default async function SalespersonPage({ params, searchParams }: { params
         <Kpi label="Discount given" value={r.discount ? formatPercent(r.discount, r.grossSales + r.discount) : '—'} caption={`${formatCurrency(r.discount)} off the price`} />
         <Kpi label="Margin" value={r.salesWithCost ? formatPercent(r.salesWithCost - r.cost, r.salesWithCost) : '—'} caption={r.salesWithCost ? `${formatCurrencyCompact(r.salesWithCost - r.cost)} on ${formatCurrencyCompact(r.salesWithCost)} with known cost` : 'No purchase values'} />
         <Kpi label="Customers" value={formatNumber(r.customers)} caption={`${formatNumber(r.newCustomers)} new · ${formatNumber(r.repeatCustomers)} came back · ${r.bills ? formatPercent(r.billsWithCustomer, r.bills, 0) : '—'} of bills matched`} />
-        <Kpi label="Walk-ins served" value={formatNumber(r.walkIns)} caption={r.walkIns ? `${formatNumber(r.walkInsShared)} shared · ${formatNumber(r.walkInsBilled)} billed (${formatPercent(r.walkInsBilled, r.walkIns, 0)}) · ${formatCurrencyCompact(r.walkInSales)}` : 'None in WalkTrack'} />
+        <Kpi label="Walk-ins served" value={formatNumber(r.walkIns)} caption={r.walkIns ? `${formatNumber(r.walkInsShared)} shared · ${formatNumber(r.walkInsConverted)} converted · ${formatNumber(r.walkInsBilled)} billed (${formatPercent(r.walkInsBilled, r.walkIns, 0)}) · ${formatCurrencyCompact(r.walkInSales)}` : 'None in WalkTrack'} />
         <Kpi label="Driver visits" value={formatNumber(r.driverVisits)} caption={r.driverVisits ? `${formatNumber(r.driverBills)} billed · ${formatCurrencyCompact(r.driverSales)}` : 'None in RC Dashboard'} />
         <Kpi label="Calls" value={formatNumber(r.calls)} caption={r.calls ? `${formatNumber(r.connected)} connected · ${formatNumber(r.interested)} interested` : 'None logged'} />
       </KpiGrid>
@@ -64,19 +64,19 @@ export default async function SalespersonPage({ params, searchParams }: { params
       <section className={`${card} overflow-hidden`}>
         <div className="border-b border-grid px-4 py-3"><h2 className="text-sm font-semibold text-ink">Month by month</h2></div>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm" style={{ minWidth: '56rem' }}>
-            <thead><tr className={eyebrow}>{['Month', 'Bills', 'Returns', 'Net sales', 'Discount', 'Margin', 'Customers', 'Walk-ins served', 'Shared walk-ins', 'Walk-ins billed'].map((h, i) =>
+          <table className="w-full border-collapse text-sm" style={{ minWidth: '64rem' }}>
+            <thead><tr className={eyebrow}>{['Month', 'Bills', 'Returns', 'Net sales', 'Discount', 'Margin', 'Customers', 'Walk-ins served', 'Shared walk-ins', 'Walk-ins converted', 'Walk-ins billed'].map((h, i) =>
               <th key={h} scope="col" className={`px-3 py-3 font-bold ${i ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
             <tbody>
               {months.map((m) => (
                 <tr key={m.month} className="border-t border-grid">
                   <th scope="row" className="px-3 py-2 text-left font-medium text-ink">{MONTH.format(new Date(`${m.month}-01T00:00:00Z`))}</th>
                   {[formatNumber(m.bills), m.returns ? formatNumber(m.returns) : '—', formatCurrency(m.netSales), m.discount ? formatCurrency(m.discount) : '—',
-                    m.salesWithCost ? formatPercent(m.salesWithCost - m.cost, m.salesWithCost) : '—', formatNumber(m.customers), m.walkIns ? formatNumber(m.walkIns) : '—', m.walkIns ? formatNumber(m.walkInsShared) : '—', m.walkIns ? formatNumber(m.walkInsBilled) : '—']
+                    m.salesWithCost ? formatPercent(m.salesWithCost - m.cost, m.salesWithCost) : '—', formatNumber(m.customers), m.walkIns ? formatNumber(m.walkIns) : '—', m.walkIns ? formatNumber(m.walkInsShared) : '—', m.walkIns ? formatNumber(m.walkInsConverted) : '—', m.walkIns ? formatNumber(m.walkInsBilled) : '—']
                     .map((v, i) => <td key={i} className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{v}</td>)}
                 </tr>
               ))}
-              {!months.length && <tr><td colSpan={10} className="px-3 py-6 text-center text-ink-muted">Nothing in this period.</td></tr>}
+              {!months.length && <tr><td colSpan={11} className="px-3 py-6 text-center text-ink-muted">Nothing in this period.</td></tr>}
             </tbody>
           </table>
         </div>

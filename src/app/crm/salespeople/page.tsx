@@ -30,6 +30,7 @@ const COLUMNS: { key: string; label: string; value: (r: SalespersonStats) => num
   { key: 'repeat', label: 'Came back', value: (r) => r.repeatCustomers, show: (r) => formatNumber(r.repeatCustomers) },
   { key: 'walkins', label: 'Walk-ins served', value: (r) => r.walkIns, show: (r) => formatNumber(r.walkIns) },
   { key: 'shared', label: 'Shared walk-ins', value: (r) => r.walkInsShared, show: (r) => (r.walkIns ? <>{formatNumber(r.walkInsShared)}<span className="block text-xs text-ink-muted">{formatPercent(r.walkInsShared, r.walkIns, 0)}</span></> : '—') },
+  { key: 'converted', label: 'Walk-ins converted', value: (r) => r.walkInsConverted, show: (r) => (r.walkIns ? <>{formatNumber(r.walkInsConverted)}<span className="block text-xs text-ink-muted">{formatPercent(r.walkInsConverted, r.walkIns, 0)}</span></> : '—') },
   { key: 'walkinbills', label: 'Walk-ins billed', value: (r) => r.walkInsBilled, show: (r) => (r.walkIns ? <>{formatNumber(r.walkInsBilled)}<span className="block text-xs text-ink-muted">{formatPercent(r.walkInsBilled, r.walkIns, 0)}</span></> : '—') },
   { key: 'walkinsales', label: 'Sales from walk-ins', value: (r) => r.walkInSales, show: (r) => (r.walkInSales ? formatCurrency(r.walkInSales) : '—') },
   { key: 'driver', label: 'Driver visits', value: (r) => r.driverVisits, show: (r) => (r.driverVisits ? <>{formatNumber(r.driverVisits)}<span className="block text-xs text-ink-muted">{formatNumber(r.driverBills)} billed</span></> : '—') },
@@ -157,7 +158,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
         <p><b className="text-ink-2">Avg bill, Items, Discount:</b> sales bills only. Discount is the item discount as a share of the price before discount.</p>
         <p><b className="text-ink-2">Margin:</b> bill amount less the purchase value of its items, on bills where every item has a purchase value.</p>
         <p><b className="text-ink-2">Customers:</b> distinct customers billed. Bills with customer: bills matched to a customer by phone. New customers: their first bill since sales history starts (1 May 2026) was with this salesperson. Came back: bought from them on two or more days.</p>
-        <p><b className="text-ink-2">Walk-ins served, billed, Sales from walk-ins:</b> WalkTrack walk-ins they were tagged on, and the bills those walk-ins led to, whoever&apos;s name is on the bill. A walk-in served by two people counts for each; Shared walk-ins shows how many of a person&apos;s walk-ins were also tagged to someone else.</p>
+        <p><b className="text-ink-2">Walk-ins served, billed, Sales from walk-ins:</b> WalkTrack walk-ins they were tagged on, and the bills those walk-ins led to, whoever&apos;s name is on the bill. A walk-in served by two people counts for each; Shared walk-ins shows how many of a person&apos;s walk-ins were also tagged to someone else. Walk-ins converted: marked as a sale in WalkTrack by staff. Walk-ins billed: linked to a bill, which needs the same phone number on the walk-in and the bill, so it is lower.</p>
         <p><b className="text-ink-2">Driver visits:</b> RC Dashboard visits naming them. <b className="text-ink-2">Calls:</b> marketing calls logged under their name.</p>
       </section>
     </main>
