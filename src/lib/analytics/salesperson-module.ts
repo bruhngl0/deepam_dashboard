@@ -5,8 +5,9 @@
  *
  * Two ways a bill is credited, both shown:
  *   - Billed by: the salesman printed on the bill (POS). Returns are the negative bills, credited the same way.
- *   - Served: the WalkTrack walk-in(s) a salesperson was tagged on, and the bill each walk-in led to.
- *     A walk-in served by two people counts in full for each.
+ *   - Served: the WalkTrack walk-in(s) a salesperson was tagged on, and whether staff marked them converted.
+ *     A walk-in served by two people counts in full for each. Walk-ins are not tied to bills (that needs
+ *     matching phone numbers): sales come only from the salesman on the sales sheet.
  *
  * Period: IST days; store: the CRM store code (MG_ROAD…) from the master filter, mapped to analytics Store IDs.
  * "New customer" means the customer's first bill in the loaded sales history (from 1 May 2026).
@@ -35,7 +36,7 @@ export type SalespersonStats = {
   bills: number; grossSales: number; returns: number; returned: number; netSales: number; qty: number; discount: number;
   salesWithCost: number; cost: number; billsWithCustomer: number; customers: number; newCustomers: number; repeatCustomers: number;
   /** walkInsShared: of walkIns, those also tagged to another salesperson (each counts them in full). */
-  walkIns: number; walkInsShared: number; walkInsConverted: number; walkInsBilled: number; walkInSales: number;
+  walkIns: number; walkInsShared: number; walkInsConverted: number;
   driverVisits: number; driverBills: number; driverSales: number; calls: number; connected: number; interested: number;
 };
 
@@ -70,10 +71,8 @@ repeat AS (
     SELECT emp_code, person_id FROM b WHERE amount > 0 AND person_id IS NOT NULL GROUP BY 1, 2 HAVING count(DISTINCT day) > 1) x
   GROUP BY 1),
 served AS (
-  SELECT ws.emp_code, count(*) AS walk_ins, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM analytics.fact_walkin_salesperson o WHERE o.walkin_id = w.walkin_id AND o.emp_code <> ws.emp_code)) AS shared, count(*) FILTER (WHERE w.converted) AS converted,
-         count(*) FILTER (WHERE fb.amount > 0) AS billed, coalesce(sum(fb.amount) FILTER (WHERE fb.amount > 0), 0) AS sales
+  SELECT ws.emp_code, count(*) AS walk_ins, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM analytics.fact_walkin_salesperson o WHERE o.walkin_id = w.walkin_id AND o.emp_code <> ws.emp_code)) AS shared, count(*) FILTER (WHERE w.converted) AS converted
   FROM analytics.fact_walkin w JOIN analytics.fact_walkin_salesperson ws USING (walkin_id)
-  LEFT JOIN analytics.fact_bill fb ON fb.bill_id = w.bill_id
   WHERE w.day BETWEEN $1 AND $2 AND ($3::text IS NULL OR w.store_code IN (SELECT store_code FROM st)) AND ($4::text IS NULL OR ws.emp_code = $4)
   GROUP BY 1),
 driver AS (
@@ -89,7 +88,7 @@ SELECT sp.emp_code, sp.name, sp.store_code, ds.name AS store_name,
   coalesce(bl.net_sales, 0) AS net_sales, coalesce(bl.qty, 0) AS qty, coalesce(bl.discount, 0) AS discount,
   coalesce(bl.sales_with_cost, 0) AS sales_with_cost, coalesce(bl.cost, 0) AS cost, coalesce(bl.bills_with_customer, 0) AS bills_with_customer,
   coalesce(bl.customers, 0) AS customers, coalesce(bl.new_customers, 0) AS new_customers, coalesce(r.repeat_customers, 0) AS repeat_customers,
-  coalesce(sv.walk_ins, 0) AS walk_ins, coalesce(sv.shared, 0) AS walk_ins_shared, coalesce(sv.converted, 0) AS walk_ins_converted, coalesce(sv.billed, 0) AS walk_ins_billed, coalesce(sv.sales, 0) AS walk_in_sales,
+  coalesce(sv.walk_ins, 0) AS walk_ins, coalesce(sv.shared, 0) AS walk_ins_shared, coalesce(sv.converted, 0) AS walk_ins_converted,
   coalesce(d.visits, 0) AS driver_visits, coalesce(d.bills, 0) AS driver_bills, coalesce(d.sales, 0) AS driver_sales,
   coalesce(c.calls, 0) AS calls, coalesce(c.connected, 0) AS connected, coalesce(c.interested, 0) AS interested
 FROM analytics.dim_salesperson sp
@@ -106,7 +105,7 @@ function toStats(r: Record<string, unknown>): SalespersonStats {
     bills: n(r.bills), grossSales: n(r.gross_sales), returns: n(r.returns), returned: n(r.returned), netSales: n(r.net_sales), qty: n(r.qty),
     discount: n(r.discount), salesWithCost: n(r.sales_with_cost), cost: n(r.cost), billsWithCustomer: n(r.bills_with_customer),
     customers: n(r.customers), newCustomers: n(r.new_customers), repeatCustomers: n(r.repeat_customers),
-    walkIns: n(r.walk_ins), walkInsShared: n(r.walk_ins_shared), walkInsConverted: n(r.walk_ins_converted), walkInsBilled: n(r.walk_ins_billed), walkInSales: n(r.walk_in_sales),
+    walkIns: n(r.walk_ins), walkInsShared: n(r.walk_ins_shared), walkInsConverted: n(r.walk_ins_converted),
     driverVisits: n(r.driver_visits), driverBills: n(r.driver_bills), driverSales: n(r.driver_sales),
     calls: n(r.calls), connected: n(r.connected), interested: n(r.interested),
   };
@@ -186,7 +185,7 @@ export async function salespersonProfile(empCode: string): Promise<SalespersonPr
   return { empCode: String(r.emp_code), name: String(r.name), storeCode: s(r.store_code), storeName: s(r.store_name), aliases: r.aliases as SalespersonProfile['aliases'] };
 }
 
-export type MonthRow = { month: string; bills: number; returns: number; netSales: number; discount: number; salesWithCost: number; cost: number; customers: number; walkIns: number; walkInsShared: number; walkInsConverted: number; walkInsBilled: number };
+export type MonthRow = { month: string; bills: number; returns: number; netSales: number; discount: number; salesWithCost: number; cost: number; customers: number; walkIns: number; walkInsShared: number; walkInsConverted: number };
 
 /** Month by month for one salesperson (billed figures by bill date, walk-ins by visit date). */
 export async function salespersonMonths(empCode: string, period: SalesPeriod): Promise<MonthRow[]> {
@@ -199,25 +198,24 @@ export async function salespersonMonths(empCode: string, period: SalesPeriod): P
                  count(DISTINCT person_id) FILTER (WHERE amount > 0) AS customers
           FROM analytics.fact_bill LEFT JOIN lines l USING (bill_id)
           WHERE emp_code = $4 AND day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code IN (SELECT store_code FROM st)) GROUP BY 1),
-    w AS (SELECT date_trunc('month', w.day)::date AS month, count(*) AS walk_ins, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM analytics.fact_walkin_salesperson o WHERE o.walkin_id = w.walkin_id AND o.emp_code <> ws.emp_code)) AS shared, count(*) FILTER (WHERE w.converted) AS converted, count(*) FILTER (WHERE fb.amount > 0) AS billed
-          FROM analytics.fact_walkin w JOIN analytics.fact_walkin_salesperson ws USING (walkin_id) LEFT JOIN analytics.fact_bill fb ON fb.bill_id = w.bill_id
+    w AS (SELECT date_trunc('month', w.day)::date AS month, count(*) AS walk_ins, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM analytics.fact_walkin_salesperson o WHERE o.walkin_id = w.walkin_id AND o.emp_code <> ws.emp_code)) AS shared, count(*) FILTER (WHERE w.converted) AS converted
+          FROM analytics.fact_walkin w JOIN analytics.fact_walkin_salesperson ws USING (walkin_id)
           WHERE ws.emp_code = $4 AND w.day BETWEEN $1 AND $2 AND ($3::text IS NULL OR w.store_code IN (SELECT store_code FROM st)) GROUP BY 1)
-    SELECT to_char(coalesce(b.month, w.month), 'YYYY-MM') AS month, b.bills, b.returns, b.net_sales, b.discount, b.sales_with_cost, b.cost, b.customers, w.walk_ins, w.shared, w.converted, w.billed
+    SELECT to_char(coalesce(b.month, w.month), 'YYYY-MM') AS month, b.bills, b.returns, b.net_sales, b.discount, b.sales_with_cost, b.cost, b.customers, w.walk_ins, w.shared, w.converted
     FROM b FULL JOIN w USING (month) ORDER BY 1 DESC`, [period.from, period.to, period.store, empCode]);
   return (rows ?? []).map((r) => ({
     month: String(r.month), bills: n(r.bills), returns: n(r.returns), netSales: n(r.net_sales), discount: n(r.discount),
-    salesWithCost: n(r.sales_with_cost), cost: n(r.cost), customers: n(r.customers), walkIns: n(r.walk_ins), walkInsShared: n(r.shared), walkInsConverted: n(r.converted), walkInsBilled: n(r.billed),
+    salesWithCost: n(r.sales_with_cost), cost: n(r.cost), customers: n(r.customers), walkIns: n(r.walk_ins), walkInsShared: n(r.shared), walkInsConverted: n(r.converted),
   }));
 }
 
 export type BillRow = {
   billId: number; day: string; voucher: string | null; storeName: string | null; personId: number | null; customerName: string | null; customerCode: string | null;
   firstBill: boolean; items: number; qty: number; amount: number; discount: number; cost: number | null;
-  servedBy: string | null; leadChannel: string | null; driverCode: string | null;
 };
 export const BILL_PAGE_SIZE = 50;
 
-/** One salesperson's bills (newest first), with how each one came in: the walk-in and who served it, a lead, a driver. */
+/** One salesperson's bills from the sales sheet, newest first. */
 /** `page` 0 returns every bill (the CSV export). */
 export async function salespersonBills(empCode: string, period: SalesPeriod, page: number): Promise<{ rows: BillRow[]; total: number }> {
   const rows = await aq<Record<string, unknown>>(`
@@ -226,11 +224,6 @@ export async function salespersonBills(empCode: string, period: SalesPeriod, pag
     SELECT b.bill_id, b.day::text AS day, b.voucher, coalesce(ds.name, b.store_code) AS store_name, b.person_id, p.name AS customer_name, p.customer_code,
            b.billed_at = (SELECT min(billed_at) FROM analytics.fact_bill f WHERE f.person_id = b.person_id AND f.amount > 0) AS first_bill,
            l.items, b.qty, b.amount, b.discount, CASE WHEN l.all_cost THEN l.cost END AS cost,
-           (SELECT string_agg(DISTINCT sp.name, ', ') FROM analytics.fact_walkin w JOIN analytics.fact_walkin_salesperson ws USING (walkin_id)
-              JOIN analytics.dim_salesperson sp ON sp.emp_code = ws.emp_code WHERE w.bill_id = b.bill_id) AS served_by,
-           (SELECT max(w.driver_code) FROM analytics.fact_walkin w WHERE w.bill_id = b.bill_id) AS driver_code,
-           (SELECT lt.channel FROM analytics.fact_lead_touch lt WHERE lt.person_id = b.person_id AND lt.touched_at <= b.billed_at
-              ORDER BY lt.touched_at DESC LIMIT 1) AS lead_channel,
            count(*) OVER () AS total
     FROM b
     LEFT JOIN analytics.dim_store ds ON ds.store_code = b.store_code
@@ -245,7 +238,6 @@ export async function salespersonBills(empCode: string, period: SalesPeriod, pag
       billId: n(r.bill_id), day: String(r.day), voucher: s(r.voucher), storeName: s(r.store_name), personId: r.person_id == null ? null : n(r.person_id),
       customerName: s(r.customer_name), customerCode: s(r.customer_code), firstBill: r.first_bill === true, items: n(r.items), qty: n(r.qty),
       amount: n(r.amount), discount: n(r.discount), cost: r.cost == null ? null : n(r.cost),
-      servedBy: s(r.served_by), leadChannel: s(r.lead_channel), driverCode: s(r.driver_code),
     })),
   };
 }

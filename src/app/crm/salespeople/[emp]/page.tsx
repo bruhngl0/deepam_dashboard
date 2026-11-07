@@ -1,6 +1,6 @@
 /**
- * One salesperson: their figures for the period, month by month, and every bill with how the customer came in
- * (the walk-in and who served it, a marketing lead, a driver). Same definitions as /crm/salespeople.
+ * One salesperson: their figures for the period, month by month, and every bill under their name on the sales sheet.
+ * Same definitions as /crm/salespeople.
  */
 
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
 import { analyticsConfigured } from '@/lib/analytics/db';
 import { BILL_PAGE_SIZE, salesPeriod, salespersonBills, salespersonMonths, salespersonProfile, salespersonStatsFor } from '@/lib/analytics/salesperson-module';
-import { CHANNEL_LABEL, formatCurrency, formatCurrencyCompact, formatDate, formatNumber, formatPercent } from '@/lib/format';
+import { formatCurrency, formatCurrencyCompact, formatDate, formatNumber, formatPercent } from '@/lib/format';
 import { button, card, eyebrow, Kpi, KpiGrid, PageHeader } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -56,7 +56,7 @@ export default async function SalespersonPage({ params, searchParams }: { params
         <Kpi label="Discount given" value={r.discount ? formatPercent(r.discount, r.grossSales + r.discount) : '—'} caption={`${formatCurrency(r.discount)} off the price`} />
         <Kpi label="Margin" value={r.salesWithCost ? formatPercent(r.salesWithCost - r.cost, r.salesWithCost) : '—'} caption={r.salesWithCost ? `${formatCurrencyCompact(r.salesWithCost - r.cost)} on ${formatCurrencyCompact(r.salesWithCost)} with known cost` : 'No purchase values'} />
         <Kpi label="Customers" value={formatNumber(r.customers)} caption={`${formatNumber(r.newCustomers)} new · ${formatNumber(r.repeatCustomers)} came back · ${r.bills ? formatPercent(r.billsWithCustomer, r.bills, 0) : '—'} of bills matched`} />
-        <Kpi label="Walk-ins served" value={formatNumber(r.walkIns)} caption={r.walkIns ? `${formatNumber(r.walkInsShared)} shared · ${formatNumber(r.walkInsConverted)} converted · ${formatNumber(r.walkInsBilled)} billed (${formatPercent(r.walkInsBilled, r.walkIns, 0)}) · ${formatCurrencyCompact(r.walkInSales)}` : 'None in WalkTrack'} />
+        <Kpi label="Walk-ins served" value={formatNumber(r.walkIns)} caption={r.walkIns ? `${formatNumber(r.walkInsShared)} shared · ${formatNumber(r.walkInsConverted)} converted (${formatPercent(r.walkInsConverted, r.walkIns, 0)})` : 'None in WalkTrack'} />
         <Kpi label="Driver visits" value={formatNumber(r.driverVisits)} caption={r.driverVisits ? `${formatNumber(r.driverBills)} billed · ${formatCurrencyCompact(r.driverSales)}` : 'None in RC Dashboard'} />
         <Kpi label="Calls" value={formatNumber(r.calls)} caption={r.calls ? `${formatNumber(r.connected)} connected · ${formatNumber(r.interested)} interested` : 'None logged'} />
       </KpiGrid>
@@ -65,18 +65,18 @@ export default async function SalespersonPage({ params, searchParams }: { params
         <div className="border-b border-grid px-4 py-3"><h2 className="text-sm font-semibold text-ink">Month by month</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm" style={{ minWidth: '64rem' }}>
-            <thead><tr className={eyebrow}>{['Month', 'Bills', 'Returns', 'Net sales', 'Discount', 'Margin', 'Customers', 'Walk-ins served', 'Shared walk-ins', 'Walk-ins converted', 'Walk-ins billed'].map((h, i) =>
+            <thead><tr className={eyebrow}>{['Month', 'Bills', 'Returns', 'Net sales', 'Discount', 'Margin', 'Customers', 'Walk-ins served', 'Shared walk-ins', 'Walk-ins converted'].map((h, i) =>
               <th key={h} scope="col" className={`px-3 py-3 font-bold ${i ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
             <tbody>
               {months.map((m) => (
                 <tr key={m.month} className="border-t border-grid">
                   <th scope="row" className="px-3 py-2 text-left font-medium text-ink">{MONTH.format(new Date(`${m.month}-01T00:00:00Z`))}</th>
                   {[formatNumber(m.bills), m.returns ? formatNumber(m.returns) : '—', formatCurrency(m.netSales), m.discount ? formatCurrency(m.discount) : '—',
-                    m.salesWithCost ? formatPercent(m.salesWithCost - m.cost, m.salesWithCost) : '—', formatNumber(m.customers), m.walkIns ? formatNumber(m.walkIns) : '—', m.walkIns ? formatNumber(m.walkInsShared) : '—', m.walkIns ? formatNumber(m.walkInsConverted) : '—', m.walkIns ? formatNumber(m.walkInsBilled) : '—']
+                    m.salesWithCost ? formatPercent(m.salesWithCost - m.cost, m.salesWithCost) : '—', formatNumber(m.customers), m.walkIns ? formatNumber(m.walkIns) : '—', m.walkIns ? formatNumber(m.walkInsShared) : '—', m.walkIns ? formatNumber(m.walkInsConverted) : '—']
                     .map((v, i) => <td key={i} className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{v}</td>)}
                 </tr>
               ))}
-              {!months.length && <tr><td colSpan={11} className="px-3 py-6 text-center text-ink-muted">Nothing in this period.</td></tr>}
+              {!months.length && <tr><td colSpan={10} className="px-3 py-6 text-center text-ink-muted">Nothing in this period.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -88,12 +88,11 @@ export default async function SalespersonPage({ params, searchParams }: { params
           <p className="text-xs text-ink-muted">Newest first. Returns show as negative amounts.</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm" style={{ minWidth: '72rem' }}>
-            <thead><tr className={eyebrow}>{['Date', 'Bill', 'Customer', 'How they came', 'Items', 'Amount', 'Discount', 'Margin'].map((h, i) =>
-              <th key={h} scope="col" className={`px-3 py-3 font-bold ${i < 4 ? 'text-left' : 'text-right'}`}>{h}</th>)}</tr></thead>
+          <table className="w-full border-collapse text-sm" style={{ minWidth: '60rem' }}>
+            <thead><tr className={eyebrow}>{['Date', 'Bill', 'Customer', 'Items', 'Amount', 'Discount', 'Margin'].map((h, i) =>
+              <th key={h} scope="col" className={`px-3 py-3 font-bold ${i < 3 ? 'text-left' : 'text-right'}`}>{h}</th>)}</tr></thead>
             <tbody>
               {bills.rows.map((b) => {
-                const how = [b.servedBy && `Walk-in, served by ${b.servedBy}`, b.leadChannel && `Lead (${CHANNEL_LABEL[b.leadChannel] ?? b.leadChannel})`, b.driverCode && `Driver ${b.driverCode}`].filter(Boolean);
                 return (
                   <tr key={b.billId} className="border-t border-grid align-top">
                     <td className="tnum whitespace-nowrap px-3 py-2 text-ink-2">{formatDate(b.day)}</td>
@@ -103,7 +102,6 @@ export default async function SalespersonPage({ params, searchParams }: { params
                       {b.firstBill && b.amount > 0 && <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">New</span>}
                       {b.customerCode && <span className="block text-xs text-ink-muted">{b.customerCode}</span>}
                     </td>
-                    <td className="px-3 py-2 text-xs text-ink-2">{how.length ? how.join(' · ') : '—'}</td>
                     <td className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{formatNumber(b.qty)}</td>
                     <td className={`tnum whitespace-nowrap px-3 py-2 text-right font-medium ${b.amount < 0 ? 'text-status-critical' : 'text-ink'}`}>{formatCurrency(b.amount)}</td>
                     <td className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{b.discount ? formatCurrency(b.discount) : '—'}</td>
@@ -111,7 +109,7 @@ export default async function SalespersonPage({ params, searchParams }: { params
                   </tr>
                 );
               })}
-              {!bills.rows.length && <tr><td colSpan={8} className="px-3 py-6 text-center text-ink-muted">No bills in this period.</td></tr>}
+              {!bills.rows.length && <tr><td colSpan={7} className="px-3 py-6 text-center text-ink-muted">No bills in this period.</td></tr>}
             </tbody>
           </table>
         </div>
