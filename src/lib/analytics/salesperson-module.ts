@@ -185,7 +185,7 @@ export async function salespersonProfile(empCode: string): Promise<SalespersonPr
   return { empCode: String(r.emp_code), name: String(r.name), storeCode: s(r.store_code), storeName: s(r.store_name), aliases: r.aliases as SalespersonProfile['aliases'] };
 }
 
-export type MonthRow = { month: string; bills: number; returns: number; netSales: number; discount: number; salesWithCost: number; cost: number; customers: number; walkIns: number; walkInsShared: number; walkInsConverted: number };
+export type MonthRow = { month: string; bills: number; returns: number; grossSales: number; returned: number; netSales: number; discount: number; salesWithCost: number; cost: number; customers: number; walkIns: number; walkInsShared: number; walkInsConverted: number };
 
 /** Month by month for one salesperson (billed figures by bill date, walk-ins by visit date). */
 export async function salespersonMonths(empCode: string, period: SalesPeriod): Promise<MonthRow[]> {
@@ -193,7 +193,7 @@ export async function salespersonMonths(empCode: string, period: SalesPeriod): P
     WITH st AS (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3),
     lines AS (SELECT bill_id, sum(cost) FILTER (WHERE cost > 0) AS cost, bool_and(cost > 0) AS all_cost FROM analytics.fact_bill_line GROUP BY 1),
     b AS (SELECT date_trunc('month', day)::date AS month, count(*) FILTER (WHERE amount > 0) AS bills, count(*) FILTER (WHERE amount < 0) AS returns,
-                 sum(amount) AS net_sales, coalesce(sum(discount) FILTER (WHERE amount > 0), 0) AS discount,
+                 coalesce(sum(amount) FILTER (WHERE amount > 0), 0) AS gross_sales, coalesce(-sum(amount) FILTER (WHERE amount < 0), 0) AS returned, sum(amount) AS net_sales, coalesce(sum(discount) FILTER (WHERE amount > 0), 0) AS discount,
                  coalesce(sum(amount) FILTER (WHERE amount > 0 AND l.all_cost), 0) AS sales_with_cost, coalesce(sum(l.cost) FILTER (WHERE amount > 0 AND l.all_cost), 0) AS cost,
                  count(DISTINCT person_id) FILTER (WHERE amount > 0) AS customers
           FROM analytics.fact_bill LEFT JOIN lines l USING (bill_id)
@@ -201,10 +201,10 @@ export async function salespersonMonths(empCode: string, period: SalesPeriod): P
     w AS (SELECT date_trunc('month', w.day)::date AS month, count(*) AS walk_ins, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM analytics.fact_walkin_salesperson o WHERE o.walkin_id = w.walkin_id AND o.emp_code <> ws.emp_code)) AS shared, count(*) FILTER (WHERE w.converted) AS converted
           FROM analytics.fact_walkin w JOIN analytics.fact_walkin_salesperson ws USING (walkin_id)
           WHERE ws.emp_code = $4 AND w.day BETWEEN $1 AND $2 AND ($3::text IS NULL OR w.store_code IN (SELECT store_code FROM st)) GROUP BY 1)
-    SELECT to_char(coalesce(b.month, w.month), 'YYYY-MM') AS month, b.bills, b.returns, b.net_sales, b.discount, b.sales_with_cost, b.cost, b.customers, w.walk_ins, w.shared, w.converted
+    SELECT to_char(coalesce(b.month, w.month), 'YYYY-MM') AS month, b.bills, b.returns, b.gross_sales, b.returned, b.net_sales, b.discount, b.sales_with_cost, b.cost, b.customers, w.walk_ins, w.shared, w.converted
     FROM b FULL JOIN w USING (month) ORDER BY 1 DESC`, [period.from, period.to, period.store, empCode]);
   return (rows ?? []).map((r) => ({
-    month: String(r.month), bills: n(r.bills), returns: n(r.returns), netSales: n(r.net_sales), discount: n(r.discount),
+    month: String(r.month), bills: n(r.bills), returns: n(r.returns), grossSales: n(r.gross_sales), returned: n(r.returned), netSales: n(r.net_sales), discount: n(r.discount),
     salesWithCost: n(r.sales_with_cost), cost: n(r.cost), customers: n(r.customers), walkIns: n(r.walk_ins), walkInsShared: n(r.shared), walkInsConverted: n(r.converted),
   }));
 }
