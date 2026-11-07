@@ -16,20 +16,29 @@ const noSubscribe = () => () => {};
  * Section tabs that live in the page's state (the salesperson and store manager desks), shown in the site
  * header. Nothing renders on the server; the tabs appear once the page is in the browser.
  */
-export function HeaderTabs<T extends string>({ label, tabs, current, onChange, count }: {
+type TabsProps<T extends string> = {
   label: string; tabs: readonly T[]; current: T; onChange: (tab: T) => void; count?: (tab: T) => number | null;
-}) {
+};
+
+function TabButtons<T extends string>({ tabs, current, onChange, count }: Omit<TabsProps<T>, 'label'>) {
+  return tabs.map(tab => {
+    const n = count?.(tab);
+    return <button key={tab} type="button" className={headerTabClass(tab === current)} aria-current={tab === current ? 'page' : undefined} onClick={() => onChange(tab)}>
+      {tab}{n == null ? '' : ` (${n})`}
+    </button>;
+  });
+}
+
+export function HeaderTabs<T extends string>({ label, ...props }: TabsProps<T>) {
   const slot = useSyncExternalStore(noSubscribe, () => document.getElementById(HEADER_TABS_SLOT), () => null);
   if (!slot) return null;
   return createPortal(
-    <nav aria-label={label} className="flex min-w-0 items-center gap-1 overflow-x-auto">
-      {tabs.map(tab => {
-        const n = count?.(tab);
-        return <button key={tab} type="button" className={headerTabClass(tab === current)} aria-current={tab === current ? 'page' : undefined} onClick={() => onChange(tab)}>
-          {tab}{n == null ? '' : ` (${n})`}
-        </button>;
-      })}
-    </nav>,
+    <nav aria-label={label} className="flex min-w-0 items-center gap-1 overflow-x-auto"><TabButtons {...props} /></nav>,
     slot,
   );
+}
+
+/** The same section tabs, rendered in place in the page body (e.g. under the KPI cards) instead of the site header. */
+export function SectionTabs<T extends string>({ label, ...props }: TabsProps<T>) {
+  return <nav aria-label={label} className="flex min-w-0 items-center gap-1 overflow-x-auto border-b border-line pb-2"><TabButtons {...props} /></nav>;
 }
