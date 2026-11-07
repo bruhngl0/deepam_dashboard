@@ -7,6 +7,9 @@
 -- Recompute each from the time WalkTrack sent (kept in store_visits.raw); running this again
 -- changes nothing. Then fix what was copied from those times, and re-match bills by the true day.
 
+-- A database behind by both migrations applies 0030 and 0031 in one transaction, where 0030's table still exists.
+DROP TABLE IF EXISTS walktrack_time_fix;
+--> statement-breakpoint
 CREATE TEMP TABLE walktrack_time_fix ON COMMIT DROP AS
 SELECT id, customer_id, visited_at AS old_at,
   ((raw->>'startTime')::timestamp AT TIME ZONE 'Asia/Kolkata') AS new_at,
