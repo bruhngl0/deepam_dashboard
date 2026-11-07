@@ -210,3 +210,27 @@ export function formatPhoneDisplay(e164: string): string {
   if (national.length !== 10) return e164;
   return `${national.slice(0, 5)} ${national.slice(5)}`;
 }
+
+/**
+ * Bill-only customers: a bill with no usable phone still gets a customer (and a Customer ID), so every bill
+ * is on someone. Their `phone_e164` is a tag, never a number, so nothing can call or message them:
+ *   invalid:<digits>        the number typed on the bill, not a valid phone (bills with the same digits share one)
+ *   nophone:name:<NAME>     no phone on the bill; bills with the same name share one
+ *   nophone:bill:<voucher>  no phone and no name; one per bill
+ * Built by the Hemparshwa sales projection (lib/integration/hemparshwa-project.ts).
+ */
+export type BillOnlyPhone = { kind: 'invalid'; digits: string } | { kind: 'none' };
+
+export function billOnlyPhone(e164: string | null | undefined): BillOnlyPhone | null {
+  if (!e164) return null;
+  if (e164.startsWith('invalid:')) return { kind: 'invalid', digits: e164.slice('invalid:'.length) };
+  if (e164.startsWith('nophone:')) return { kind: 'none' };
+  return null;
+}
+
+/** "Phone on bill not valid: 4012340563" or "No phone on bill"; null for a real number. */
+export function billOnlyPhoneLabel(e164: string | null | undefined): string | null {
+  const b = billOnlyPhone(e164);
+  if (!b) return null;
+  return b.kind === 'invalid' ? `Phone on bill not valid: ${b.digits}` : 'No phone on bill';
+}

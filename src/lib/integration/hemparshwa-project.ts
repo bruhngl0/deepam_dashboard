@@ -20,7 +20,10 @@
  *     removed too: its number carries no date, so it cannot be matched.
  *
  * The export has no bill time, so a new bill is stamped 12:00 IST on its date.
- * Customers follow CRM's rule: identity is a valid Indian phone, nothing else.
+ * Customers follow CRM's rule: identity is a valid Indian phone. A bill without one still gets a customer,
+ * a bill-only one that can never be called or messaged (lib/phone.ts billOnlyPhone), so every bill has a
+ * Customer ID. Bills of staff and store accounts (internal_accounts: by phone, or for a bill with no valid
+ * phone by the name before the label's colon) are not sales: they are left out, and any written earlier are removed.
  *
  * A Hemparshwa store is matched by its Store ID (STR-001) or, for one CRM cannot
  * number that way, by CRM's store code (EXHIBITION).
@@ -41,6 +44,10 @@ export interface ProjectionResult {
   legacyBillsRemoved: number;
   lineItems: number;
   customersTouched: number;
+  /** Customers for bills with no valid phone (bill-only; never contacted). */
+  billOnlyCustomers: number;
+  /** Bills of staff and store accounts, left out of sales. */
+  internalBillsSkipped: number;
   /** Lines whose Store ID matches no CRM store; they are not billed. */
   unmappedStoreLines: number;
   visitsReconciled: number;
@@ -193,6 +200,18 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
       `);
       await t.execute(sql`CREATE UNIQUE INDEX ON hp_bills (voucher_no)`);
 
+      // ── Staff and store accounts are not sales ───────────────────────────────
+      // Dropped here, so the clean-up below also removes any written earlier, with their line items.
+      const internalBillsSkipped = count(await t.execute(sql`
+        WITH gone AS (
+          DELETE FROM hp_bills b
+          WHERE EXISTS (SELECT 1 FROM internal_accounts i
+                        WHERE i.phone_e164 = b.e164
+                           OR (b.e164 IS NULL AND upper(trim(split_part(i.label, ':', 1))) = upper(regexp_replace(trim(coalesce(b.customer_name, '')), '\\s+', ' ', 'g'))))
+          RETURNING 1)
+        SELECT count(*) AS n FROM gone
+      `));
+
       // ── Customers (same upsert rules as the Sales Report import, D-24) ────────
       const customers = await t.execute(sql`
         INSERT INTO customers (phone_e164, phone_national, full_name, name_source, first_seen_at, last_seen_at)
@@ -207,6 +226,34 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
           name_source = CASE WHEN EXCLUDED.full_name IS NOT NULL
                               AND name_trust_rank(EXCLUDED.name_source) >= name_trust_rank(customers.name_source)
                              THEN EXCLUDED.name_source ELSE customers.name_source END,
+          first_seen_at = LEAST(customers.first_seen_at, EXCLUDED.first_seen_at),
+          last_seen_at = GREATEST(customers.last_seen_at, EXCLUDED.last_seen_at),
+          updated_at = now()
+        RETURNING id
+      `);
+
+      // ── Bill-only customers: bills with no valid phone ──────────────────────
+      // Keyed by what the bill carries: the digits typed (when they look like a number, not "0" or "1111"),
+      // else the name, else the bill itself.
+      await t.execute(sql`ALTER TABLE hp_bills ADD COLUMN bill_key text`);
+      await t.execute(sql`
+        UPDATE hp_bills b SET bill_key = CASE
+            WHEN length(d.digits) >= 6 AND d.digits !~ '^(\\d)\\1*$' THEN 'invalid:' || d.digits
+            WHEN d.name <> '' THEN 'nophone:name:' || d.name
+            ELSE 'nophone:bill:' || b.voucher_no END
+        FROM (SELECT voucher_no, regexp_replace(coalesce(phone_raw, ''), '\\D', '', 'g') AS digits,
+                     upper(regexp_replace(trim(coalesce(customer_name, '')), '\\s+', ' ', 'g')) AS name
+              FROM hp_bills) d
+        WHERE d.voucher_no = b.voucher_no AND b.e164 IS NULL
+      `);
+      const billOnly = await t.execute(sql`
+        INSERT INTO customers (phone_e164, phone_national, full_name, name_source, first_seen_at, last_seen_at)
+        SELECT b.bill_key, CASE WHEN b.bill_key LIKE 'invalid:%' THEN substr(b.bill_key, 9) ELSE '' END, max(b.customer_name),
+               CASE WHEN max(b.customer_name) IS NOT NULL THEN 'existing' END, min(b.billed_at), max(b.billed_at)
+        FROM hp_bills b WHERE b.bill_key IS NOT NULL
+        GROUP BY b.bill_key
+        ON CONFLICT (phone_e164) DO UPDATE SET
+          full_name = COALESCE(EXCLUDED.full_name, customers.full_name),
           first_seen_at = LEAST(customers.first_seen_at, EXCLUDED.first_seen_at),
           last_seen_at = GREATEST(customers.last_seen_at, EXCLUDED.last_seen_at),
           updated_at = now()
@@ -236,7 +283,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
         SELECT b.voucher_no, b.batch_id, b.store_id, b.billed_at, c.id, b.customer_name, b.phone_raw,
                b.qty, b.bill_amount, b.taxable_amount, b.item_disc_amount, b.salesman_code,
                jsonb_build_object('source', 'hemparshwa', 'invoice_id', b.invoice_id, 'lines', b.lines)
-        FROM hp_bills b LEFT JOIN customers c ON c.phone_e164 = b.e164
+        FROM hp_bills b LEFT JOIN customers c ON c.phone_e164 = COALESCE(b.e164, b.bill_key)
         ON CONFLICT (voucher_no) DO UPDATE SET
           batch_id = EXCLUDED.batch_id, store_id = EXCLUDED.store_id, customer_id = EXCLUDED.customer_id,
           customer_name_raw = EXCLUDED.customer_name_raw, phone_raw = EXCLUDED.phone_raw, qty = EXCLUDED.qty,
@@ -294,7 +341,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
 
       return {
         bills, billsAdded, billsRemoved, legacyBillsRemoved, lineItems: lineItems.rows.length,
-        customersTouched: customers.rows.length, unmappedStoreLines, visitsReconciled: 0,
+        customersTouched: customers.rows.length, billOnlyCustomers: billOnly.rows.length, internalBillsSkipped, unmappedStoreLines, visitsReconciled: 0,
       };
     });
   } finally {
