@@ -21,7 +21,7 @@ vi.mock('@/components/marketing-shared', async importOriginal => {
 describe('marketing page rendering', () => {
   it('renders dashboard metrics and navigation with demo data', () => {
     const html = renderToStaticMarkup(createElement(MarketingWorkspace));
-    for (const label of ['Marketing performance', 'Total marketing spend', 'Cost per lead', 'Converted leads', 'Sales generated', 'CAC', 'ROAS', 'Leads funnel', 'Calling and follow-up summary', 'New leads awaiting first call', 'Calls due today', 'Overdue follow-ups', 'Leads contacted today', 'Leads converted today', 'Date-Time From']) expect(html).toContain(label);
+    for (const label of ['Marketing performance', 'Total marketing spend', 'Cost per lead', 'Converted leads', 'Sales generated', 'CAC', 'ROAS', 'Leads funnel', 'Calling and follow-up summary', 'New leads awaiting first call', 'Calls due today', 'Overdue follow-ups', 'Leads contacted today', 'Leads converted today', 'From']) expect(html).toContain(label);
     // The four sections are tabs in the site header now, not buttons on the page.
     expect(html).not.toContain('aria-label="Marketing modules"');
     expect(html).toContain('shared by every desk');

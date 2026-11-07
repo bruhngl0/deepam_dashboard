@@ -2,8 +2,10 @@
 import { useState } from 'react';
 import { SectionTabs } from './header-tabs';
 import { storeName, campaignName, convertedLeads, filterLeads, hasLoggedCall, metrics, nowLocal, STORES, type Lead } from '@/lib/marketing/local';
-import { button, CampaignTag, card, dateLabel, dayMonthYearLabel, Field, input, LeadMeta, money, useMarketing } from './marketing-shared';
+import { button, CampaignTag, card, dateLabel, dayMonthYearLabel, input, LeadMeta, money, useMarketing } from './marketing-shared';
 import { MarketingSalespeople } from './marketing-salespeople';
+import { control, FilterField, textButton } from './ui';
+import { useUrlState } from '@/lib/use-url-state';
 
 type ManagerTab = 'Overview' | 'All leads' | 'Team queue' | 'Follow-ups' | 'Team performance';
 const tabs: ManagerTab[] = ['Overview', 'All leads', 'Team queue', 'Follow-ups', 'Team performance'];
@@ -19,9 +21,9 @@ export function StoreManagerWorkspace({ logoutAction }: { logoutAction: () => Pr
   const [tab, setTab] = useState<ManagerTab>('Overview');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [store, setStore] = useState('');
+  const [from, setFrom] = useUrlState('from', '');
+  const [to, setTo] = useUrlState('to', '');
+  const [store, setStore] = useUrlState('store', '');
   if (!data) return <p role="status" className="p-8 text-ink-2">{message || 'Loading store manager workspace...'}</p>;
 
   // The date (lead date) and store (preferred store) filters narrow every tab except Team performance, which has its own.
@@ -39,20 +41,20 @@ export function StoreManagerWorkspace({ logoutAction }: { logoutAction: () => Pr
   const changeTab = (next: ManagerTab) => { setTab(next); setSearch(''); setPage(0); };
 
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Store manager</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Team operations dashboard</h1><p className="mt-2 text-sm text-ink-2">Monitor the lead pipeline, follow-ups, and salesperson performance.</p></div><form action={logoutAction}><button className={button}>Sign out</button></form></header>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Store manager</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">Team operations dashboard</h1><p className="mt-1 max-w-3xl text-sm text-ink-2">Monitor the lead pipeline, follow-ups, and salesperson performance.</p></div><form action={logoutAction}><button className={button}>Sign out</button></form></header>
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
-    {tab !== 'Team performance' && <section aria-label="Lead filters" className={`${card} flex flex-wrap items-end gap-3`}>
-      <Field label="Leads from"><input type="date" className={input} max={to || undefined} value={from} onChange={event => { setFrom(event.target.value); setPage(0); }} /></Field>
-      <Field label="Leads to"><input type="date" className={input} min={from || undefined} value={to} onChange={event => { setTo(event.target.value); setPage(0); }} /></Field>
-      <Field label="Store"><select className={input} value={store} onChange={event => { setStore(event.target.value); setPage(0); }}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></Field>
-      <button className={button} onClick={() => { setFrom(''); setTo(''); setStore(''); setPage(0); }}>Clear filters</button>
+    {tab !== 'Team performance' && <section aria-label="Lead filters" className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-ink-muted">Filter</span>
+      <FilterField label="Leads from"><input type="date" className={control} max={to || undefined} value={from} onChange={event => { setFrom(event.target.value); setPage(0); }} /></FilterField>
+      <FilterField label="Leads to"><input type="date" className={control} min={from || undefined} value={to} onChange={event => { setTo(event.target.value); setPage(0); }} /></FilterField>
+      <FilterField label="Store"><select className={control} value={store} onChange={event => { setStore(event.target.value); setPage(0); }}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></FilterField>
+      <button className={textButton} onClick={() => { setFrom(''); setTo(''); setStore(''); setPage(0); }}>Clear filters</button>
       <p className="w-full text-xs text-ink-muted">By the date the lead arrived and the store they prefer.</p>
       {from && to && from > to && <p role="alert" className="w-full text-sm text-red-600">From must be on or before To.</p>}
     </section>}
     <SectionTabs label="Store manager sections" tabs={tabs} current={tab} onChange={changeTab} count={value => value === 'Team queue' ? queue.length : value === 'Follow-ups' ? pending.length : null} />
     {tab === 'Overview' && <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
       ['Total leads', stats.total], ['Team queue', queue.length], ['Pending follow-ups', pending.length], ['Interested', stats.interested], ['Converted', stats.converted], ['Sales', money(stats.revenue)], ['Contacted', stats.contacted], ['Walk-ins', stats.visits],
-    ].map(([label, value]) => <section className={card} key={label}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p></section>)}</div>
+    ].map(([label, value]) => <section className={card} key={label}><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{label}</p><p className="tnum mt-2 text-3xl font-semibold leading-none tracking-tight text-ink">{value}</p></section>)}</div>
       <div className="grid gap-5 lg:grid-cols-2"><section className={card}><h2 className="text-lg font-semibold text-ink">Follow-up health</h2><p className="mt-3 text-sm text-ink-2">{pending.filter(item => item.followup.due < now).length} overdue · {pending.filter(item => item.followup.due.startsWith(today)).length} due today · {pending.filter(item => item.followup.due.slice(0, 10) > today).length} upcoming</p></section><section className={card}><h2 className="text-lg font-semibold text-ink">Queue health</h2><p className="mt-3 text-sm text-ink-2">{queue.filter(lead => lastSalesperson(lead) === 'Unassigned').length} unassigned · {queue.length} active leads</p></section></div></>}
     {['All leads', 'Team queue'].includes(tab) && <section className="overflow-hidden rounded-2xl border border-line bg-surface"><div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-lg font-semibold text-ink">{tab}</h2><p className="text-xs text-ink-muted">Team-wide lead visibility and latest salesperson activity.</p></div><input className={`${input} sm:!w-80`} aria-label="Search leads" placeholder="Name, number, campaign..." value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} /></div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-inset text-xs uppercase text-ink-muted"><tr>{['Lead / contact', 'Campaign', 'Date', 'Store', 'Salesperson', 'Status'].map(heading => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead><tbody>{visible.slice(currentPage * 20, currentPage * 20 + 20).map(lead => <tr key={lead.id} className="border-t border-line text-ink"><td className="px-4 py-3"><span className="font-semibold">{lead.name}</span><p className="text-ink-2">{lead.phone}</p></td><td className="px-4 py-3">{[...new Set(lead.acquisitions.map(acquisition => campaignName(acquisition.campaignId)).filter(Boolean))].join(', ') || 'No campaign'}{(lead.claimGroup || lead.tags?.length) ? <div className="mt-2 flex flex-wrap gap-1.5"><CampaignTag lead={lead} /></div> : null}</td><td className="whitespace-nowrap px-4 py-3 text-ink-2">{dayMonthYearLabel(lead.acquiredAt)}</td><td className="px-4 py-3">{storeName(lead.preferredStore) || 'Not recorded'}</td><td className="px-4 py-3">{lastSalesperson(lead)}</td><td className="px-4 py-3">{lead.status}</td></tr>)}</tbody></table></div>

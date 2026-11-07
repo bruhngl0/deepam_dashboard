@@ -14,7 +14,7 @@ export function VendorAdminHub() {
     <section className="card mb-5 rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[.09em] text-ink-muted">Admin workspace</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Admin workspace</p>
           <h2 className="mt-1 text-lg font-semibold text-ink">Run vendor operations in order</h2>
           <p className="mt-1 text-sm text-ink-2">Each module owns one decision, from supplier setup through demand fulfilment.</p>
         </div>

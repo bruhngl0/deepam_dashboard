@@ -14,6 +14,8 @@ import { MarketingConverted } from './marketing-converted';
 import { campaignBuyers } from '@/lib/marketing/campaign-buyers';
 import { useLeadTypeConversions } from './lead-type-conversions-panel';
 import { CampaignBreakdown } from './campaign-breakdown';
+import { control, FilterField, textButton } from './ui';
+import { useUrlState } from '@/lib/use-url-state';
 
 type Module = MarketingModule;
 type LeadsView = 'Lead management' | 'Calling workspace' | 'Existing customers' | 'Online customers' | 'Import';
@@ -34,9 +36,9 @@ export function MarketingWorkspace() {
   const setModule = (next: Module) => { if (next !== section) router.push(marketingModuleHref(next), { scroll: false }); };
   const [leadsView, setLeadsView] = useState<LeadsView>('Lead management');
   const [callingView, setCallingView] = useState<CallingView>('Queue');
-  const [status, setStatus] = useState<Status>('All leads');
-  const [campaign, setCampaign] = useState(''); const [salesperson, setSalesperson] = useState('');
-  const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [store, setStore] = useState(''); const [source, setSource] = useState(''); const [search, setSearch] = useState('');
+  const [status, setStatus] = useUrlState<Status>('status', 'All leads');
+  const [campaign, setCampaign] = useUrlState('campaign', ''); const [salesperson, setSalesperson] = useUrlState('salesperson', '');
+  const [from, setFrom] = useUrlState('from', ''); const [to, setTo] = useUrlState('to', ''); const [store, setStore] = useUrlState('store', ''); const [source, setSource] = useUrlState('source', ''); const [search, setSearch] = useState('');
   const [page, setPage] = useState(0); const [add, setAdd] = useState(false);
   // A new section starts on its first page, with no search.
   const [shownModule, setShownModule] = useState(section);
@@ -79,20 +81,20 @@ export function MarketingWorkspace() {
     <nav className="flex flex-wrap gap-2" aria-label={label}>{items.map(item => { const n = count?.(item); return <button key={item} className={current === item ? primary : button} aria-current={current === item ? 'page' : undefined} onClick={() => choose(item)}>{item}{n === null || n === undefined ? '' : ` (${n})`}</button>; })}</nav>;
 
   return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Marketing · Customer relationships</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Every lead. Every conversation.</h1><p className="mt-2 text-sm text-ink-2">One customer profile from acquisition to follow-up and purchase.</p></div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-inset px-3 py-2 text-xs text-ink-2">Shared records · {data.leads.length} leads</span><button className={primary} onClick={() => setAdd(!add)}>Add lead</button><button className={button} onClick={() => openLeads('Import')}>Import Excel</button></div></header>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Marketing · Customer relationships</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">Every lead. Every conversation.</h1><p className="mt-1 max-w-3xl text-sm text-ink-2">One customer profile from acquisition to follow-up and purchase.</p></div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-inset px-3 py-2 text-xs text-ink-2">Shared records · {data.leads.length} leads</span><button className={primary} onClick={() => setAdd(!add)}>Add lead</button><button className={button} onClick={() => openLeads('Import')}>Import Excel</button></div></header>
     {message && <p role="status" className={`${card} text-sm text-ink`}>{message}</p>}
     {add && <AddLead data={data} save={save} close={() => setAdd(false)} />}
-    {showFilters && <section aria-label="Marketing filters" className={`${card} flex flex-wrap items-end gap-3`}>
-      <Field label="Date-Time From"><input type="date" className={input} max={to || undefined} value={from} onChange={e => { setFrom(e.target.value); resetPage(); }} /></Field>
-      <Field label="Date-Time To"><input type="date" className={input} min={from || undefined} value={to} onChange={e => { setTo(e.target.value); resetPage(); }} /></Field>
-      <Field label="Preferred store"><select className={input} value={store} onChange={e => { setStore(e.target.value); resetPage(); }}><option value="">All stores</option>{STORES.map(s => <option key={s} value={s}>{storeName(s)}</option>)}</select></Field>
-      <Field label="Source"><select className={input} value={source} onChange={e => { setSource(e.target.value); resetPage(); }}><option value="">All sources</option>{SOURCES.map(s => <option key={s}>{s}</option>)}</select></Field>
+    {showFilters && <section aria-label="Marketing filters" className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-ink-muted">Filter</span>
+      <FilterField label="From"><input type="date" className={control} max={to || undefined} value={from} onChange={e => { setFrom(e.target.value); resetPage(); }} /></FilterField>
+      <FilterField label="To"><input type="date" className={control} min={from || undefined} value={to} onChange={e => { setTo(e.target.value); resetPage(); }} /></FilterField>
+      <FilterField label="Store"><select className={control} value={store} onChange={e => { setStore(e.target.value); resetPage(); }}><option value="">All stores</option>{STORES.map(s => <option key={s} value={s}>{storeName(s)}</option>)}</select></FilterField>
+      <FilterField label="Source"><select className={control} value={source} onChange={e => { setSource(e.target.value); resetPage(); }}><option value="">All sources</option>{SOURCES.map(s => <option key={s}>{s}</option>)}</select></FilterField>
       {section === 'Leads' && leadsView === 'Lead management' && <>
-        <Field label="Campaign"><select className={input} value={campaign} onChange={e => { setCampaign(e.target.value); resetPage(); }}><option value="">All campaigns</option>{campaigns.map(c => <option key={c}>{c}</option>)}</select></Field>
-        <Field label="Status"><select className={input} value={status} onChange={e => { setStatus(e.target.value as Status); resetPage(); }}>{STATUSES.map(s => <option key={s}>{s}</option>)}</select></Field>
-        <Field label="Salesperson"><select className={input} value={salesperson} onChange={e => { setSalesperson(e.target.value); resetPage(); }}><option value="">All salespeople</option><option value={UNASSIGNED}>Unassigned</option>{salespeople.map(p => <option key={p}>{p}</option>)}</select></Field>
+        <FilterField label="Campaign"><select className={control} value={campaign} onChange={e => { setCampaign(e.target.value); resetPage(); }}><option value="">All campaigns</option>{campaigns.map(c => <option key={c}>{c}</option>)}</select></FilterField>
+        <FilterField label="Status"><select className={control} value={status} onChange={e => { setStatus(e.target.value as Status); resetPage(); }}>{STATUSES.map(s => <option key={s}>{s}</option>)}</select></FilterField>
+        <FilterField label="Salesperson"><select className={control} value={salesperson} onChange={e => { setSalesperson(e.target.value); resetPage(); }}><option value="">All salespeople</option><option value={UNASSIGNED}>Unassigned</option>{salespeople.map(p => <option key={p}>{p}</option>)}</select></FilterField>
       </>}
-      <button className={button} onClick={() => { setFrom(''); setTo(''); setStore(''); setSource(''); setCampaign(''); setSalesperson(''); setStatus('All leads'); resetPage(); }}>Clear filters</button>
+      <button className={textButton} onClick={() => { setFrom(''); setTo(''); setStore(''); setSource(''); setCampaign(''); setSalesperson(''); setStatus('All leads'); resetPage(); }}>Clear filters</button>
       <p className="w-full text-xs text-ink-muted">Filters select leads by lead date and preferred store. Sales and purchases include their full imported history. All times IST.</p>
       {from && to && from > to && <p role="alert" className="text-sm text-red-600">From must be on or before To.</p>}
     </section>}
@@ -106,7 +108,7 @@ export function MarketingWorkspace() {
           ['Overdue follow-ups', overdue.length, () => { setCallingView('Follow-ups'); openLeads('Calling workspace'); }],
           ['Leads contacted today', contactedToday, null],
           ['Leads converted today', convertedToday, null],
-        ] as const).map(([label, value, open]) => { const body = <><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p></>; return open ? <button type="button" key={label} className="rounded-xl border border-line p-4 text-left transition hover:border-accent focus-visible:outline-2 focus-visible:outline-accent" onClick={open}>{body}</button> : <div key={label} className="rounded-xl border border-line p-4">{body}</div>; })}</div></section>
+        ] as const).map(([label, value, open]) => { const body = <><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{label}</p><p className="tnum mt-2 text-3xl font-semibold leading-none tracking-tight text-ink">{value}</p></>; return open ? <button type="button" key={label} className="rounded-xl border border-line p-4 text-left transition hover:border-accent focus-visible:outline-2 focus-visible:outline-accent" onClick={open}>{body}</button> : <div key={label} className="rounded-xl border border-line p-4">{body}</div>; })}</div></section>
     </>}
 
     {section === 'Leads' && <>
@@ -176,7 +178,7 @@ function OverviewPerformance({ filters }: { filters: { from: string; to: string;
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">{[
         ['Total marketing spend', spend === null ? '—' : money(spend)], ['Total leads', stats.total.toLocaleString('en-IN')], ['Cost per lead', per(stats.total)],
         ['Converted leads', stats.converted.toLocaleString('en-IN')], ['Sales generated', money(stats.revenue)], ['CAC', per(stats.converted)], ['ROAS', spend ? `${(stats.revenue / spend).toFixed(2)}×` : '—'],
-      ].map(([label, value]) => <div key={label} className="rounded-xl border border-line p-4"><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-2xl font-semibold tracking-tight text-ink">{value}</p></div>)}</div>
+      ].map(([label, value]) => <div key={label} className="rounded-xl border border-line p-4"><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{label}</p><p className="tnum mt-2 text-2xl font-semibold leading-none tracking-tight text-ink">{value}</p></div>)}</div>
       <p className="mt-3 text-xs text-ink-muted">Every lead of any date that matches the filters. Converted: a Deepam CRM bill on or after the lead date. CAC is spend ÷ converted leads, ROAS is sales ÷ spend. {spendNote}</p></section>
     <section className={card}><h2 className="text-lg font-semibold text-ink">Leads funnel</h2><div className="mt-5 space-y-5">{funnel.map(([label, value]) => <div key={label}><div className="mb-2 flex justify-between text-sm text-ink"><span>{label}</span><span>{value.toLocaleString('en-IN')} · {pct(value, stats.total)}</span></div><div className="h-2 rounded bg-inset"><div className="h-2 rounded bg-accent" style={{ width: `${stats.total ? value / stats.total * 100 : 0}%` }} /></div></div>)}</div>
       <p className="mt-4 text-xs text-ink-muted">Each stage as a share of total leads. Contacted: at least one connected call. Interested: latest call marked interested. Stages can overlap; a purchase does not require a recorded call.</p></section>

@@ -2,7 +2,8 @@
 import { Fragment, useEffect, useState } from 'react';
 import { calledCustomers, callLog, callSourceLabel, CUSTOMER_GROUP_LABELS, CUSTOMER_GROUPS, nowLocal, openFollowupDue, OUTCOMES, salespersonPerformance, STORES, storeName, type CallEntry, type CustomerGroup, type Dataset, type ExistingClaim } from '@/lib/marketing/local';
 import { SALESPEOPLE } from '@/lib/salespeople';
-import { button, card, dayMonthYearTimeLabel, Field, input, money } from './marketing-shared';
+import { dayMonthYearTimeLabel, money } from './marketing-shared';
+import { control, FilterField, textButton } from './ui';
 
 const KNOWN_SALESPEOPLE = SALESPEOPLE.map(({ name }) => name);
 
@@ -45,15 +46,15 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
   const reset = () => { setPerson(''); setFrom(''); setTo(''); setOutcome(''); setStore(''); setSearch(''); setGroup('all'); };
 
   return <div className="space-y-5">
-    <section aria-label="Salesperson filters" className={`${card} flex flex-wrap items-end gap-3`}>
-      <Field label="Salesperson"><select className={input} value={person} onChange={event => setPerson(event.target.value)}><option value="">All salespeople</option>{people.map(name => <option key={name}>{name}</option>)}</select></Field>
-      <Field label="Customers"><select className={input} value={group} onChange={event => setGroup(event.target.value as CustomerGroup)}>{CUSTOMER_GROUPS.map(value => <option key={value} value={value}>{CUSTOMER_GROUP_LABELS[value]}</option>)}</select></Field>
-      <Field label="Store"><select className={input} value={store} onChange={event => setStore(event.target.value)}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></Field>
-      <Field label="Calls from"><input type="date" className={input} max={to || undefined} value={from} onChange={event => setFrom(event.target.value)} /></Field>
-      <Field label="Calls to"><input type="date" className={input} min={from || undefined} value={to} onChange={event => setTo(event.target.value)} /></Field>
-      <Field label="Outcome"><select className={input} value={outcome} onChange={event => setOutcome(event.target.value)}><option value="">All outcomes</option>{OUTCOMES.map(value => <option key={value}>{value}</option>)}</select></Field>
-      <Field label="Search"><input className={input} placeholder="Customer, number, note…" value={search} onChange={event => setSearch(event.target.value)} /></Field>
-      <button className={button} onClick={reset}>Clear filters</button>
+    <section aria-label="Salesperson filters" className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-ink-muted">Filter</span>
+      <FilterField label="Salesperson"><select className={control} value={person} onChange={event => setPerson(event.target.value)}><option value="">All salespeople</option>{people.map(name => <option key={name}>{name}</option>)}</select></FilterField>
+      <FilterField label="Customers"><select className={control} value={group} onChange={event => setGroup(event.target.value as CustomerGroup)}>{CUSTOMER_GROUPS.map(value => <option key={value} value={value}>{CUSTOMER_GROUP_LABELS[value]}</option>)}</select></FilterField>
+      <FilterField label="Store"><select className={control} value={store} onChange={event => setStore(event.target.value)}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></FilterField>
+      <FilterField label="Calls from"><input type="date" className={control} max={to || undefined} value={from} onChange={event => setFrom(event.target.value)} /></FilterField>
+      <FilterField label="Calls to"><input type="date" className={control} min={from || undefined} value={to} onChange={event => setTo(event.target.value)} /></FilterField>
+      <FilterField label="Outcome"><select className={control} value={outcome} onChange={event => setOutcome(event.target.value)}><option value="">All outcomes</option>{OUTCOMES.map(value => <option key={value}>{value}</option>)}</select></FilterField>
+      <FilterField label="Search"><input className={control} placeholder="Customer, number, note…" value={search} onChange={event => setSearch(event.target.value)} /></FilterField>
+      <button className={textButton} onClick={reset}>Clear filters</button>
       {from && to && from > to && <p role="alert" className="w-full text-sm text-red-600">From must be on or before To.</p>}
     </section>
     <section className="overflow-hidden rounded-2xl border border-line bg-surface">

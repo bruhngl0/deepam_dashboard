@@ -19,6 +19,7 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCallback, useTransition } from 'react';
 import { CHANNEL_LABEL, VALUE_TIER_LABEL, VALUE_TIER_ORDER, formatNumber } from '@/lib/format';
+import { button, control, textButton } from '@/components/ui';
 
 export function useSetParam() {
   const router = useRouter();
@@ -44,9 +45,7 @@ export function useSetParam() {
   return { setParam, params, pending };
 }
 
-const selectClass =
-  'rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink transition-shadow ' +
-  'focus:outline-none focus:ring-2 focus:ring-accent/40';
+const selectClass = control;
 
 export function FilterBar({
   channels,
@@ -169,7 +168,7 @@ export function FilterBar({
           p.delete('pageSize');
           return p.toString();
         })()}`}
-        className="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-medium text-ink-2 shadow-sm transition-colors hover:bg-inset hover:text-ink active:scale-95"
+        className={button}
       >
         Export CSV
       </a>
@@ -187,7 +186,7 @@ export function FilterBar({
               source: null,
             })
           }
-          className="rounded-xl px-3 py-2 text-sm font-medium text-accent transition-colors hover:underline active:scale-95"
+          className={textButton}
         >
           Clear {active} filter{active > 1 ? 's' : ''}
         </button>

@@ -19,10 +19,9 @@
 
 import { VALUE_TIER_LABEL, formatNumber } from '@/lib/format';
 import { useSetParam } from './filters';
+import { control, textButton } from '@/components/ui';
 
-const selectClass =
-  'rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink transition-shadow ' +
-  'focus:outline-none focus:ring-2 focus:ring-accent/40';
+const selectClass = control;
 
 /** `'none'` is omitted deliberately — a buyer with no purchase is a contradiction. */
 const BUYER_TIERS = ['top10', 'next20', 'rest70'] as const;
@@ -113,7 +112,7 @@ export function BuyerFilterBar({ total }: { total: number }) {
         <button
           type="button"
           onClick={() => setParam({ q: null, tier: null, segment: null })}
-          className="rounded-xl px-3 py-2 text-sm font-medium text-accent transition-colors hover:underline active:scale-95"
+          className={textButton}
         >
           Clear {active} filter{active > 1 ? 's' : ''}
         </button>

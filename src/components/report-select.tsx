@@ -13,6 +13,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useTransition } from 'react';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/format';
 import type { SalesReport } from '@/lib/queries/analysis';
+import { control } from '@/components/ui';
 
 export function ReportSelect({ reports }: { reports: SalesReport[] }) {
   const router = useRouter();
@@ -36,7 +37,7 @@ export function ReportSelect({ reports }: { reports: SalesReport[] }) {
           else next.delete('batch');
           startTransition(() => router.push(`${pathname}?${next.toString()}`));
         }}
-        className="rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink transition-shadow focus:outline-none focus:ring-2 focus:ring-accent/40"
+        className={control}
       >
         <option value="">All reports · every bill loaded</option>
         {reports.map((r) => (

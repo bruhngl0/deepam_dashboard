@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { formatNumber, formatPhone } from '@/lib/format';
 import type { ExistingCustomerFilters, ExistingCustomerKpis, ExistingCustomerListRow, ExistingCustomerView } from '@/lib/marketing/existing-customer-store';
-import { button, card, dayMonthYearTimeLabel, Field, input, money, primary } from './marketing-shared';
+import { button, card, dayMonthYearTimeLabel, input, money, primary } from './marketing-shared';
+import { control, FilterField, textButton } from './ui';
 
 type Response = { listName: string; total: number; assigned: number; unassigned: number; kpis: ExistingCustomerKpis; stores: string[]; filtered: number; page: number; pageSize: number; rows: ExistingCustomerListRow[] };
 
@@ -24,8 +25,8 @@ export function ExistingCustomerCallCard({ open }: { open: () => void }) {
   const [data, setData] = useState<Response | null>(null);
   useEffect(() => { void load().then(setData).catch(() => {}); }, []);
   return <section className={card}>
-    <p className="text-sm text-ink-2">Existing customer call list</p>
-    <p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{data ? formatNumber(data.total) : '…'}</p>
+    <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Existing customer call list</p>
+    <p className="tnum mt-2 text-3xl font-semibold leading-none tracking-tight text-ink">{data ? formatNumber(data.total) : '…'}</p>
     <p className="mt-2 text-xs text-ink-muted">For exhibition outreach · kept separate from leads</p>
     <button className={`${button} mt-4`} onClick={open}>Open customer list</button>
   </section>;
@@ -52,14 +53,14 @@ export function ExistingCustomerCallList({ list = 'exhibition' }: { list?: CallL
   const extra = view === 'followups' ? 'Follow-up due' : view === 'converted' ? 'Billed' : '';
   return <section className="overflow-hidden rounded-2xl border border-line bg-surface">
     <div className="flex flex-wrap items-end justify-between gap-4 p-5">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">{text.eyebrow}</p><h2 className="mt-1 text-xl font-semibold text-ink">{text.title}</h2><p className="mt-1 text-sm text-ink-2">{text.blurb}</p></div>
+      <div><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{text.eyebrow}</p><h2 className="mt-1 text-xl font-semibold text-ink">{text.title}</h2><p className="mt-1 text-sm text-ink-2">{text.blurb}</p></div>
       <input className={`${input} sm:!w-80`} aria-label={`Search ${text.eyebrow.toLowerCase()}`} placeholder="Name, Contact No., salesperson, store…" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} />
     </div>
-    <div className="flex flex-wrap items-end gap-3 border-t border-line px-5 py-4">
-      <Field label="From"><input type="date" className={input} max={to || undefined} value={from} onChange={event => { setFrom(event.target.value); setPage(0); }} /></Field>
-      <Field label="To"><input type="date" className={input} min={from || undefined} value={to} onChange={event => { setTo(event.target.value); setPage(0); }} /></Field>
-      <Field label="Store"><select className={input} value={store} onChange={event => { setStore(event.target.value); setPage(0); }}><option value="">All stores</option>{(data?.stores ?? (store ? [store] : [])).map(name => <option key={name}>{name}</option>)}</select></Field>
-      <button className={button} onClick={() => { setFrom(''); setTo(''); setStore(''); setPage(0); }}>Clear filters</button>
+    <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3"><span className="text-xs font-medium text-ink-muted">Filter</span>
+      <FilterField label="From"><input type="date" className={control} max={to || undefined} value={from} onChange={event => { setFrom(event.target.value); setPage(0); }} /></FilterField>
+      <FilterField label="To"><input type="date" className={control} min={from || undefined} value={to} onChange={event => { setTo(event.target.value); setPage(0); }} /></FilterField>
+      <FilterField label="Store"><select className={control} value={store} onChange={event => { setStore(event.target.value); setPage(0); }}><option value="">All stores</option>{(data?.stores ?? (store ? [store] : [])).map(name => <option key={name}>{name}</option>)}</select></FilterField>
+      <button className={textButton} onClick={() => { setFrom(''); setTo(''); setStore(''); setPage(0); }}>Clear filters</button>
       <p className="w-full text-xs text-ink-muted">Dates narrow Customers called, Interested and Converted to calls and bills in that period, and Follow-ups due to those falling due in it. Customers and Pending calls are today&apos;s totals. All times IST.</p>
     </div>
     {data && <Kpis kpis={data.kpis} view={view} open={open} />}
@@ -82,5 +83,5 @@ function Kpis({ kpis, view, open }: { kpis: ExistingCustomerKpis; view: Existing
     ['followups', 'Follow-ups due', formatNumber(kpis.followups), `${formatNumber(kpis.overdue)} overdue`],
     ['converted', 'Converted', formatNumber(kpis.converted), `${money(kpis.revenue)} billed after being claimed`],
   ];
-  return <div className="grid gap-3 border-y border-line bg-inset/40 p-4 sm:grid-cols-2 lg:grid-cols-3">{cards.map(([id, label, value, note]) => <button key={id} type="button" aria-pressed={view === id} onClick={() => open(id)} className={`${card} text-left hover:border-accent focus-visible:outline-2 focus-visible:outline-accent ${view === id ? '!border-accent ring-1 ring-accent' : ''}`}><p className="text-sm text-ink-2">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p><p className="mt-2 text-xs text-ink-muted">{note}</p></button>)}</div>;
+  return <div className="grid gap-3 border-y border-line bg-inset/40 p-4 sm:grid-cols-2 lg:grid-cols-3">{cards.map(([id, label, value, note]) => <button key={id} type="button" aria-pressed={view === id} onClick={() => open(id)} className={`${card} text-left hover:border-accent focus-visible:outline-2 focus-visible:outline-accent ${view === id ? '!border-accent ring-1 ring-accent' : ''}`}><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{label}</p><p className="tnum mt-2 text-3xl font-semibold leading-none tracking-tight text-ink">{value}</p><p className="mt-2 text-xs text-ink-muted">{note}</p></button>)}</div>;
 }

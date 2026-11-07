@@ -74,7 +74,7 @@ export default async function NewCustomersPage({ searchParams }: { searchParams:
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-6">
         <Link href={back} className="text-sm font-medium text-accent hover:underline">← Dashboard</Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">New customers</h1>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">New customers</h1>
         <p className="mt-1 max-w-[72ch] text-sm text-ink-2">
           Everyone who bought between {formatDate(from ?? bounds.earliest)} and {formatDate(to ?? bounds.latest)}
           {store ? ' at this store' : ''} and is not on the loyalty customer sheet. Each person is in one group:
