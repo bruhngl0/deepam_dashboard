@@ -122,17 +122,47 @@ export async function salespersonStatsFor(empCode: string, period: SalesPeriod):
   return rows?.[0] ? toStats(rows[0]) : null;
 }
 
-/** Bills in the period with no salesperson credited: blank on the bill, or a name not matched to a Salesperson ID yet. */
+/** Bills in the period with no salesperson credited: blank on the bill, or a name not matched to a Salesperson ID.
+ * unmatchedNames leaves out names deliberately kept unmatched (SELF). */
 export async function uncreditedBills(period: SalesPeriod): Promise<{ bills: number; sales: number; unmatchedNames: number } | null> {
   const rows = await aq<Record<string, unknown>>(`
     SELECT count(*) AS bills, coalesce(sum(amount), 0) AS sales,
-           (SELECT count(*) FROM analytics.salesperson_alias WHERE emp_code IS NULL AND source = 'pos') AS unmatched
+           (SELECT count(*) FROM analytics.salesperson_alias WHERE emp_code IS NULL AND matched_by IS NULL AND source = 'pos') AS unmatched
     FROM analytics.fact_bill b
     WHERE b.emp_code IS NULL AND b.day BETWEEN $1 AND $2
       AND ($3::text IS NULL OR b.store_code IN (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3))`,
     [period.from, period.to, period.store]);
   const r = rows?.[0];
   return r ? { bills: n(r.bills), sales: n(r.sales), unmatchedNames: n(r.unmatched) } : null;
+}
+
+export type BillCoverage = {
+  bills: number; sales: number; returns: number; value: number;
+  matchedBills: number; matchedValue: number;
+  /** Bills credited to no one, by the salesman name printed on them ('' = no name). Largest first. */
+  uncredited: { name: string; bills: number; value: number }[];
+};
+
+/** How much of the sales sheet is credited to a salesperson, and what the rest says, for the period and store. */
+export async function billCoverage(period: SalesPeriod): Promise<BillCoverage | null> {
+  const rows = await aq<Record<string, unknown>>(`
+    SELECT CASE WHEN b.emp_code IS NOT NULL THEN NULL ELSE upper(coalesce(trim(b.salesman_raw), '')) END AS name,
+           count(*) AS bills, count(*) FILTER (WHERE b.amount > 0) AS sales, count(*) FILTER (WHERE b.amount < 0) AS returns,
+           coalesce(sum(b.amount), 0) AS value
+    FROM analytics.fact_bill b
+    WHERE b.day BETWEEN $1 AND $2
+      AND ($3::text IS NULL OR b.store_code IN (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3))
+    GROUP BY 1`,
+    [period.from, period.to, period.store]);
+  if (!rows) return null;
+  const out: BillCoverage = { bills: 0, sales: 0, returns: 0, value: 0, matchedBills: 0, matchedValue: 0, uncredited: [] };
+  for (const r of rows) {
+    out.bills += n(r.bills); out.sales += n(r.sales); out.returns += n(r.returns); out.value += n(r.value);
+    if (r.name === null) { out.matchedBills = n(r.bills); out.matchedValue = n(r.value); }
+    else out.uncredited.push({ name: String(r.name), bills: n(r.bills), value: n(r.value) });
+  }
+  out.uncredited.sort((a, b) => b.bills - a.bills || (a.name ? 0 : 1) - (b.name ? 0 : 1));
+  return out;
 }
 
 /** The loaded range of bills, for the "Showing …" line. */

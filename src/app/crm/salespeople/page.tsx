@@ -7,9 +7,9 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { analyticsAsOf, analyticsConfigured } from '@/lib/analytics/db';
-import { billBounds, salesPeriod, salespersonStats, uncreditedBills, type SalespersonStats } from '@/lib/analytics/salesperson-module';
+import { billBounds, billCoverage, salesPeriod, salespersonStats, uncreditedBills, type SalespersonStats } from '@/lib/analytics/salesperson-module';
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime, formatNumber, formatPercent } from '@/lib/format';
-import { card, Kpi, KpiGrid, PageHeader, button } from '@/components/ui';
+import { button, card, eyebrow, Kpi, KpiGrid, PageHeader } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +55,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
     </main>;
   }
 
-  const [rows, uncredited, bounds, asOf] = await Promise.all([salespersonStats(period), uncreditedBills(period), billBounds(), analyticsAsOf()]);
+  const [rows, uncredited, coverage, bounds, asOf] = await Promise.all([salespersonStats(period), uncreditedBills(period), billCoverage(period), billBounds(), analyticsAsOf()]);
   const list = rows ?? [];
   const sortKey = COLUMNS.some((c) => c.key === one(sp.sort)) || one(sp.sort) === 'name' ? one(sp.sort)! : 'net';
   const dir = one(sp.dir) === 'asc' ? 1 : -1;
@@ -96,6 +96,33 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
         <Kpi label="Not credited to anyone" value={uncredited ? formatNumber(uncredited.bills) : '—'}
           caption={uncredited ? <>{formatCurrency(uncredited.sales)} on bills with no salesperson{uncredited.unmatchedNames ? <> · <Link className="font-medium text-accent hover:underline" href="/reports/salespeople/match">{formatNumber(uncredited.unmatchedNames)} names to match</Link></> : ''}</> : undefined} />
       </KpiGrid>
+
+      {coverage && coverage.bills > 0 && (
+        <section className={`${card} overflow-hidden`}>
+          <div className="border-b border-grid px-4 py-3"><h2 className="text-sm font-semibold text-ink">Bills in the sales sheet</h2></div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm" style={{ minWidth: '36rem' }}>
+              <thead><tr className={eyebrow}>{['', 'Bills', 'Share of bills', 'Value', 'Share of value'].map((h, i) =>
+                <th key={i} scope="col" className={`px-4 py-3 font-bold ${i ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
+              <tbody>
+                {([
+                  { label: 'All bills', bills: coverage.bills, note: `${formatNumber(coverage.sales)} sales + ${formatNumber(coverage.returns)} returns`, value: coverage.value, strong: true },
+                  { label: 'Matched to a salesperson', bills: coverage.matchedBills, value: coverage.matchedValue },
+                  ...coverage.uncredited.map((u) => ({ label: u.name ? <>Salesman written as &ldquo;{u.name}&rdquo;</> : 'No salesman name on the bill', bills: u.bills, value: u.value })),
+                ] as { label: React.ReactNode; bills: number; value: number; note?: string; strong?: boolean }[]).map((r, i) => (
+                  <tr key={i} className="border-t border-grid">
+                    <th scope="row" className={`px-4 py-2 text-left ${r.strong ? 'font-semibold text-ink' : 'font-medium text-ink-2'}`}>{r.label}</th>
+                    <td className="tnum whitespace-nowrap px-4 py-2 text-right text-ink">{formatNumber(r.bills)}{r.note && <span className="block text-xs text-ink-muted">{r.note}</span>}</td>
+                    <td className="tnum whitespace-nowrap px-4 py-2 text-right text-ink-2">{r.strong ? '—' : formatPercent(r.bills, coverage.bills)}</td>
+                    <td className="tnum whitespace-nowrap px-4 py-2 text-right text-ink">{formatCurrencyCompact(r.value)}</td>
+                    <td className="tnum whitespace-nowrap px-4 py-2 text-right text-ink-2">{r.strong || !coverage.value ? '—' : formatPercent(r.value, coverage.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className={`${card} overflow-hidden`}>
         <div className="overflow-x-auto">
