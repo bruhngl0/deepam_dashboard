@@ -7,9 +7,9 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { analyticsAsOf, analyticsConfigured } from '@/lib/analytics/db';
-import { billBounds, salesPeriod, salespersonStats, uncreditedBills, type SalespersonStats } from '@/lib/analytics/salesperson-module';
+import { billBounds, billCoverage, salesPeriod, salespersonStats, uncreditedBills, type SalespersonStats } from '@/lib/analytics/salesperson-module';
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime, formatNumber, formatPercent } from '@/lib/format';
-import { card, Kpi, KpiGrid, PageHeader, button } from '@/components/ui';
+import { button, card, eyebrow, Kpi, KpiGrid, PageHeader } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,8 +29,8 @@ const COLUMNS: { key: string; label: string; value: (r: SalespersonStats) => num
   { key: 'new', label: 'New customers', value: (r) => r.newCustomers, show: (r) => formatNumber(r.newCustomers) },
   { key: 'repeat', label: 'Came back', value: (r) => r.repeatCustomers, show: (r) => formatNumber(r.repeatCustomers) },
   { key: 'walkins', label: 'Walk-ins served', value: (r) => r.walkIns, show: (r) => formatNumber(r.walkIns) },
-  { key: 'walkinbills', label: 'Walk-ins billed', value: (r) => r.walkInsBilled, show: (r) => (r.walkIns ? <>{formatNumber(r.walkInsBilled)}<span className="block text-xs text-ink-muted">{formatPercent(r.walkInsBilled, r.walkIns, 0)}</span></> : '—') },
-  { key: 'walkinsales', label: 'Sales from walk-ins', value: (r) => r.walkInSales, show: (r) => (r.walkInSales ? formatCurrency(r.walkInSales) : '—') },
+  { key: 'shared', label: 'Shared walk-ins', value: (r) => r.walkInsShared, show: (r) => (r.walkIns ? <>{formatNumber(r.walkInsShared)}<span className="block text-xs text-ink-muted">{formatPercent(r.walkInsShared, r.walkIns, 0)}</span></> : '—') },
+  { key: 'converted', label: 'Walk-ins converted', value: (r) => r.walkInsConverted, show: (r) => (r.walkIns ? <>{formatNumber(r.walkInsConverted)}<span className="block text-xs text-ink-muted">{formatPercent(r.walkInsConverted, r.walkIns, 0)}</span></> : '—') },
   { key: 'driver', label: 'Driver visits', value: (r) => r.driverVisits, show: (r) => (r.driverVisits ? <>{formatNumber(r.driverVisits)}<span className="block text-xs text-ink-muted">{formatNumber(r.driverBills)} billed</span></> : '—') },
   { key: 'calls', label: 'Calls', value: (r) => r.calls, show: (r) => (r.calls ? <>{formatNumber(r.calls)}<span className="block text-xs text-ink-muted">{formatNumber(r.connected)} connected</span></> : '—') },
 ];
@@ -55,7 +55,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
     </main>;
   }
 
-  const [rows, uncredited, bounds, asOf] = await Promise.all([salespersonStats(period), uncreditedBills(period), billBounds(), analyticsAsOf()]);
+  const [rows, uncredited, coverage, bounds, asOf] = await Promise.all([salespersonStats(period), uncreditedBills(period), billCoverage(period), billBounds(), analyticsAsOf()]);
   const list = rows ?? [];
   const sortKey = COLUMNS.some((c) => c.key === one(sp.sort)) || one(sp.sort) === 'name' ? one(sp.sort)! : 'net';
   const dir = one(sp.dir) === 'asc' ? 1 : -1;
@@ -97,6 +97,33 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
           caption={uncredited ? <>{formatCurrency(uncredited.sales)} on bills with no salesperson{uncredited.unmatchedNames ? <> · <Link className="font-medium text-accent hover:underline" href="/reports/salespeople/match">{formatNumber(uncredited.unmatchedNames)} names to match</Link></> : ''}</> : undefined} />
       </KpiGrid>
 
+      {coverage && coverage.bills > 0 && (
+        <section className={`${card} overflow-hidden`}>
+          <div className="border-b border-grid px-4 py-3"><h2 className="text-sm font-semibold text-ink">Bills in the sales sheet</h2></div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm" style={{ minWidth: '36rem' }}>
+              <thead><tr className={eyebrow}>{['', 'Bills', 'Share of bills', 'Value', 'Share of value'].map((h, i) =>
+                <th key={i} scope="col" className={`px-4 py-3 font-bold ${i ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
+              <tbody>
+                {([
+                  { label: 'All bills', bills: coverage.bills, note: `${formatNumber(coverage.sales)} sales + ${formatNumber(coverage.returns)} returns`, value: coverage.value, strong: true },
+                  { label: 'Matched to a salesperson', bills: coverage.matchedBills, value: coverage.matchedValue },
+                  ...coverage.uncredited.map((u) => ({ label: u.name ? <>Salesman written as &ldquo;{u.name}&rdquo;</> : 'No salesman name on the bill', bills: u.bills, value: u.value })),
+                ] as { label: React.ReactNode; bills: number; value: number; note?: string; strong?: boolean }[]).map((r, i) => (
+                  <tr key={i} className="border-t border-grid">
+                    <th scope="row" className={`px-4 py-2 text-left ${r.strong ? 'font-semibold text-ink' : 'font-medium text-ink-2'}`}>{r.label}</th>
+                    <td className="tnum whitespace-nowrap px-4 py-2 text-right text-ink">{formatNumber(r.bills)}{r.note && <span className="block text-xs text-ink-muted">{r.note}</span>}</td>
+                    <td className="tnum whitespace-nowrap px-4 py-2 text-right text-ink-2">{r.strong ? '—' : formatPercent(r.bills, coverage.bills)}</td>
+                    <td className="tnum whitespace-nowrap px-4 py-2 text-right text-ink">{formatCurrencyCompact(r.value)}</td>
+                    <td className="tnum whitespace-nowrap px-4 py-2 text-right text-ink-2">{r.strong || !coverage.value ? '—' : formatPercent(r.value, coverage.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <section className={`${card} overflow-hidden`}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm" style={{ minWidth: '96rem' }}>
@@ -129,7 +156,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
         <p><b className="text-ink-2">Avg bill, Items, Discount:</b> sales bills only. Discount is the item discount as a share of the price before discount.</p>
         <p><b className="text-ink-2">Margin:</b> bill amount less the purchase value of its items, on bills where every item has a purchase value.</p>
         <p><b className="text-ink-2">Customers:</b> distinct customers billed. Bills with customer: bills matched to a customer by phone. New customers: their first bill since sales history starts (1 May 2026) was with this salesperson. Came back: bought from them on two or more days.</p>
-        <p><b className="text-ink-2">Walk-ins served, billed, Sales from walk-ins:</b> WalkTrack walk-ins they were tagged on, and the bills those walk-ins led to, whoever&apos;s name is on the bill. A walk-in served by two people counts for each.</p>
+        <p><b className="text-ink-2">Walk-ins served, Shared, Converted:</b> from WalkTrack. Walk-ins they were tagged on; a walk-in served by two people counts for each, and Shared shows how many were also tagged to someone else. Converted: marked as a sale by staff in WalkTrack. Walk-ins are not tied to bills: sales come only from the salesman named on the sales sheet.</p>
         <p><b className="text-ink-2">Driver visits:</b> RC Dashboard visits naming them. <b className="text-ink-2">Calls:</b> marketing calls logged under their name.</p>
       </section>
     </main>
