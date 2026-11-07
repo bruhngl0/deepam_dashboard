@@ -34,7 +34,7 @@ const gate: GateConfig = {
   // personal: they belong to one employee each.
   adminCookies: () => [{ name: STORE_MANAGER_COOKIE, value: STORE_MANAGER_TOKEN, path: STORE_MANAGER_COOKIE_PATH, maxAge: STORE_MANAGER_MAX_AGE }],
   // Vendor Intelligence, RC Dashboard and WalkTrack: CRM's links to them go through GO_PATH, so an admin arrives signed in.
-  peers: ['https://n7v6pm6bm2.ap-south-1.awsapprunner.com', 'https://2q9cmkmxnu.ap-south-1.awsapprunner.com', 'https://na8yspyqqp.ap-south-1.awsapprunner.com'],
+  peers: ['https://vendor.hemparshwa.com', 'https://rc.hemparshwa.com', 'https://walktrack.hemparshwa.com'],
 };
 
 // The sales workspace loads and saves through these, under the salesperson's own login.

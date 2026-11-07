@@ -38,7 +38,7 @@ const CRM_TABS = [
 // Overview lives in the separately deployed vendor application; linking to it
 // directly avoids the hop through `/vendor`, which only redirects there.
 const VENDOR_TABS = [
-  { href: '/__gate/go?to=https%3A%2F%2Fn7v6pm6bm2.ap-south-1.awsapprunner.com%2F', label: 'Overview' },
+  { href: '/__gate/go?to=https%3A%2F%2Fvendor.hemparshwa.com%2F', label: 'Overview' },
   { href: '/vendor/vendors', label: 'Vendors' },
   { href: '/vendor/purchases', label: 'Purchases' },
   { href: '/vendor/performance', label: 'Performance' },

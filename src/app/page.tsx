@@ -92,7 +92,7 @@ export default async function HeroPage() {
         </Link>
 
         <a
-          href="/__gate/go?to=https%3A%2F%2Fn7v6pm6bm2.ap-south-1.awsapprunner.com%2F"
+          href="/__gate/go?to=https%3A%2F%2Fvendor.hemparshwa.com%2F"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -110,7 +110,7 @@ export default async function HeroPage() {
         </a>
 
         <a
-          href="/__gate/go?to=https%3A%2F%2F2q9cmkmxnu.ap-south-1.awsapprunner.com%2F"
+          href="/__gate/go?to=https%3A%2F%2Frc.hemparshwa.com%2F"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -127,7 +127,7 @@ export default async function HeroPage() {
         </a>
 
         <a
-          href="/__gate/go?to=https%3A%2F%2Fna8yspyqqp.ap-south-1.awsapprunner.com%2F"
+          href="/__gate/go?to=https%3A%2F%2Fwalktrack.hemparshwa.com%2F"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
