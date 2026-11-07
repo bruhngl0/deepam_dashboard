@@ -210,7 +210,7 @@ export async function salespersonMonths(empCode: string, period: SalesPeriod): P
 }
 
 export type BillRow = {
-  billId: number; day: string; voucher: string | null; storeName: string | null; personId: number | null; customerName: string | null; customerCode: string | null;
+  billId: number; day: string; voucher: string | null; storeName: string | null; personId: number | null; customerName: string | null; customerCode: string | null; customerPhone: string | null;
   firstBill: boolean; items: number; qty: number; amount: number; discount: number; cost: number | null;
 };
 export const BILL_PAGE_SIZE = 50;
@@ -221,8 +221,8 @@ export async function salespersonBills(empCode: string, period: SalesPeriod, pag
   const rows = await aq<Record<string, unknown>>(`
     WITH st AS (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3),
     b AS (SELECT * FROM analytics.fact_bill WHERE emp_code = $4 AND day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code IN (SELECT store_code FROM st)))
-    SELECT b.bill_id, b.day::text AS day, b.voucher, coalesce(ds.name, b.store_code) AS store_name, b.person_id, p.name AS customer_name, p.customer_code,
-           b.billed_at = (SELECT min(billed_at) FROM analytics.fact_bill f WHERE f.person_id = b.person_id AND f.amount > 0) AS first_bill,
+    SELECT b.bill_id, b.day::text AS day, b.voucher, coalesce(ds.name, b.store_code) AS store_name, b.person_id, p.name AS customer_name, p.customer_code, p.phone AS customer_phone,
+           b.bill_id = (SELECT f.bill_id FROM analytics.fact_bill f WHERE f.person_id = b.person_id AND f.amount > 0 ORDER BY f.billed_at, f.bill_id LIMIT 1) AS first_bill,
            l.items, b.qty, b.amount, b.discount, CASE WHEN l.all_cost THEN l.cost END AS cost,
            count(*) OVER () AS total
     FROM b
@@ -236,7 +236,7 @@ export async function salespersonBills(empCode: string, period: SalesPeriod, pag
     total: n(rows?.[0]?.total),
     rows: (rows ?? []).map((r) => ({
       billId: n(r.bill_id), day: String(r.day), voucher: s(r.voucher), storeName: s(r.store_name), personId: r.person_id == null ? null : n(r.person_id),
-      customerName: s(r.customer_name), customerCode: s(r.customer_code), firstBill: r.first_bill === true, items: n(r.items), qty: n(r.qty),
+      customerName: s(r.customer_name), customerCode: s(r.customer_code), customerPhone: s(r.customer_phone), firstBill: r.first_bill === true, items: n(r.items), qty: n(r.qty),
       amount: n(r.amount), discount: n(r.discount), cost: r.cost == null ? null : n(r.cost),
     })),
   };
