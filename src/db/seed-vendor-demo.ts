@@ -45,7 +45,7 @@ async function main() {
       ] as const;
       for (const [code, barcode, itemName, itemGroupName, purcQty, purcAmt, netSalesQty, netSalesAmt, clQty, clAmt] of ledgerRows) {
         await tx.insert(vendorStockLedger).values({ vendorId: vendorId.get(code)!, batchId: ledgerBatch.id, barcode, itemName, itemGroupName, periodFrom: '2026-01-01', periodTo: '2026-09-17', purcQty: String(purcQty), purcAmt: String(purcAmt), netPurcQty: String(purcQty), netPurcAmt: String(purcAmt), netSalesQty: String(netSalesQty), netSalesAmt: String(netSalesAmt), clQty: String(clQty), clAmt: String(clAmt), clMrp: String(clAmt * 1.45), raw: { synthetic: true } })
-          .onConflictDoUpdate({ target: [vendorStockLedger.barcode, vendorStockLedger.periodFrom, vendorStockLedger.periodTo], set: { vendorId: vendorId.get(code)!, batchId: ledgerBatch.id, netSalesQty: String(netSalesQty), netSalesAmt: String(netSalesAmt), clQty: String(clQty), clAmt: String(clAmt) } });
+          .onConflictDoUpdate({ target: [vendorStockLedger.barcode, vendorStockLedger.branch, vendorStockLedger.periodFrom, vendorStockLedger.periodTo], set: { vendorId: vendorId.get(code)!, batchId: ledgerBatch.id, netSalesQty: String(netSalesQty), netSalesAmt: String(netSalesAmt), clQty: String(clQty), clAmt: String(clAmt) } });
       }
       const [defaultStore] = await tx.select({ id: stores.id }).from(stores).limit(1);
       const poSeed = [

@@ -14,7 +14,7 @@
  * returns/exchanges and are never rejected for it.
  */
 
-import { readWorkbook, sheetToRows, mapColumns, toNumber, toText } from '../excel';
+import { readWorkbook, sheetToRows, mapColumns, normalizeHeader, toNumber, toText } from '../excel';
 
 export interface ParsedSaleLineItem {
   rowNumber: number;
@@ -42,6 +42,16 @@ export interface ParsedSaleLineItem {
   otherAddLessAmt: number | null;
   amtWithTax: number | null;
   salesAmt: number | null;
+  /** The ERP's branch ('MG', 'JAYANAGAR', …), when the export has Branch Name. */
+  branch: string | null;
+  /** Lower-case ('sales', 'return'); '' when the export has no Sales Type. */
+  salesType: string;
+  salesperson: string | null;
+  helper: string | null;
+  vendor: string | null;
+  customerPhone: string | null;
+  purchaseDate: string | null; // 'YYYY-MM-DD'
+  vendorInvoiceNo: string | null;
   raw: Record<string, unknown>;
 }
 
@@ -94,6 +104,30 @@ const COLUMN_SPEC = {
   salesAmt: 'Sales Amt',
 } satisfies Record<string, string | string[]>;
 
+/** Columns matched on the exact heading only, so `Purc VoucherNo` can never be read as the purchase date. */
+const EXACT_COLUMN_SPEC = {
+  branch: ['Branch Name', 'Branch'],
+  salesType: 'Sales Type',
+  salesperson: ['Salesman Name', 'Salesman'],
+  helper: ['Helper Name', 'Helper'],
+  vendor: ['Party Name', 'Vendor Name'],
+  customerPhone: ['Mobile1', 'Mobile', 'Mobile No'],
+  purchaseDate: ['Purc VoucherDate', 'Purc Voucher Date', 'Purchase Voucher Date'],
+  vendorInvoiceNo: ['Purc BillNo', 'Purc Bill No', 'Purch Bill Number'],
+} satisfies Record<string, string | string[]>;
+
+function exactColumns<K extends string>(header: unknown[], spec: Record<K, string | string[]>): Record<K, number> {
+  const normalized = header.map(normalizeHeader);
+  const out = {} as Record<K, number>;
+  for (const [key, needles] of Object.entries(spec) as [K, string | string[]][]) {
+    const index = (Array.isArray(needles) ? needles : [needles])
+      .map((n) => normalized.indexOf(normalizeHeader(n)))
+      .find((i) => i >= 0);
+    out[key] = index ?? -1;
+  }
+  return out;
+}
+
 /** Locate the header row by the Voucher No+Barcode column signature. */
 function findHeaderRow(rows: unknown[][]): number {
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
@@ -136,6 +170,7 @@ export function parseSaleLineItemsWorkbook(
   const headerRow = findHeaderRow(rows);
   const header = rows[headerRow];
   const col = mapColumns(header, COLUMN_SPEC);
+  const extra = exactColumns(header, EXACT_COLUMN_SPEC);
 
   if (col.voucherNo < 0 || col.barcode < 0) {
     throw new Error(
@@ -244,6 +279,14 @@ export function parseSaleLineItemsWorkbook(
       otherAddLessAmt: toNumber(row[col.otherAddLessAmt]),
       amtWithTax: toNumber(row[col.amtWithTax]),
       salesAmt,
+      branch: toText(row[extra.branch]),
+      salesType: (toText(row[extra.salesType]) ?? '').toLowerCase(),
+      salesperson: toText(row[extra.salesperson]),
+      helper: toText(row[extra.helper]),
+      vendor: toText(row[extra.vendor]),
+      customerPhone: toText(row[extra.customerPhone]),
+      purchaseDate: toDateOnly(row[extra.purchaseDate]),
+      vendorInvoiceNo: toText(row[extra.vendorInvoiceNo]),
       raw,
     });
   }

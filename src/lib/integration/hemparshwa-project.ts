@@ -301,26 +301,33 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
       const lineItems = await t.execute(sql`
         INSERT INTO sale_line_items (sale_id, voucher_date_raw, voucher_no_raw, batch_id, barcode, account_name_raw, item_name,
                                      color_name, size, qty, purc_value, sales_rate, amount, item_disc_amt, item_amt, net_amt,
-                                     taxable_amt, sgst_amt, cgst_amt, igst_amt, sales_amt, raw)
+                                     taxable_amt, sgst_amt, cgst_amt, igst_amt, sales_amt, store_id, sales_type, salesperson,
+                                     helper, vendor, customer_phone, purchase_date, vendor_invoice_no, raw)
         SELECT min(s.id), l.invoice_date, l.invoice_id, min(i.batch_id::text)::uuid, l.sku_code, max(l.customer_name),
                max(COALESCE(l.subcategory, l.sku_name)), max(l.details->>'colour'), max(l.details->>'size'),
                sum(l.quantity), sum((l.details->>'purchase_value')::numeric), max(l.selling_price),
                sum((l.details->>'total_amount')::numeric), sum(l.discount), sum((l.details->>'item_amount')::numeric),
                sum(l.net_amount), sum((l.details->>'taxable_amount')::numeric), sum((l.details->>'sgst_amount')::numeric),
                sum((l.details->>'cgst_amount')::numeric), sum((l.details->>'igst_amount')::numeric), sum(l.net_amount),
+               st.id, l.sales_type, min(l.salesperson), max(NULLIF(trim(l.details->>'employee2'), '')), max(l.vendor),
+               max(l.customer_phone),
+               max(CASE WHEN l.details->>'purchase_date' ~ '^\\d{4}-\\d{2}-\\d{2}' THEN substr(l.details->>'purchase_date', 1, 10)::date END),
+               max(NULLIF(trim(l.details->>'vendor_invoice_number'), '')),
                (jsonb_agg(l.details))->0
         FROM hemparshwa_sales_lines l
         JOIN hemparshwa_imports i ON i.import_id = l.import_id
         JOIN stores st ON st.store_code = l.store_id OR st.code = l.store_id
         JOIN sales s ON s.voucher_no = COALESCE(st.voucher_prefix, st.store_code || '-') || l.invoice_id || '@' || l.invoice_date || CASE WHEN l.sales_type IN ('', 'sales') THEN '' ELSE '-' || l.sales_type END
-        GROUP BY l.invoice_date, l.invoice_id, l.sku_code
-        ON CONFLICT (voucher_date_raw, voucher_no_raw, barcode) DO UPDATE SET
+        GROUP BY l.invoice_date, l.invoice_id, l.sku_code, st.id, l.sales_type
+        ON CONFLICT (voucher_date_raw, voucher_no_raw, barcode, store_id, sales_type) DO UPDATE SET
           sale_id = EXCLUDED.sale_id, batch_id = EXCLUDED.batch_id, account_name_raw = EXCLUDED.account_name_raw,
           item_name = EXCLUDED.item_name, color_name = EXCLUDED.color_name, size = EXCLUDED.size, qty = EXCLUDED.qty,
           purc_value = EXCLUDED.purc_value, sales_rate = EXCLUDED.sales_rate, amount = EXCLUDED.amount,
           item_disc_amt = EXCLUDED.item_disc_amt, item_amt = EXCLUDED.item_amt, net_amt = EXCLUDED.net_amt,
           taxable_amt = EXCLUDED.taxable_amt, sgst_amt = EXCLUDED.sgst_amt, cgst_amt = EXCLUDED.cgst_amt,
-          igst_amt = EXCLUDED.igst_amt, sales_amt = EXCLUDED.sales_amt, raw = EXCLUDED.raw
+          igst_amt = EXCLUDED.igst_amt, sales_amt = EXCLUDED.sales_amt, salesperson = EXCLUDED.salesperson,
+          helper = EXCLUDED.helper, vendor = EXCLUDED.vendor, customer_phone = EXCLUDED.customer_phone,
+          purchase_date = EXCLUDED.purchase_date, vendor_invoice_no = EXCLUDED.vendor_invoice_no, raw = EXCLUDED.raw
         RETURNING id
       `);
 

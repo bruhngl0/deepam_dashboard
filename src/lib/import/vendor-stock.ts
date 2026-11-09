@@ -3,7 +3,8 @@
  *
  * Re-uploading the same reporting period is an upsert, not a duplicate: a
  * barcode's figures can be corrected in a later export of the same window
- * (`(barcode, period_from, period_to)` is the natural key, D-59-style).
+ * (`(barcode, branch, period_from, period_to)` is the natural key, D-59-style:
+ * the Stock Report lists a barcode once for every branch it passed through).
  * Independent of `customers`/`sales` (D-64) — no lifecycle recompute or
  * materialized-view refresh runs here.
  */
@@ -11,7 +12,8 @@
 import { createHash } from 'node:crypto';
 import { sql, inArray } from 'drizzle-orm';
 import { db, txDb } from '@/db';
-import { importBatches, importRowsRejected, vendors as vendorsTable, vendorStockLedger } from '@/db/schema';
+import { importBatches, importRowsRejected, stores as storesTable, vendors as vendorsTable, vendorStockLedger } from '@/db/schema';
+import { storeIdForBranch } from '../branch-store';
 import {
   parseVendorStockWorkbook,
   type ParsedVendorStockRow,
@@ -48,13 +50,13 @@ export async function previewVendorStockImport(
   fileName: string,
   sheetName?: string,
 ): Promise<VendorStockPreview> {
-  const parsed = parseVendorStockWorkbook(fileBuffer, sheetName);
+  const parsed = parseVendorStockWorkbook(fileBuffer, sheetName, fileName);
   const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
 
   const seen = new Set<string>();
   let duplicateRowsInFile = 0;
   for (const row of parsed.rows) {
-    const key = `${row.barcode}|${row.periodFrom}|${row.periodTo}`;
+    const key = `${row.barcode}|${row.branch}|${row.periodFrom}|${row.periodTo}`;
     if (seen.has(key)) duplicateRowsInFile++;
     seen.add(key);
   }
@@ -142,14 +144,32 @@ export async function commitVendorStockImport(
       // Dedupe within the file so ON CONFLICT sees each identity key once.
       const byKey = new Map<string, ParsedVendorStockRow>();
       for (const row of rows) {
-        byKey.set(`${row.barcode}|${row.periodFrom}|${row.periodTo}`, row);
+        byKey.set(`${row.barcode}|${row.branch}|${row.periodFrom}|${row.periodTo}`, row);
       }
       const uniqueRows = [...byKey.values()];
+
+      const storeList = await t
+        .select({ id: storesTable.id, code: storesTable.code, name: storesTable.name })
+        .from(storesTable);
 
       const ledgerValues = uniqueRows.map((row) => ({
         vendorId: vendorIdByName.get(row.vendorName)!,
         batchId,
         barcode: row.barcode,
+        branch: row.branch,
+        storeId: storeIdForBranch(row.branch, storeList),
+        department: row.department,
+        brand: row.brand,
+        product: row.product,
+        style: row.style,
+        designNo: row.designNo,
+        color: row.color,
+        size: row.size,
+        lotNo: row.lotNo,
+        city: row.city,
+        mrp: row.mrp === null ? null : String(row.mrp),
+        purchaseVoucher: row.purchaseVoucher,
+        purchaseDate: row.purchaseDate,
         itemName: row.itemName,
         itemGroupName: row.itemGroupName,
         compSize: row.compSize,
@@ -191,12 +211,26 @@ export async function commitVendorStockImport(
           .onConflictDoUpdate({
             target: [
               vendorStockLedger.barcode,
+              vendorStockLedger.branch,
               vendorStockLedger.periodFrom,
               vendorStockLedger.periodTo,
             ],
             set: {
               vendorId: sql`EXCLUDED.vendor_id`,
               batchId: sql`EXCLUDED.batch_id`,
+              storeId: sql`EXCLUDED.store_id`,
+              department: sql`EXCLUDED.department`,
+              brand: sql`EXCLUDED.brand`,
+              product: sql`EXCLUDED.product`,
+              style: sql`EXCLUDED.style`,
+              designNo: sql`EXCLUDED.design_no`,
+              color: sql`EXCLUDED.color`,
+              size: sql`EXCLUDED.size`,
+              lotNo: sql`EXCLUDED.lot_no`,
+              city: sql`EXCLUDED.city`,
+              mrp: sql`EXCLUDED.mrp`,
+              purchaseVoucher: sql`EXCLUDED.purchase_voucher`,
+              purchaseDate: sql`EXCLUDED.purchase_date`,
               itemName: sql`EXCLUDED.item_name`,
               itemGroupName: sql`EXCLUDED.item_group_name`,
               compSize: sql`EXCLUDED.comp_size`,

@@ -92,3 +92,30 @@ describe('parseSaleLineItemsWorkbook', () => {
     expect(result.rejected[0].errorCode).toBe('date.invalid');
   });
 });
+
+describe('the barcode-wise export with branch, salesman and purchase columns', () => {
+  const header = ['Voucher No', 'Voucher Date', 'Account Name', 'Sales Type', 'Sales Rate', 'Amount', 'Party Name', 'Purc VoucherNo',
+    'Purc VoucherDate', 'Purc Rate', 'Purc Value', 'Branch Name', 'Purc BillNo', 'Mobile1', 'Barcode', 'Brand Name', 'Item Name',
+    'Salesman Name', 'Helper Name', 'Qty', 'SalesAmt'];
+
+  it('reads them into their own fields', () => {
+    const wb = buildWorkbook([
+      ['ANANTA SILK WEAVES PRIVATE LIMITED'], ['MG/ JAYANAGAR'], ['Sales Report'],
+      header,
+      ['00001', 46143, 'SUJATA JOSHI', 'Return', -7150, -7150, 'VEER FASHION', '00001', 46143, -3095, -3095, 'MG', '6860', '9822127027',
+        '01000009', 'VF', 'ART - POLYSTERS', 'MARY JOSEPHINE', '', -1, 7150],
+    ]);
+    const [r] = parseSaleLineItemsWorkbook(wb).rows;
+    expect(r).toMatchObject({
+      voucherNoRaw: '00001', voucherDateRaw: '2026-05-01', branch: 'MG', salesType: 'return', salesperson: 'MARY JOSEPHINE',
+      helper: null, vendor: 'VEER FASHION', customerPhone: '9822127027', purchaseDate: '2026-05-01', vendorInvoiceNo: '6860',
+      qty: -1, purcValue: -3095,
+    });
+  });
+
+  it('leaves them empty for an export without those columns', () => {
+    const wb = buildWorkbook([['Voucher No', 'Voucher Date', 'Barcode', 'Qty'], ['00670', '19/07/2026', 'BC1', 1]]);
+    const [r] = parseSaleLineItemsWorkbook(wb).rows;
+    expect(r).toMatchObject({ branch: null, salesType: '', salesperson: null, vendor: null, customerPhone: null, purchaseDate: null });
+  });
+});

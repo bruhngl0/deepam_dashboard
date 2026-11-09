@@ -232,6 +232,13 @@
       "when": 1792760400000,
       "tag": "0032_internal_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792846800000,
+      "tag": "0033_line_item_store_and_stock_branch",
+      "breakpoints": true
     }
   ]
 }
