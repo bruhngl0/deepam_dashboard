@@ -5,7 +5,7 @@
  *
  * The timer runs every `HEMPARSHWA_SYNC_HOURS` (default 5; 0 turns it off)
  * wherever `HEMPARSHWA_URL` and `HEMPARSHWA_INTEGRATION_TOKEN` are set, with a
- * first run shortly after boot. App Runner throttles a container's CPU while
+ * first run shortly after boot, which always rebuilds. App Runner throttles a container's CPU while
  * it serves no requests, so a tick can run late on a quiet service; calling
  * `POST /api/integration/hemparshwa/sync` does the same job on demand.
  */
@@ -82,8 +82,12 @@ export function startHemparshwaSyncScheduler() {
   const hours = syncIntervalHours();
   if (!hours || state.hemparshwaSyncTimer) return;
   if (!process.env.HEMPARSHWA_URL || !process.env.HEMPARSHWA_INTEGRATION_TOKEN) return;
+  // The first run after boot rebuilds even with nothing new, so a release that changes how bills are built applies at once.
+  let first = true;
   const tick = () => {
-    runHemparshwaSync()
+    const rebuild = first;
+    first = false;
+    runHemparshwaSync(rebuild)
       .then((run) => {
         if (run.projection || (run.conversions && 'billsAdded' in run.conversions && run.conversions.billsAdded > 0)) console.log('[hemparshwa sync]', JSON.stringify(run));
       })
