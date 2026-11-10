@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { isIntegrationAuthorized } from '@/lib/integration/auth';
+import { LATEST_STOCK_ROWS } from '@/lib/queries/stock-ledger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,25 +10,27 @@ const resultRows = (result: unknown) => Array.isArray(result) ? result : (result
 export async function GET(request: Request) {
   if (!isIntegrationAuthorized(request)) return Response.json({ error: 'Unauthorized' }, { status: 401 });
   const [vendors, products, stockUnits, dailySales] = await Promise.all([
-    db.execute(sql`WITH latest AS (SELECT DISTINCT ON (barcode) * FROM vendor_stock_ledger ORDER BY barcode, period_to DESC)
+    db.execute(sql`WITH latest AS (${sql.raw(LATEST_STOCK_ROWS)})
       SELECT v.name AS brand, v.vendor_code, COALESCE(SUM(l.purc_qty),0)::float8 AS purchase_qty,
         COALESCE(SUM(l.purc_amt),0)::float8 AS purchase_value, COALESCE(SUM(l.net_sales_amt),0)::float8 AS purchase_total,
         COALESCE(SUM(l.cl_qty),0)::float8 AS stock_qty, COALESCE(SUM(l.cl_amt)/NULLIF(SUM(l.cl_qty),0),0)::float8 AS avg_cost,
         COALESCE(SUM(l.cl_mrp)/NULLIF(SUM(l.cl_qty),0),0)::float8 AS avg_mrp,
         COALESCE(SUM(l.cl_amt),0)::float8 AS stock_cost_est, COALESCE(SUM(l.cl_mrp),0)::float8 AS stock_mrp_est
       FROM latest l JOIN vendors v ON v.id=l.vendor_id GROUP BY v.id,v.name,v.vendor_code ORDER BY v.name`),
-    db.execute(sql`WITH latest AS (SELECT DISTINCT ON (barcode) * FROM vendor_stock_ledger ORDER BY barcode, period_to DESC)
+    db.execute(sql`WITH latest AS (${sql.raw(LATEST_STOCK_ROWS)})
       SELECT v.name AS brand, COALESCE(l.item_name,'Unclassified') AS name, cat.category_code, COALESCE(SUM(l.net_sales_qty),0)::float8 AS quantity,
         COALESCE(SUM(l.net_sales_amt),0)::float8 AS sales_value, COALESCE(SUM(l.net_purc_amt),0)::float8 AS cost_value,
         COALESCE(SUM(l.net_purc_amt)/NULLIF(SUM(l.net_purc_qty),0),0)::float8 AS unit_cost,
         COALESCE(SUM(l.cl_mrp)/NULLIF(SUM(l.cl_qty),0),0)::float8 AS mrp
       FROM latest l JOIN vendors v ON v.id=l.vendor_id LEFT JOIN categories cat ON lower(cat.name)=lower(l.item_name)
       GROUP BY v.name,l.item_name,cat.category_code`),
-    db.execute(sql`WITH latest AS (SELECT DISTINCT ON (barcode) * FROM vendor_stock_ledger ORDER BY barcode, period_to DESC)
-      SELECT v.name AS brand, COALESCE(l.item_name,'Unclassified') AS name, l.barcode, COALESCE(l.cl_qty,0)::float8 AS quantity,
-        COALESCE(l.cl_amt/NULLIF(l.cl_qty,0),0)::float8 AS purchase_cost, COALESCE(l.cl_mrp/NULLIF(l.cl_qty,0),0)::float8 AS mrp,
-        COALESCE(l.net_sales_amt/NULLIF(l.net_sales_qty,0),0)::float8 AS sales_rate, l.comp_size AS design_no, l.period_to::text AS inward_date
-      FROM latest l JOIN vendors v ON v.id=l.vendor_id ORDER BY v.name,l.item_name,l.barcode`),
+    db.execute(sql`WITH latest AS (${sql.raw(LATEST_STOCK_ROWS)})
+      SELECT v.name AS brand, COALESCE(max(l.item_name),'Unclassified') AS name, l.barcode, COALESCE(SUM(l.cl_qty),0)::float8 AS quantity,
+        COALESCE(SUM(l.cl_amt)/NULLIF(SUM(l.cl_qty),0),0)::float8 AS purchase_cost,
+        COALESCE(max(l.mrp), SUM(l.cl_mrp)/NULLIF(SUM(l.cl_qty),0), 0)::float8 AS mrp,
+        COALESCE(SUM(l.net_sales_amt)/NULLIF(SUM(l.net_sales_qty),0),0)::float8 AS sales_rate,
+        COALESCE(max(l.design_no), max(l.comp_size)) AS design_no, COALESCE(min(l.purchase_date), max(l.period_to))::text AS inward_date
+      FROM latest l JOIN vendors v ON v.id=l.vendor_id GROUP BY v.name,l.barcode ORDER BY v.name,name,l.barcode`),
     db.execute(sql`WITH item_vendor AS (SELECT DISTINCT ON (barcode) barcode,vendor_id FROM vendor_stock_ledger ORDER BY barcode,period_to DESC)
       SELECT sli.voucher_date_raw::text AS sale_date, v.name AS brand, COALESCE(SUM(sli.qty),0)::float8 AS quantity,
         COALESCE(SUM(sli.sales_amt),0)::float8 AS sales_value, COALESCE(SUM(sli.purc_value*sli.qty),0)::float8 AS cost_value,

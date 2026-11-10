@@ -24,6 +24,8 @@ export interface VendorStockPreviewResponse {
   closingAmount: number;
   uniqueVendors: number;
   uniqueBarcodes: number;
+  /** Fabric rows left out: fabric is not tracked as stock. */
+  fabricRowsSkipped: number;
   duplicateRowsInFile: number;
   alreadyImported: boolean;
   rejectedByCode: { code: string; n: number }[];
@@ -65,6 +67,7 @@ export async function POST(request: Request) {
       closingAmount: preview.summary.closingAmount,
       uniqueVendors: preview.summary.uniqueVendors,
       uniqueBarcodes: preview.summary.uniqueBarcodes,
+      fabricRowsSkipped: preview.summary.fabricRowsSkipped,
       duplicateRowsInFile: preview.summary.duplicateRowsInFile,
       alreadyImported: preview.summary.alreadyImported,
       rejectedByCode: [...rejectedByCode.entries()]

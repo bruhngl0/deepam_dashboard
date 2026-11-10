@@ -17,7 +17,13 @@
  *     returns, the same figure Hemparshwa shows;
  *   - a bill built here earlier whose document is gone (import reset) is removed;
  *   - a bill from the old Sales Report import on a covered store and day is
- *     removed too: its number carries no date, so it cannot be matched.
+ *     removed too: its number carries no date, so it cannot be matched;
+ *   - the newest export wins. A line belongs to the import that last wrote it,
+ *     so a line still held by an older import, on a store and date a newer
+ *     import covers, is one the newer export no longer has: it is left out.
+ *     (The 01-05 to 30-09 export held five company bills, ₹17.4 L, that the
+ *     01-05 to 06-11 export dropped.) A newer import covers a store from its
+ *     first to its last line date there.
  *
  * The export has no bill time, so a new bill is stamped 12:00 IST on its date.
  * Customers follow CRM's rule: identity is a valid Indian phone. A bill without one still gets a customer,
@@ -50,6 +56,8 @@ export interface ProjectionResult {
   internalBillsSkipped: number;
   /** Lines whose Store ID matches no CRM store; they are not billed. */
   unmappedStoreLines: number;
+  /** Lines of an older import on a store and date a newer import covers, which the newer one dropped: not billed. */
+  supersededLines: number;
   visitsReconciled: number;
 }
 
@@ -161,8 +169,25 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
         UPDATE hemparshwa_imports i SET batch_id = made.id FROM made WHERE made.file_url = 'hemparshwa:' || i.import_id
       `);
 
+      // ── The lines that count: the newest export wins ─────────────────────────
+      await t.execute(sql`
+        CREATE TEMP TABLE hp_lines ON COMMIT DROP AS
+        WITH span AS (
+          SELECT import_id, store_id, min(invoice_date) AS first_day, max(invoice_date) AS last_day
+          FROM hemparshwa_sales_lines GROUP BY import_id, store_id
+        )
+        SELECT l.* FROM hemparshwa_sales_lines l JOIN hemparshwa_imports i ON i.import_id = l.import_id
+        WHERE NOT EXISTS (
+          SELECT 1 FROM span s JOIN hemparshwa_imports n ON n.import_id = s.import_id
+          WHERE s.store_id = l.store_id AND l.invoice_date BETWEEN s.first_day AND s.last_day
+            AND (n.imported_at, n.import_id) > (i.imported_at, i.import_id))
+      `);
+      const supersededLines = count(await t.execute(sql`
+        SELECT (SELECT count(*) FROM hemparshwa_sales_lines) - (SELECT count(*) FROM hp_lines) AS n
+      `));
+
       // ── Phones → CRM identity ────────────────────────────────────────────────
-      const phones = (await t.execute(sql`SELECT DISTINCT customer_phone AS phone FROM hemparshwa_sales_lines WHERE customer_phone IS NOT NULL`))
+      const phones = (await t.execute(sql`SELECT DISTINCT customer_phone AS phone FROM hp_lines WHERE customer_phone IS NOT NULL`))
         .rows as { phone: string }[];
       const identities = phones.flatMap(({ phone }) => {
         const p = normalizePhone(phone);
@@ -192,7 +217,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
                sum(l.discount) AS item_disc_amount,
                min(l.salesperson) AS salesman_code,
                count(*) AS lines
-        FROM hemparshwa_sales_lines l
+        FROM hp_lines l
         JOIN hemparshwa_imports i ON i.import_id = l.import_id
         JOIN stores st ON st.store_code = l.store_id OR st.code = l.store_id
         LEFT JOIN hp_phone p ON p.phone = l.customer_phone
@@ -301,26 +326,33 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
       const lineItems = await t.execute(sql`
         INSERT INTO sale_line_items (sale_id, voucher_date_raw, voucher_no_raw, batch_id, barcode, account_name_raw, item_name,
                                      color_name, size, qty, purc_value, sales_rate, amount, item_disc_amt, item_amt, net_amt,
-                                     taxable_amt, sgst_amt, cgst_amt, igst_amt, sales_amt, raw)
+                                     taxable_amt, sgst_amt, cgst_amt, igst_amt, sales_amt, store_id, sales_type, salesperson,
+                                     helper, vendor, customer_phone, purchase_date, vendor_invoice_no, raw)
         SELECT min(s.id), l.invoice_date, l.invoice_id, min(i.batch_id::text)::uuid, l.sku_code, max(l.customer_name),
                max(COALESCE(l.subcategory, l.sku_name)), max(l.details->>'colour'), max(l.details->>'size'),
                sum(l.quantity), sum((l.details->>'purchase_value')::numeric), max(l.selling_price),
                sum((l.details->>'total_amount')::numeric), sum(l.discount), sum((l.details->>'item_amount')::numeric),
                sum(l.net_amount), sum((l.details->>'taxable_amount')::numeric), sum((l.details->>'sgst_amount')::numeric),
                sum((l.details->>'cgst_amount')::numeric), sum((l.details->>'igst_amount')::numeric), sum(l.net_amount),
+               st.id, l.sales_type, min(l.salesperson), max(NULLIF(trim(l.details->>'employee2'), '')), max(l.vendor),
+               max(l.customer_phone),
+               max(CASE WHEN l.details->>'purchase_date' ~ '^\\d{4}-\\d{2}-\\d{2}' THEN substr(l.details->>'purchase_date', 1, 10)::date END),
+               max(NULLIF(trim(l.details->>'vendor_invoice_number'), '')),
                (jsonb_agg(l.details))->0
-        FROM hemparshwa_sales_lines l
+        FROM hp_lines l
         JOIN hemparshwa_imports i ON i.import_id = l.import_id
         JOIN stores st ON st.store_code = l.store_id OR st.code = l.store_id
         JOIN sales s ON s.voucher_no = COALESCE(st.voucher_prefix, st.store_code || '-') || l.invoice_id || '@' || l.invoice_date || CASE WHEN l.sales_type IN ('', 'sales') THEN '' ELSE '-' || l.sales_type END
-        GROUP BY l.invoice_date, l.invoice_id, l.sku_code
-        ON CONFLICT (voucher_date_raw, voucher_no_raw, barcode) DO UPDATE SET
+        GROUP BY l.invoice_date, l.invoice_id, l.sku_code, st.id, l.sales_type
+        ON CONFLICT (voucher_date_raw, voucher_no_raw, barcode, store_id, sales_type) DO UPDATE SET
           sale_id = EXCLUDED.sale_id, batch_id = EXCLUDED.batch_id, account_name_raw = EXCLUDED.account_name_raw,
           item_name = EXCLUDED.item_name, color_name = EXCLUDED.color_name, size = EXCLUDED.size, qty = EXCLUDED.qty,
           purc_value = EXCLUDED.purc_value, sales_rate = EXCLUDED.sales_rate, amount = EXCLUDED.amount,
           item_disc_amt = EXCLUDED.item_disc_amt, item_amt = EXCLUDED.item_amt, net_amt = EXCLUDED.net_amt,
           taxable_amt = EXCLUDED.taxable_amt, sgst_amt = EXCLUDED.sgst_amt, cgst_amt = EXCLUDED.cgst_amt,
-          igst_amt = EXCLUDED.igst_amt, sales_amt = EXCLUDED.sales_amt, raw = EXCLUDED.raw
+          igst_amt = EXCLUDED.igst_amt, sales_amt = EXCLUDED.sales_amt, salesperson = EXCLUDED.salesperson,
+          helper = EXCLUDED.helper, vendor = EXCLUDED.vendor, customer_phone = EXCLUDED.customer_phone,
+          purchase_date = EXCLUDED.purchase_date, vendor_invoice_no = EXCLUDED.vendor_invoice_no, raw = EXCLUDED.raw
         RETURNING id
       `);
 
@@ -332,7 +364,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
       `);
 
       const unmappedStoreLines = count(await t.execute(sql`
-        SELECT count(*) AS n FROM hemparshwa_sales_lines l WHERE NOT EXISTS (SELECT 1 FROM stores st WHERE st.store_code = l.store_id OR st.code = l.store_id)
+        SELECT count(*) AS n FROM hp_lines l WHERE NOT EXISTS (SELECT 1 FROM stores st WHERE st.store_code = l.store_id OR st.code = l.store_id)
       `));
       const bills = count(await t.execute(sql`SELECT count(*) AS n FROM hp_bills`));
 
@@ -341,7 +373,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
 
       return {
         bills, billsAdded, billsRemoved, legacyBillsRemoved, lineItems: lineItems.rows.length,
-        customersTouched: customers.rows.length, billOnlyCustomers: billOnly.rows.length, internalBillsSkipped, unmappedStoreLines, visitsReconciled: 0,
+        customersTouched: customers.rows.length, billOnlyCustomers: billOnly.rows.length, internalBillsSkipped, unmappedStoreLines, supersededLines, visitsReconciled: 0,
       };
     });
   } finally {
