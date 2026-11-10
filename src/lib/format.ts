@@ -40,6 +40,9 @@ export function formatPercent(part: number, whole: number, digits = 1): string {
 /** '+919845784157' → '98457 84157' */
 export function formatPhone(e164: string | null | undefined): string {
   if (!e164) return '—';
+  // Bill-only customers carry a tag, not a number (lib/phone.ts billOnlyPhone).
+  if (e164.startsWith('invalid:')) return `${e164.slice('invalid:'.length)} (not a valid number)`;
+  if (e164.startsWith('nophone:')) return 'No phone on bill';
   const national = e164.startsWith('+91') ? e164.slice(3) : e164.replace(/\D/g, '');
   if (national.length !== 10) return e164;
   return `${national.slice(0, 5)} ${national.slice(5)}`;

@@ -5,6 +5,7 @@
 
 import { requireApiUser } from '@/lib/auth';
 import { toCsv } from '@/lib/csv';
+import { billOnlyPhoneLabel } from '@/lib/phone';
 import { salesPeriod, salespersonBills, salespersonStats } from '@/lib/analytics/salesperson-module';
 
 export const runtime = 'nodejs';
@@ -25,8 +26,8 @@ export async function GET(request: Request) {
   if (emp && /^EMP-\d{4}$/.test(emp)) {
     const { rows } = await salespersonBills(emp, period, 0);
     csv = toCsv(
-      ['Date', 'Bill', 'Store', 'Customer ID', 'Customer', 'New customer', 'Items', 'Qty', 'Amount', 'Discount', 'Purchase value'],
-      rows.map((b) => [b.day, b.voucher?.split('@')[0] ?? '', b.storeName ?? '', b.customerCode ?? '', b.customerName ?? '', b.firstBill && b.amount > 0 ? 'yes' : '',
+      ['Date', 'Bill', 'Store', 'Customer ID', 'Customer', 'Customer phone note', 'New customer', 'Items', 'Qty', 'Amount', 'Discount', 'Purchase value'],
+      rows.map((b) => [b.day, b.voucher?.split('@')[0] ?? '', b.storeName ?? '', b.customerCode ?? '', b.customerName ?? '', billOnlyPhoneLabel(b.customerPhone) ?? '', b.firstBill && b.amount > 0 ? 'yes' : '',
         b.items, round(b.qty), round(b.amount), round(b.discount), b.cost === null ? '' : round(b.cost)]),
     );
     name = `${emp}-bills-${stamp}.csv`;

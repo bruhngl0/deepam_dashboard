@@ -8,6 +8,7 @@ import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
 import { analyticsConfigured } from '@/lib/analytics/db';
 import { BILL_PAGE_SIZE, billBounds, salesPeriod, salespersonBills, salespersonMonths, salespersonProfile, salespersonStatsFor, type MonthRow } from '@/lib/analytics/salesperson-module';
+import { billOnlyPhoneLabel } from '@/lib/phone';
 import { formatCurrency, formatCurrencyCompact, formatDate, formatNumber, formatPercent } from '@/lib/format';
 import { button, card, eyebrow, Kpi, KpiGrid, PageHeader, SectionLabel } from '@/components/ui';
 
@@ -172,9 +173,9 @@ export default async function SalespersonPage({ params, searchParams }: { params
                     <td className="tnum whitespace-nowrap px-3 py-2 text-ink-2">{formatDate(b.day)}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-ink-2">{b.voucher?.split('@')[0] ?? '—'}<span className="block text-xs text-ink-muted">{b.storeName}</span></td>
                     <td className="px-3 py-2 text-ink">
-                      {b.personId ? <Link href={`/crm/buyers/${b.personId}`} className="hover:text-accent hover:underline">{b.customerName || 'Unnamed customer'}</Link> : <span className="text-ink-muted">No customer matched</span>}
+                      {b.personId ? <Link href={`/crm/buyers/${b.personId}`} className="hover:text-accent hover:underline">{b.customerName || 'No name on bill'}</Link> : <span className="text-ink-muted">Staff or store account (not a customer)</span>}
                       {b.firstBill && b.amount > 0 && <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">New</span>}
-                      {b.customerCode && <span className="block text-xs text-ink-muted">{b.customerCode}</span>}
+                      {(b.customerCode || billOnlyPhoneLabel(b.customerPhone)) && <span className="block text-xs text-ink-muted">{[b.customerCode, billOnlyPhoneLabel(b.customerPhone)].filter(Boolean).join(' · ')}</span>}
                     </td>
                     <td className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{formatNumber(b.qty)}</td>
                     <td className={`tnum whitespace-nowrap px-3 py-2 text-right font-medium ${b.amount < 0 ? 'text-status-critical' : 'text-ink'}`}>{formatCurrency(b.amount)}</td>
