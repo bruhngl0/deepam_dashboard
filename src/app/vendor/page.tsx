@@ -7,5 +7,5 @@ export const dynamic = 'force-dynamic';
 
 export default async function VendorPage() {
   await requireUser();
-  redirect('/__gate/go?to=https%3A%2F%2Fvendor.hemparshwa.com%2F');
+  redirect('/__gate/go?to=https%3A%2F%2Fvendor.13-234-229-86.sslip.io%2F');
 }
