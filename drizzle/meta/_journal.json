@@ -239,6 +239,13 @@
       "when": 1792846800000,
       "tag": "0033_line_item_store_and_stock_branch",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794300000000,
+      "tag": "0034_resync_hemparshwa_sales",
+      "breakpoints": true
     }
   ]
 }
