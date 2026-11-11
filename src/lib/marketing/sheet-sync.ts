@@ -26,8 +26,6 @@ import { routeActive, routeForTab, routeSheetLead } from './sheet-routing';
 import { CANONICAL, tabRows } from './sheet-rows';
 import { loadDataset, saveChanges } from './store';
 import { linkMarketingLeadsToCrm } from './crm-sync';
-import { campaignSpendFromWorkbooks, saveCampaignSpend, SPEND_PLATFORMS } from './campaign-spend';
-import { googleAdsConfigured } from './google-ads-spend';
 
 const CONFIG_KEY = 'marketing_sheet_sync';
 const STATUS_KEY = 'marketing_sheet_sync_status';
@@ -132,10 +130,9 @@ async function sync(force: boolean): Promise<SyncOutcome> {
     const hash = createHash('sha1').update(JSON.stringify([config, workbooks])).digest('hex');
     state.checkedAt = at;
     if (!force && hash === state.hash) return { state: 'unchanged', status: null };
-    // Google ad spend from the Campaign Summary tabs, until the Google Ads API is connected (./google-ads-spend):
-    // then the API is its only source. Meta spend comes only from the Meta Ads Manager export
-    // (scripts/import-meta-spend.ts), so the Meta rows here are ignored. A bad summary tab never stops the lead import.
-    if (!googleAdsConfigured()) await saveCampaignSpend(campaignSpendFromWorkbooks(workbooks), SPEND_PLATFORMS.google).catch((error) => console.error('[campaign spend]', error));
+    // Spend is not read from the sheets: Meta comes from the Meta Ads Manager export, Google from the
+    // Google Ads API or its billing activity report (see ./campaign-spend). Saving the (empty) Campaign
+    // Summary tabs here used to wipe imported Google spend on every sheet change.
 
     const collected = config.sheets.reduce((into, source, i) => collectRows(source, workbooks[i], into), undefined as Collected | undefined)!;
     if (!collected.tabs.length && !collected.problems.length) throw new Error('No lead tab found. A lead tab needs a row of headings that includes a contact number and a name.');

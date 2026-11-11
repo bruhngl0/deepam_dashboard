@@ -170,7 +170,7 @@ function OverviewPerformance({ filters }: { filters: { from: string; to: string;
   const per = (count: number) => spend === null || !count ? '—' : money(spend / count);
   const spendNote = !conversions.data ? (conversions.error || 'Loading spend…')
     : conversions.data.spendError ? `Spend is unavailable: ${conversions.data.spendError}`
-    : spendShown ? `Spend: Meta from the Meta Ads Manager export, Google from the Campaign Summary tabs, all dates.`
+    : spendShown ? `Spend: Meta from the Meta Ads Manager exports, Google from the Google Ads billing report, all dates.`
     : 'Spend is recorded by campaign, not by store or day: clear the date and store filters to see spend, cost per lead, CAC and ROAS.';
   const funnel: [string, number][] = [['Total leads', stats.total], ['Contacted', stats.contacted], ['Interested', stats.interested], ['Converted', stats.converted]];
   return <>
