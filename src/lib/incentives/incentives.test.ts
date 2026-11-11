@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeIncentives } from './compute';
+import { computeIncentives, roundDown } from './compute';
 import { ageBand, lakhIncentive, stockAgeYears, volumeIncentive } from './slabs';
 
 describe('slabs', () => {
@@ -28,6 +28,12 @@ describe('slabs', () => {
   });
 });
 
+describe('roundDown', () => {
+  it('pays the total rounded down to a whole ₹10,000', () => {
+    expect([0, 9_999.5, 10_000, 10_500, 21_000, 25_500, 33_500, 50_000].map(roundDown)).toEqual([0, 0, 10_000, 10_000, 20_000, 20_000, 30_000, 50_000]);
+  });
+});
+
 describe('computeIncentives', () => {
   const people = [{ empCode: 'EMP-0001', name: 'A', store: 'STR-001' as const, weekendStaff: false }];
   it('leaves old stock out of the volume and pays it by age; lakh per customer, returns netted', () => {
@@ -40,7 +46,7 @@ describe('computeIncentives', () => {
     ], [{ billId: 1, band: 1, amount: 100_000 }, { billId: 2, band: 3, amount: 50_000 }, { billId: 9, band: 3, amount: 1 }]);
     expect(row).toMatchObject({
       bills: 3, business: 1_250_000, oldStock: 150_000, volume: 1_100_000, volumeIncentive: 10_000,
-      ageIncentive: 5_500, lakhCustomers: [0, 1, 0, 1], lakhIncentive: 2_500, total: 18_000,
+      ageIncentive: 5_500, lakhCustomers: [0, 1, 0, 1], lakhIncentive: 2_500, calculated: 18_000, total: 10_000,
     });
   });
 });

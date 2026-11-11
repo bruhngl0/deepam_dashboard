@@ -77,7 +77,7 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
       </div>
 
       <KpiGrid>
-        <Kpi label="Total incentive" value={formatCurrency(sum((r) => r.total))} caption={`${formatNumber(rows.length)} salespeople`} />
+        <Kpi label="Total incentive" value={formatCurrency(sum((r) => r.total))} caption={`${formatNumber(rows.length)} salespeople · rounded down to ₹10,000 each`} />
         <Kpi label="Business volume" value={formatCurrency(sum((r) => r.volumeIncentive))} caption={`On ${formatCurrencyCompact(sum((r) => r.volume))} of business, old stock left out`} />
         <Kpi label="Age-wise stock" value={formatCurrency(sum((r) => r.ageIncentive))} caption={`On ${formatCurrencyCompact(sum((r) => r.oldStock))} of stock 2 years or older`} />
         <Kpi label="Lakh business" value={formatCurrency(sum((r) => r.lakhIncentive))} caption={`${formatNumber(sum((r) => r.lakhCustomers.reduce((a, b) => a + b, 0)))} customers of ₹1 L or more`} />
@@ -105,7 +105,7 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
                   <td className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{r.volumeIncentive ? formatCurrency(r.volumeIncentive) : '—'}{r.weekendStaff && <span className="block text-xs text-ink-muted">weekend rule</span>}</td>
                   <td className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{r.ageIncentive ? formatCurrency(r.ageIncentive) : '—'}</td>
                   <td className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{r.lakhIncentive ? <>{formatCurrency(r.lakhIncentive)}<span className="block text-xs text-ink-muted">{r.lakhCustomers.map((c, i) => (c ? `${c} × ${formatCurrency(LAKH_BANDS[i].amount)}` : '')).filter(Boolean).join(', ')}</span></> : '—'}</td>
-                  <td className="tnum whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">{formatCurrency(r.total)}</td>
+                  <td className="tnum whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">{formatCurrency(r.total)}{r.calculated !== r.total && <span className="block text-xs font-normal text-ink-muted">from {formatCurrency(r.calculated)}</span>}</td>
                   <td className="px-3 py-2 text-center">
                     <form action={toggleWeekend}>
                       <input type="hidden" name="emp" value={r.empCode} />
@@ -145,7 +145,7 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
       <section className="space-y-1 text-xs leading-relaxed text-ink-muted">
         <p><b className="text-ink-2">Who and which store:</b> every salesperson with bills credited to them (the salesman printed on the bill), at any location. Their store for the month, and so its slabs, is where they billed the most of MG Road and Jayanagar. A helper named on a line is not credited.</p>
         <p><b className="text-ink-2">Business:</b> the month&rsquo;s sales less returns, as billed (after discount, with GST). <b className="text-ink-2">Old stock:</b> lines whose stock was 2 years or older on the sale day, by inward date; left out of Volume and paid by age instead. Inward dates in the ERP start on 1 May 2026, so nothing reaches 2 years before May 2028.</p>
-        <p><b className="text-ink-2">Volume incentive:</b> the flat amount for the band Volume falls in. Weekend staff get the weekend amount instead; mark them with the button. <b className="text-ink-2">Lakh business:</b> each customer&rsquo;s business with the salesperson in the month; a bill with no customer counts alone.</p>
+        <p><b className="text-ink-2">Volume incentive:</b> the flat amount for the band Volume falls in. Weekend staff get the weekend amount instead; mark them with the button. <b className="text-ink-2">Lakh business:</b> each customer&rsquo;s business with the salesperson in the month; a bill with no customer counts alone. <b className="text-ink-2">Total:</b> the three incentives added up, then rounded down to a whole ₹10,000 (₹33,500 is paid as ₹30,000; under ₹10,000 is nil). The figure before rounding is shown under it.</p>
         <p><b className="text-ink-2">Not included:</b> Special Incentive (Scanned Products) 3%, as the sales data does not say which products were scanned.</p>
       </section>
     </main>
