@@ -98,6 +98,9 @@ export function spendRowsFor(weeks: CampaignSpendWeek[], platform: SpendPlatform
   return [...new Map(weeks.filter((w) => w.platform === platform).map((w) => [`${w.campaign}|${w.platform}|${w.month}|${w.week}`, w])).values()];
 }
 
+// Patterns for saved month/week keys, sent as query parameters (a backslash in a sql`` template is lost).
+const DAY_RE = '^[0-9]{4}-[0-9]{2}-[0-9]{2}$', MONTH_RE = '^[0-9]{4}-[0-9]{2}', PERIOD_RE = '^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][.][0-9]{4}-[0-9]{2}-[0-9]{2}$';
+
 /** A report period, both days included, as YYYY-MM-DD. */
 export type SpendPeriod = { from: string; to: string };
 
@@ -121,9 +124,9 @@ export async function saveCampaignSpend(weeks: CampaignSpendWeek[], platform: Sp
     if (!period) await t.execute(sql`DELETE FROM marketing_campaign_spend WHERE platform = ${platform}`);
     else {
       await t.execute(sql`DELETE FROM marketing_campaign_spend WHERE platform = ${platform} AND (
-        (month ~ '^\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$' AND split_part(month, '..', 1) <= ${period.to} AND split_part(month, '..', 2) >= ${period.from})
-        OR (week ~ '^\d{4}-\d{2}-\d{2}$' AND week BETWEEN ${period.from} AND ${period.to})
-        OR (month !~ '^\d{4}-\d{2}' AND week !~ '^\d{4}-\d{2}-\d{2}$'))`);
+        (month ~ ${PERIOD_RE} AND split_part(month, '..', 1) <= ${period.to} AND split_part(month, '..', 2) >= ${period.from})
+        OR (week ~ ${DAY_RE} AND week BETWEEN ${period.from} AND ${period.to})
+        OR (month !~ ${MONTH_RE} AND week !~ ${DAY_RE}))`);
     }
     if (rows.length) {
       await t.execute(sql`INSERT INTO marketing_campaign_spend (campaign, platform, month, week, spend, leads)
