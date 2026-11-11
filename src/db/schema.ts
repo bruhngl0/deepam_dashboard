@@ -21,6 +21,7 @@ import {
   jsonb,
   uuid,
   uniqueIndex,
+  unique,
   index,
   primaryKey,
 } from 'drizzle-orm/pg-core';
@@ -596,6 +597,21 @@ export const vendorStockLedger = pgTable(
     itemGroupName: text('item_group_name'), // blank in every row seen so far; kept for when it isn't
     compSize: text('comp_size'),
     freshOrDefective: text('fresh_or_defective'), // open set (D-66) — only 'Fresh' seen so far
+    /** The ERP's branch ('MG', 'JAYANAGAR', …); '' for a report with no Branch column. A barcode has a row per branch it passed through. */
+    branch: text('branch').notNull().default(''),
+    storeId: integer('store_id').references(() => stores.id), // the branch's CRM store, when it maps to one
+    department: text('department'), // 'GARMENT' | 'FABRIC'
+    brand: text('brand'), // the ERP's brand code: 'AF', 'DEEPAM', 'VF'
+    product: text('product'), // 'SAREES' | 'SUITS & SETS' | …
+    style: text('style'),
+    designNo: text('design_no'),
+    color: text('color'),
+    size: text('size'),
+    lotNo: text('lot_no'),
+    city: text('city'), // the supplier's city
+    mrp: numeric('mrp', { precision: 12, scale: 2 }), // one piece; cl_mrp is the closing stock's total
+    purchaseVoucher: text('purchase_voucher'), // the purchase voucher the piece came in on
+    purchaseDate: date('purchase_date'), // that voucher's date: the inward date stock is aged from
     periodFrom: date('period_from').notNull(),
     periodTo: date('period_to').notNull(),
     opQty: numeric('op_qty', { precision: 12, scale: 2 }),
@@ -626,6 +642,7 @@ export const vendorStockLedger = pgTable(
   (t) => [
     uniqueIndex('vendor_stock_ledger_identity_idx').on(
       t.barcode,
+      t.branch,
       t.periodFrom,
       t.periodTo,
     ),
@@ -676,14 +693,23 @@ export const saleLineItems = pgTable(
     otherAddLessAmt: numeric('other_add_less_amt', { precision: 12, scale: 2 }),
     amtWithTax: numeric('amt_with_tax', { precision: 12, scale: 2 }),
     salesAmt: numeric('sales_amt', { precision: 12, scale: 2 }),
+    /** The store that billed it. Voucher numbers repeat across stores, so a line is store + voucher + date + type + barcode. */
+    storeId: integer('store_id').references(() => stores.id),
+    /** Lower-case ('sales', 'return'); '' when the source has none. */
+    salesType: text('sales_type').notNull().default(''),
+    salesperson: text('salesperson'), // the ERP's Salesman Name
+    helper: text('helper'), // Helper Name: the second salesperson on the line
+    vendor: text('vendor'), // Party Name / Brand Name, as the source gives them
+    customerPhone: text('customer_phone'), // as typed (Mobile1); identity stays on the bill (D-23)
+    purchaseDate: date('purchase_date'), // Purc VoucherDate: the day the piece came in
+    vendorInvoiceNo: text('vendor_invoice_no'), // Purc BillNo: the supplier's bill number
     raw: jsonb('raw').notNull(), // D-14
   },
   (t) => [
-    uniqueIndex('sale_line_items_identity_idx').on(
-      t.voucherDateRaw,
-      t.voucherNoRaw,
-      t.barcode,
-    ),
+    // A constraint, not an index, so Drizzle can say NULLS NOT DISTINCT: a line with no store still has one identity.
+    unique('sale_line_items_identity_key')
+      .on(t.voucherDateRaw, t.voucherNoRaw, t.barcode, t.storeId, t.salesType)
+      .nullsNotDistinct(),
     index('sale_line_items_sale_idx')
       .on(t.saleId)
       .where(sql`sale_id IS NOT NULL`),

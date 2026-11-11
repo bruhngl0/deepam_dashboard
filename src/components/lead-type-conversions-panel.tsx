@@ -13,7 +13,7 @@ const headings = ['Leads', 'Converted', 'Conversion rate', 'Bills', 'Sales', 'Sp
 function cells(row: Costed) {
   const { stats, spend } = row;
   return [stats.leads, stats.converted, pct(stats.converted, stats.leads), stats.bills, rupees(stats.sales), rupees(spend),
-    per(spend, row.sheetLeads), per(spend, stats.converted), spend ? `₹${(stats.sales / spend).toFixed(2)}` : '—'];
+    per(spend, row.sheetLeads || stats.leads), per(spend, stats.converted), spend ? `₹${(stats.sales / spend).toFixed(2)}` : '—'];
 }
 const th = 'whitespace-nowrap px-4 py-3';
 const td = 'whitespace-nowrap px-4 py-3';

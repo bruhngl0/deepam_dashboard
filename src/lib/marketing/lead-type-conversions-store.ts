@@ -16,9 +16,8 @@ const rowsOf = <T>(result: unknown): T[] =>
   Array.isArray(result) ? (result as T[]) : ((result as { rows?: T[] }).rows ?? []);
 
 /**
- * Saved spend per campaign: Meta from the last Meta Ads Manager export
- * (scripts/import-meta-spend.ts), Google from the sheets' Campaign Summary
- * tabs (saved by the sheet sync). Cached for a minute.
+ * Saved spend per campaign: Meta from the Meta Ads Manager exports (scripts/import-meta-spend.ts),
+ * Google from the Google Ads API or its billing report (scripts/import-google-spend.ts). Cached for a minute.
  */
 export async function campaignSpend(): Promise<CampaignSpend[]> {
   const cached = holder.__campaignSpend;
@@ -51,7 +50,7 @@ export async function leadTypeConversions(): Promise<LeadTypeConversions> {
     // A sheet that cannot be read hides the spend columns, not the conversions.
     campaignSpend().then((value) => ({ value, error: null }), (error: unknown) => {
       console.error('marketing/campaign-spend', error);
-      return { value: [] as CampaignSpend[], error: error instanceof Error ? error.message : 'Could not read the Campaign Summary tabs.' };
+      return { value: [] as CampaignSpend[], error: error instanceof Error ? error.message : 'Could not read the saved ad spend.' };
     }),
   ]);
   const acquisitionRows = rowsOf<Record<string, unknown>>(acquisitions).map((row) => ({

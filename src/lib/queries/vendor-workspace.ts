@@ -2,6 +2,7 @@
 import { db } from '@/db';
 import { sql } from 'drizzle-orm';
 import { parseDateParam, parseStoreParam, type DateRange } from './dashboard';
+import { LATEST_STOCK_ROWS } from './stock-ledger';
 
 type Row = Record<string, unknown>;
 async function query(text: string): Promise<Row[]> {
@@ -36,7 +37,7 @@ export type VendorWorkspaceRow = {
 
 export async function getVendorWorkspaceRows(range: DateRange = {}): Promise<VendorWorkspaceRow[]> {
   const rows = await query(`
-    WITH latest AS (SELECT DISTINCT ON (barcode) * FROM vendor_stock_ledger ORDER BY barcode, period_to DESC),
+    WITH latest AS (${LATEST_STOCK_ROWS}),
     ledger AS (SELECT vendor_id, SUM(purc_amt) purchased_value, SUM(purc_qty) purchased_qty, SUM(net_sales_amt) sold_value, SUM(net_sales_qty) sold_qty, SUM(cl_amt) stock_value, SUM(cl_qty) stock_qty FROM latest GROUP BY vendor_id),
     orders AS (SELECT po.vendor_id, SUM(i.return_value) return_value, SUM(i.return_qty) return_qty, MAX(po.purchase_date) last_purchase, SUM(i.qty*i.cost) ordered_value FROM vendor_purchase_orders po JOIN vendor_purchase_items i ON i.purchase_order_id=po.id WHERE true${dates('po.purchase_date', range)}${itemStore('i', range)} GROUP BY po.vendor_id),
     payments AS (SELECT vendor_id, SUM(amount) paid, MAX(paid_at) last_paid_at FROM vendor_payments WHERE true${dates('paid_at', range)} GROUP BY vendor_id),

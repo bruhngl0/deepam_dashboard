@@ -9,7 +9,7 @@
  * barcode can have several `(period_from, period_to)` rows as later exports
  * extend the same fiscal-year-to-date window. Every ledger-based query below
  * reads only the *latest* snapshot per barcode (`latest_ledger`, ranked by
- * `period_to`), the same reasoning `getCustomerValueTiers` in dashboard.ts
+ * `period_to`; a row per branch the barcode passed through), the same reasoning `getCustomerValueTiers` in dashboard.ts
  * gives for not taking a `DateRange` at all: re-ranking a lifetime/point-in-
  * time figure inside an arbitrary window doesn't have a stable meaning.
  * `sale_line_items` is event-level, so the margin and coverage queries do
@@ -23,6 +23,7 @@
  */
 
 import { db } from '@/db';
+import { LATEST_STOCK_ROWS } from './stock-ledger';
 import { sql } from 'drizzle-orm';
 import { type DateRange, parseDateParam } from './dashboard';
 
@@ -48,13 +49,9 @@ function voucherDateCondition(alias: string, range: DateRange): string {
   return parts.length ? ` AND ${parts.join(' AND ')}` : '';
 }
 
-/** The most recent `(period_from, period_to)` snapshot per barcode. */
+/** The most recent `(period_from, period_to)` snapshot per barcode: one row per branch it passed through. */
 const LATEST_LEDGER = `
-  latest_ledger AS (
-    SELECT DISTINCT ON (vsl.barcode) vsl.*
-    FROM   vendor_stock_ledger vsl
-    ORDER  BY vsl.barcode, vsl.period_to DESC
-  )
+  latest_ledger AS (${LATEST_STOCK_ROWS})
 `;
 
 export interface VendorKpis {
@@ -75,7 +72,7 @@ export async function getVendorKpis(): Promise<VendorKpis> {
       COALESCE(SUM(net_sales_amt), 0)::numeric AS net_sales_amount,
       COALESCE(SUM(cl_amt), 0)::numeric        AS closing_value,
       COUNT(DISTINCT vendor_id)::int           AS vendor_count,
-      COUNT(*)::int                            AS barcode_count
+      COUNT(DISTINCT barcode)::int             AS barcode_count
     FROM latest_ledger`);
 
   const purchaseAmount = Number(row.purchase_amount ?? 0);
@@ -108,7 +105,7 @@ export async function getVendorBreakdown(): Promise<VendorBreakdownRow[]> {
            COALESCE(SUM(ll.purc_amt), 0)::numeric      AS purchase_amount,
            COALESCE(SUM(ll.net_sales_amt), 0)::numeric AS net_sales_amount,
            COALESCE(SUM(ll.cl_amt), 0)::numeric        AS closing_value,
-           COUNT(*)::int                        AS barcode_count
+           COUNT(DISTINCT ll.barcode)::int      AS barcode_count
     FROM   latest_ledger ll
     JOIN   vendors v ON v.id = ll.vendor_id
     GROUP  BY v.name
@@ -145,7 +142,7 @@ export async function getItemGroupBreakdown(): Promise<ItemGroupBreakdownRow[]> 
            COALESCE(SUM(purc_amt), 0)::numeric      AS purchase_amount,
            COALESCE(SUM(net_sales_amt), 0)::numeric AS net_sales_amount,
            COALESCE(SUM(cl_amt), 0)::numeric        AS closing_value,
-           COUNT(*)::int                            AS barcode_count
+           COUNT(DISTINCT barcode)::int             AS barcode_count
     FROM   latest_ledger
     GROUP  BY 1
     ORDER  BY purchase_amount DESC`);

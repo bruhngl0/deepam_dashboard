@@ -203,7 +203,7 @@ Same five as `.env.example`, now split by where they live:
 | `ALLOW_MASTER_SHEET_IMPORT` | Plain env var | Leave `false` until you deliberately want the lead-layer-replacing commit route live (D-89) |
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | Secrets Manager | Service-account JSON key for reading private Google Sheets in the live lead import (D-94). Optional; without it only sheets shared as "Anyone with the link" can be connected |
 | `CRON_SECRET` | Secrets Manager | Bearer token for `/api/marketing/sheet-sync/cron` and `/api/marketing/google-ads-sync`. Needed for the schedulers below |
-| `GOOGLE_ADS_*` | Secrets Manager | Google Ads API access for Google ad spend; see "Google Ads spend" below. Optional; without them Google spend comes from the sheets' Campaign Summary tabs |
+| `GOOGLE_ADS_*` | Secrets Manager | Google Ads API access for Google ad spend; see "Google Ads spend" below. Optional; without them Google spend comes from the billing activity report (`scripts/import-google-spend.ts`) |
 | `MARKETING_SHEET_SYNC_MINUTES` | Plain env var | In-process sync timer interval, default `5`; `0` disables it |
 
 ## Live Google Sheet sync (optional)
@@ -240,8 +240,12 @@ Running both is fine: a sync that finds nothing new writes nothing.
 ## Google Ads spend (Google Ads API)
 
 Google ad spend comes from the Google Ads API once these are set; leads still come from the
-sheet sync, and Meta spend from the Meta Ads Manager export. Until then Google spend is read from
-the sheets' Campaign Summary tabs. Code: `src/lib/marketing/google-ads-spend.ts`.
+sheet sync, and Meta spend from the Meta Ads Manager export. Until then load Google spend from the
+billing activity report (Google Ads → Billing → Transactions → download):
+`npx tsx scripts/import-google-spend.ts "<report.xlsx>"` (dry run; `--apply` saves). It replaces Google spend
+for the report's days only, and the API sync, once on, replaces all of it. Meta: `scripts/import-meta-spend.ts`
+replaces Meta spend for the export's period only, so export each new period and load it.
+The sheets' Campaign Summary tabs are not read for spend. Code: `src/lib/marketing/google-ads-spend.ts`.
 
 1. **Developer token.** In a Google Ads *manager* account (create one at ads.google.com/home/tools/manager-accounts
    if needed, and link the ad account to it): Admin → API Center → apply. Basic access is enough;

@@ -5,7 +5,8 @@
  * `saleId` is resolved by matching the line's `(voucherDateRaw, suffix of
  * voucherNoRaw)` against a bill-level `sales` row with the same IST calendar
  * date and the same numeric voucher suffix (leading zeros ignored either
- * way). Unmatched lines are inserted with `saleId = NULL`, not rejected —
+ * way), and the same store when the line names its branch: voucher numbers
+ * repeat across stores. Unmatched lines are inserted with `saleId = NULL`, not rejected —
  * they are real transactions (most likely Online-channel orders, or dates
  * outside what's been imported into `sales`), the same treatment D-51 gives
  * phone-less bills. Independent of `customers` (D-64): no lifecycle
@@ -15,7 +16,8 @@
 import { createHash } from 'node:crypto';
 import { sql, and, gte, lt } from 'drizzle-orm';
 import { db, txDb } from '@/db';
-import { importBatches, importRowsRejected, sales as salesTable, saleLineItems } from '@/db/schema';
+import { importBatches, importRowsRejected, sales as salesTable, saleLineItems, stores as storesTable } from '@/db/schema';
+import { storeIdForBranch } from '../branch-store';
 import { IST_OFFSET_MINUTES } from '../excel';
 import {
   parseSaleLineItemsWorkbook,
@@ -72,7 +74,7 @@ export async function previewSaleLineItemsImport(
   const seen = new Set<string>();
   let duplicateRowsInFile = 0;
   for (const row of parsed.rows) {
-    const key = `${row.voucherDateRaw}|${row.voucherNoRaw}|${row.barcode}`;
+    const key = `${row.voucherDateRaw}|${row.voucherNoRaw}|${row.barcode}|${row.branch ?? ''}|${row.salesType}`;
     if (seen.has(key)) duplicateRowsInFile++;
     seen.add(key);
   }
@@ -149,26 +151,37 @@ export async function commitSaleLineItemsImport(
       windowEnd.setUTCDate(windowEnd.getUTCDate() + 2);
 
       const candidateSales = await t
-        .select({ id: salesTable.id, voucherNo: salesTable.voucherNo, billedAt: salesTable.billedAt })
+        .select({ id: salesTable.id, voucherNo: salesTable.voucherNo, billedAt: salesTable.billedAt, storeId: salesTable.storeId })
         .from(salesTable)
         .where(and(gte(salesTable.billedAt, windowStart), lt(salesTable.billedAt, windowEnd)));
 
+      const storeList = await t
+        .select({ id: storesTable.id, code: storesTable.code, name: storesTable.name })
+        .from(storesTable);
+
+      // By store when the line names its branch; without one, only a date + number that a single bill has
+      // (-1 marks a number two stores billed that day, which stays unmatched rather than guessed).
       const saleIdByKey = new Map<string, number>();
       for (const s of candidateSales) {
         const key = `${istDateOf(s.billedAt)}|${normalizeSuffix(voucherSuffix(s.voucherNo))}`;
-        saleIdByKey.set(key, s.id);
+        saleIdByKey.set(`${key}|${s.storeId}`, s.id);
+        saleIdByKey.set(key, saleIdByKey.has(key) ? -1 : s.id);
       }
 
       // ── Sale line items ────────────────────────────────────────────────────
       // Dedupe within the file so ON CONFLICT sees each identity key once.
       const byKey = new Map<string, ParsedSaleLineItem>();
-      for (const row of rows) byKey.set(`${row.voucherDateRaw}|${row.voucherNoRaw}|${row.barcode}`, row);
+      for (const row of rows) {
+        byKey.set(`${row.voucherDateRaw}|${row.voucherNoRaw}|${row.barcode}|${row.branch ?? ''}|${row.salesType}`, row);
+      }
       const uniqueRows = [...byKey.values()];
 
       let matchedToSale = 0;
       const lineValues = uniqueRows.map((row) => {
-        const saleId =
-          saleIdByKey.get(`${row.voucherDateRaw}|${normalizeSuffix(row.voucherNoRaw)}`) ?? null;
+        const storeId = storeIdForBranch(row.branch, storeList);
+        const key = `${row.voucherDateRaw}|${normalizeSuffix(row.voucherNoRaw)}`;
+        const found = storeId !== null ? saleIdByKey.get(`${key}|${storeId}`) : saleIdByKey.get(key);
+        const saleId = found !== undefined && found !== -1 ? found : null;
         if (saleId !== null) matchedToSale++;
         return {
           saleId,
@@ -197,6 +210,14 @@ export async function commitSaleLineItemsImport(
           otherAddLessAmt: row.otherAddLessAmt === null ? null : String(row.otherAddLessAmt),
           amtWithTax: row.amtWithTax === null ? null : String(row.amtWithTax),
           salesAmt: row.salesAmt === null ? null : String(row.salesAmt),
+          storeId,
+          salesType: row.salesType,
+          salesperson: row.salesperson,
+          helper: row.helper,
+          vendor: row.vendor,
+          customerPhone: row.customerPhone,
+          purchaseDate: row.purchaseDate,
+          vendorInvoiceNo: row.vendorInvoiceNo,
           raw: row.raw,
         };
       });
@@ -208,7 +229,13 @@ export async function commitSaleLineItemsImport(
           .insert(saleLineItems)
           .values(part)
           .onConflictDoUpdate({
-            target: [saleLineItems.voucherDateRaw, saleLineItems.voucherNoRaw, saleLineItems.barcode],
+            target: [
+              saleLineItems.voucherDateRaw,
+              saleLineItems.voucherNoRaw,
+              saleLineItems.barcode,
+              saleLineItems.storeId,
+              saleLineItems.salesType,
+            ],
             set: {
               saleId: sql`EXCLUDED.sale_id`,
               batchId: sql`EXCLUDED.batch_id`,
@@ -233,6 +260,12 @@ export async function commitSaleLineItemsImport(
               otherAddLessAmt: sql`EXCLUDED.other_add_less_amt`,
               amtWithTax: sql`EXCLUDED.amt_with_tax`,
               salesAmt: sql`EXCLUDED.sales_amt`,
+              salesperson: sql`EXCLUDED.salesperson`,
+              helper: sql`EXCLUDED.helper`,
+              vendor: sql`EXCLUDED.vendor`,
+              customerPhone: sql`EXCLUDED.customer_phone`,
+              purchaseDate: sql`EXCLUDED.purchase_date`,
+              vendorInvoiceNo: sql`EXCLUDED.vendor_invoice_no`,
               raw: sql`EXCLUDED.raw`,
             },
           })

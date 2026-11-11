@@ -148,6 +148,10 @@ export async function syncHemparshwa(): Promise<SyncResult> {
                customer_phone = excluded.customer_phone, salesperson = excluded.salesperson, quantity = excluded.quantity,
                selling_price = excluded.selling_price, discount = excluded.discount, net_amount = excluded.net_amount,
                cogs = excluded.cogs, details = excluded.details
+            -- A line belongs to the newest import that has it, whatever order imports sync in;
+            -- the projection's "newest export wins" rule depends on this.
+            WHERE ((SELECT n.imported_at FROM hemparshwa_imports n WHERE n.import_id = excluded.import_id), excluded.import_id)
+               >= ((SELECT o.imported_at FROM hemparshwa_imports o WHERE o.import_id = hemparshwa_sales_lines.import_id), hemparshwa_sales_lines.import_id)
           `);
         }
       });

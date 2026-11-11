@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
-import { parseVendorStockWorkbook, parsePeriodBanner } from './vendor-stock';
+import { parseVendorStockWorkbook, parsePeriodBanner, parsePeriodFromFileName, financialYearStart } from './vendor-stock';
 
 function buildWorkbook(rows: unknown[][]): Buffer {
   const sheet = XLSX.utils.aoa_to_sheet(rows);
@@ -115,5 +115,79 @@ describe('parseVendorStockWorkbook', () => {
   it('throws when the period banner cannot be parsed', () => {
     const wb = buildWorkbook([['Party Wise Stock Report'], header, row('V', 'BC001')]);
     expect(() => parseVendorStockWorkbook(wb)).toThrow(/period/i);
+  });
+});
+
+describe('parsePeriodFromFileName', () => {
+  it('runs a one-date stock report from 1 April of that financial year', () => {
+    expect(parsePeriodFromFileName('Stock Report 06-11-2026.xlsx')).toEqual({ periodFrom: '2026-04-01', periodTo: '2026-11-06' });
+    expect(parsePeriodFromFileName('Stock Report 10-02-2027.xlsx')).toEqual({ periodFrom: '2026-04-01', periodTo: '2027-02-10' });
+  });
+
+  it('reads both ends of a range', () => {
+    expect(parsePeriodFromFileName('Stock 01-05-2026 to 06-11-2026.xlsx')).toEqual({ periodFrom: '2026-05-01', periodTo: '2026-11-06' });
+  });
+
+  it('returns nulls for a name with no date', () => {
+    expect(parsePeriodFromFileName('Party Wise.xlsx')).toEqual({ periodFrom: null, periodTo: null });
+    expect(parsePeriodFromFileName(undefined)).toEqual({ periodFrom: null, periodTo: null });
+  });
+
+  it('knows where the financial year starts', () => {
+    expect(financialYearStart('2026-04-01')).toBe('2026-04-01');
+    expect(financialYearStart('2027-03-31')).toBe('2026-04-01');
+  });
+});
+
+describe('the ERP Stock Report layout (no banner, a row per branch)', () => {
+  const header = ['Department', 'Brand', 'Product', 'Item', 'ItemGroup Name', 'Style', 'Design', 'Color', 'Size1', 'Lot No', 'MRP',
+    'Branch', 'Account', 'City', 'Voucher', 'Voucher Date', 'Barcode', 'CATEGORY', 'Op. Qty', 'Op. Amt', 'Purc. Qty', 'Purc. Amt',
+    'PR Qty', 'PR. Amt', 'Net Purc Qty', 'Net Purc Amt', 'In Qty', 'In Amt', 'Out Qty', 'Out Amt', 'In transit Qty', 'In transit Amt',
+    'Sales Qty', 'Sales Amt', 'SR. Qty', 'SR. Amt', 'Net Sales Qty', 'Net Sales Amt', 'CL. Qty', 'CL. Amt', 'CL. MRP'];
+  const line = (branch: string, purc: number, inQty: number, out: number, cl: number) => [
+    'GARMENT', 'AF', 'SAREES', 'ART - PRINTED', '', 'ART - PRINTED', '052/1', ' ', 'F', '', 2379,
+    branch, 'VITTAL COMMERCE LLP', 'SALEM', 'P00715/454', '24/10/2026', '01024967', '', 0, 0, purc, purc * 1100,
+    0, 0, purc, purc * 1100, inQty, inQty * 1100, out, out * 1100, 0, 0,
+    0, 0, 0, 0, 0, 0, cl, cl * 1100, cl * 2379];
+
+  it('takes the period from the file name and keeps one row per branch', () => {
+    const wb = buildWorkbook([header, line('MG', 20, 0, 20, 0), line('JAYANAGAR', 0, 20, 0, 20)]);
+    const result = parseVendorStockWorkbook(wb, undefined, 'Stock Report 06-11-2026.xlsx');
+
+    expect(result.periodFrom).toBe('2026-04-01');
+    expect(result.periodTo).toBe('2026-11-06');
+    expect(result.rows.map((r) => r.branch)).toEqual(['MG', 'JAYANAGAR']);
+    const j = result.rows[1];
+    expect(j).toMatchObject({
+      vendorName: 'VITTAL COMMERCE LLP', itemName: 'ART - PRINTED', department: 'GARMENT', brand: 'AF', product: 'SAREES',
+      designNo: '052/1', color: null, size: 'F', city: 'SALEM', mrp: 2379, purchaseVoucher: 'P00715/454',
+      purchaseDate: '2026-10-24', inQty: 20, clQty: 20, clMrp: 47580,
+    });
+    expect(result.summary.uniqueBarcodes).toBe(1);
+  });
+
+  it('still refuses a file with neither a banner nor a date in its name', () => {
+    const wb = buildWorkbook([header, line('MG', 1, 0, 0, 1)]);
+    expect(() => parseVendorStockWorkbook(wb, undefined, 'Stock Report.xlsx')).toThrow(/period/i);
+  });
+
+  it('leaves the new columns empty for the older Party Wise layout', () => {
+    const wb = buildWorkbook([
+      ['From Dated 01/04/2026 To 08/08/2026'],
+      ['Account', 'Barcode', 'Item Name', 'CL Qty', 'CL Amt', 'CL MRP'],
+      ['V', 'BC1', 'MYSORE SILK', 1, 100, 250],
+    ]);
+    const [r] = parseVendorStockWorkbook(wb).rows;
+    expect(r).toMatchObject({ branch: '', mrp: null, purchaseVoucher: null, purchaseDate: null, itemName: 'MYSORE SILK', clMrp: 250 });
+  });
+
+  it('skips fabric rows and counts them', () => {
+    const fabric = line('MG', 18, 0, 0, 13.5);
+    fabric[0] = 'FABRIC'; fabric[1] = 'DEEPAM'; fabric[2] = 'FABRICS'; fabric[3] = 'FABRICS - SILKS'; fabric[16] = '01024967F';
+    const wb = buildWorkbook([header, line('MG', 1, 0, 0, 1), fabric]);
+    const result = parseVendorStockWorkbook(wb, undefined, 'Stock Report 06-11-2026.xlsx');
+    expect(result.rows).toHaveLength(1);
+    expect(result.rejected).toHaveLength(0);
+    expect(result.summary.fabricRowsSkipped).toBe(1);
   });
 });
