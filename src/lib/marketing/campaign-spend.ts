@@ -106,6 +106,8 @@ export type SpendPeriod = { from: string; to: string };
  * Without `period` it replaces everything saved for the platform. With `period` it replaces only the saved rows
  * inside that period: Meta rows whose report period ("from..to") overlaps it, and day rows (week "2026-10-21")
  * in it. So exports of back-to-back periods add up, and loading the same period again replaces it.
+ * Rows once saved from the sheets' Campaign Summary tabs (month "Sep", week "1-7 Sep") are always removed,
+ * as the sheets are no longer a source and would count those weeks twice.
  * The CRM's campaign pages and the analytics database's cost-per-lead and payback figures read it.
  */
 export async function saveCampaignSpend(weeks: CampaignSpendWeek[], platform: SpendPlatform, period?: SpendPeriod): Promise<number> {
@@ -120,7 +122,8 @@ export async function saveCampaignSpend(weeks: CampaignSpendWeek[], platform: Sp
     else {
       await t.execute(sql`DELETE FROM marketing_campaign_spend WHERE platform = ${platform} AND (
         (month ~ '^\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$' AND split_part(month, '..', 1) <= ${period.to} AND split_part(month, '..', 2) >= ${period.from})
-        OR (week ~ '^\d{4}-\d{2}-\d{2}$' AND week BETWEEN ${period.from} AND ${period.to}))`);
+        OR (week ~ '^\d{4}-\d{2}-\d{2}$' AND week BETWEEN ${period.from} AND ${period.to})
+        OR (month !~ '^\d{4}-\d{2}' AND week !~ '^\d{4}-\d{2}-\d{2}$'))`);
     }
     if (rows.length) {
       await t.execute(sql`INSERT INTO marketing_campaign_spend (campaign, platform, month, week, spend, leads)
