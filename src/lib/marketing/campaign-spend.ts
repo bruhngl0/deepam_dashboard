@@ -2,7 +2,10 @@
  * Ad spend per campaign. Each platform has one source of truth and owns its rows
  * of marketing_campaign_spend (saveCampaignSpend replaces one platform at a time):
  *   - Meta ads: the Meta Ads Manager export (./meta-spend-export, scripts/import-meta-spend.ts)
- *   - Google ads: the lead sheets' "Campaign Summary" tabs, saved by the sheet sync
+ *   - Google ads: the Google Ads API when it is set up (./google-ads-spend), otherwise the Google Ads
+ *     billing activity report (./google-ads-billing-export, scripts/import-google-spend.ts)
+ * The lead sheets' "Campaign Summary" tabs are no longer saved as spend; their parser below is kept
+ * for the campaign tests and old sheets.
  *
  * The Campaign Summary tab format:
  *
@@ -95,17 +98,36 @@ export function spendRowsFor(weeks: CampaignSpendWeek[], platform: SpendPlatform
   return [...new Map(weeks.filter((w) => w.platform === platform).map((w) => [`${w.campaign}|${w.platform}|${w.month}|${w.week}`, w])).values()];
 }
 
+// Patterns for saved month/week keys, sent as query parameters (a backslash in a sql`` template is lost).
+const DAY_RE = '^[0-9]{4}-[0-9]{2}-[0-9]{2}$', MONTH_RE = '^[0-9]{4}-[0-9]{2}', PERIOD_RE = '^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][.][0-9]{4}-[0-9]{2}-[0-9]{2}$';
+
+/** A report period, both days included, as YYYY-MM-DD. */
+export type SpendPeriod = { from: string; to: string };
+
 /**
- * Replaces one platform's saved spend with these rows (rows of other platforms are ignored), leaving the
- * other platform's spend as it is. The CRM's campaign pages and the analytics database's cost-per-lead and
- * payback figures read it. Meta: scripts/import-meta-spend.ts; Google: the sheet sync.
+ * Saves one platform's spend (rows of other platforms are ignored), leaving the other platform's spend as it is.
+ * Without `period` it replaces everything saved for the platform. With `period` it replaces only the saved rows
+ * inside that period: Meta rows whose report period ("from..to") overlaps it, and day rows (week "2026-10-21")
+ * in it. So exports of back-to-back periods add up, and loading the same period again replaces it.
+ * Rows once saved from the sheets' Campaign Summary tabs (month "Sep", week "1-7 Sep") are always removed,
+ * as the sheets are no longer a source and would count those weeks twice.
+ * The CRM's campaign pages and the analytics database's cost-per-lead and payback figures read it.
  */
-export async function saveCampaignSpend(weeks: CampaignSpendWeek[], platform: SpendPlatform): Promise<number> {
+export async function saveCampaignSpend(weeks: CampaignSpendWeek[], platform: SpendPlatform, period?: SpendPeriod): Promise<number> {
   const { db } = await import('@/db');
   const { sql } = await import('drizzle-orm');
   const rows = spendRowsFor(weeks, platform);
+  if (period && !(/^\d{4}-\d{2}-\d{2}$/.test(period.from) && /^\d{4}-\d{2}-\d{2}$/.test(period.to) && period.from <= period.to)) {
+    throw new Error(`Bad report period: ${period.from} to ${period.to}`);
+  }
   await db.transaction(async (t) => {
-    await t.execute(sql`DELETE FROM marketing_campaign_spend WHERE platform = ${platform}`);
+    if (!period) await t.execute(sql`DELETE FROM marketing_campaign_spend WHERE platform = ${platform}`);
+    else {
+      await t.execute(sql`DELETE FROM marketing_campaign_spend WHERE platform = ${platform} AND (
+        (month ~ ${PERIOD_RE} AND split_part(month, '..', 1) <= ${period.to} AND split_part(month, '..', 2) >= ${period.from})
+        OR (week ~ ${DAY_RE} AND week BETWEEN ${period.from} AND ${period.to})
+        OR (month !~ ${MONTH_RE} AND week !~ ${DAY_RE}))`);
+    }
     if (rows.length) {
       await t.execute(sql`INSERT INTO marketing_campaign_spend (campaign, platform, month, week, spend, leads)
         SELECT campaign, platform, month, week, spend, leads
@@ -114,3 +136,4 @@ export async function saveCampaignSpend(weeks: CampaignSpendWeek[], platform: Sp
   });
   return rows.length;
 }
+

@@ -38,7 +38,7 @@ export function MarketingTeamWorkspace() {
   const leads = source ? baseLeads.filter(lead => lead.acquisitions.some(acquisition => acquisition.source === source)) : baseLeads;
   const stats = dashboardStats(data, leads);
   const sourceRows = availableSources.map(name => ({ name, stats: dashboardStats(data, baseLeads.filter(lead => lead.acquisitions.some(acquisition => acquisition.source === name))) }));
-  // Spend comes from the Campaign Summary tabs: by campaign and week, with no store or single day.
+  // Spend is saved by campaign and report period (Meta) or day (Google), with no store.
   // It follows the Source filter; with a date range or Store filter it cannot be split, so it is not shown.
   const spendRows = campaignData.data?.spend ?? [];
   const spendFor = (name: string) => spendRows.filter(row => !name || row.platform === name).reduce((sum, row) => sum + row.spend, 0);
@@ -47,7 +47,7 @@ export function MarketingTeamWorkspace() {
   const campaigns = campaignBuyers(data, leads, source, spendShown ? spendRows : null);
   const spendNote = !campaignData.data ? (campaignData.error || 'Loading spend…')
     : campaignData.data.spendError ? `Spend is unavailable: ${campaignData.data.spendError}`
-    : spendShown ? `Spend is the ${source || 'Meta and Google'} total from the Campaign Summary tabs, all dates.`
+    : spendShown ? `Spend is the ${source || 'Meta and Google'} total from the Meta Ads Manager exports and the Google Ads billing report, all dates.`
     : 'Spend is recorded by campaign and week, not by store or day: clear the From, To and Store filters to see it.';
   const clear = () => { setFrom(''); setTo(''); setStore(''); setSource(''); };
   const dateLabel = from && to ? (from === to ? from : `${from} to ${to}`) : from ? `From ${from}` : to ? `Up to ${to}` : 'All dates';

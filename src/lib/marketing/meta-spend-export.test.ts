@@ -17,6 +17,22 @@ describe('parseMetaSpendExport', () => {
     ]);
   });
 
+  it('reads the "Meta report" layout: title rows first, campaign rows only, not their ad sets', () => {
+    const report = `,Meta report Oct-31-2026 to Nov-10-2026,,,Report Period: Oct 31 2026 - Nov 10 2026,,,,,
+,,,,,,,,,
+,Campaign name,Ad set name,Delivery status,Delivery level,Result type,Results,Amount spent (INR),Reporting starts,Reporting ends
+,Meta | 0016 | 2026 | 11 | Diwali Sale Online,All,active,campaign,Website purchases,1,15288.7,2026-10-31,2026-11-10
+,,Prospecting,active,adset,Website purchases,1,4512.24,2026-10-31,2026-11-10
+,Meta | 0001 | 2026 | 09 | Storevisit,All,active,campaign,Leads (form),159,9625.05,2026-10-31,2026-11-10
+,,Storevisit set,active,adset,Leads (form),159,9625.05,2026-10-31,2026-11-10`;
+    const parsed = parseMetaSpendExport(report);
+    expect(parsed).toMatchObject({ from: '2026-10-31', to: '2026-11-10', skipped: 0, total: 24913.75 });
+    expect(parsed.rows).toEqual([
+      { campaign: 'Meta | 0016 | 2026 | 11 | Diwali Sale Online', platform: 'Meta ads', month: '2026-10-31..2026-11-10', week: '', spend: 15288.7, leads: null },
+      { campaign: 'Meta | 0001 | 2026 | 09 | Storevisit', platform: 'Meta ads', month: '2026-10-31..2026-11-10', week: '', spend: 9625.05, leads: 159 },
+    ]);
+  });
+
   it('refuses a file that is not a Meta campaign export', () => {
     expect(() => parseMetaSpendExport('Name,Phone\nA,1')).toThrow(/Meta Ads Manager campaign export/);
   });

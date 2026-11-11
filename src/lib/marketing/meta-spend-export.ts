@@ -1,11 +1,14 @@
 /**
- * Ad spend from a Meta Ads Manager campaign export (CSV or XLSX, one row per
- * campaign: "Campaign name", "Amount spent (INR)", "Results", "Result
- * indicator", "Reporting starts", "Reporting ends"). This is the only source
- * of spend: the lead sheets' Campaign Summary tabs are no longer read.
+ * Ad spend from a Meta Ads Manager campaign export (CSV or XLSX). Two layouts are read:
+ *   - the plain export: one row per campaign, headings on the first row;
+ *   - the "Meta report" download: a title row, then headings ("Campaign name", "Ad set name",
+ *     "Delivery level", ...), with a campaign row followed by its ad set rows. Only campaign rows
+ *     count, so ad set spend is not added twice. The "Raw Data Report" sheet is read when present.
+ * Columns used: "Campaign name", "Amount spent (INR)", "Results", "Result indicator" or "Result type",
+ * "Reporting starts", "Reporting ends". This is the only source of Meta spend.
  *
  * Each campaign becomes one row of `marketing_campaign_spend` for the whole
- * report period (month holds the period, week is blank). Campaigns with no
+ * report period (month holds the period "from..to", week is blank). Campaigns with no
  * spend are left out; a name that appears twice is added up.
  */
 
@@ -21,17 +24,29 @@ function isoDay(value: unknown): string {
 
 export type MetaSpendExport = { rows: CampaignSpendWeek[]; from: string; to: string; total: number; skipped: number };
 
+const NOT_META = 'This is not a Meta Ads Manager campaign export: it needs "Campaign name" and "Amount spent (INR)" columns.';
+
+/** The sheet's rows as records keyed by the headings row (the first row that has "Campaign name"). */
+function recordsOf(book: XLSX.WorkBook): Record<string, unknown>[] {
+  const name = book.SheetNames.find((n) => /raw\s*data/i.test(n)) ?? book.SheetNames[0];
+  const grid = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets[name], { header: 1, defval: '', raw: true });
+  const at = grid.findIndex((row) => row.some((v) => String(v).trim() === 'Campaign name'));
+  if (at < 0) return [];
+  const heads = grid[at].map((v) => String(v).trim());
+  return grid.slice(at + 1).map((row) => Object.fromEntries(heads.flatMap((h, i) => (h ? [[h, row[i] ?? '']] : []))));
+}
+
 export function parseMetaSpendExport(file: ArrayBuffer | string): MetaSpendExport {
   const book = typeof file === 'string' ? XLSX.read(file, { type: 'string', raw: true }) : XLSX.read(file, { type: 'array', raw: true });
-  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets[book.SheetNames[0]], { defval: '', raw: true });
-  if (!records.length || !('Campaign name' in records[0]) || !Object.keys(records[0]).some((k) => /^amount spent/i.test(k))) {
-    throw new Error('This is not a Meta Ads Manager campaign export: it needs "Campaign name" and "Amount spent (INR)" columns.');
-  }
-  const spentKey = Object.keys(records[0]).find((k) => /^amount spent/i.test(k))!;
+  const records = recordsOf(book);
+  const spentKey = records.length ? Object.keys(records[0]).find((k) => /^amount spent/i.test(k)) : undefined;
+  if (!spentKey) throw new Error(NOT_META);
   const byName = new Map<string, CampaignSpendWeek>();
   const days: string[] = [];
   let skipped = 0;
   for (const record of records) {
+    // In the "Meta report" layout, ad set rows repeat their campaign's spend; only campaign rows count.
+    if ('Delivery level' in record && String(record['Delivery level']).trim().toLowerCase() !== 'campaign') continue;
     const campaign = String(record['Campaign name'] ?? '').trim();
     const spend = money(record[spentKey]) ?? 0;
     if (!campaign || spend <= 0) { skipped++; continue; }
@@ -39,7 +54,8 @@ export function parseMetaSpendExport(file: ArrayBuffer | string): MetaSpendExpor
     if (from) days.push(from);
     if (to) days.push(to);
     // Results count leads only where Meta says they are lead form submissions.
-    const leads = /lead/i.test(String(record['Result indicator'] ?? '')) ? Math.round(money(record['Results']) ?? 0) : null;
+    const indicator = String(record['Result indicator'] ?? record['Result type'] ?? '');
+    const leads = /lead/i.test(indicator) ? Math.round(money(record['Results']) ?? 0) : null;
     const row = byName.get(campaign) ?? { campaign, platform: 'Meta ads', month: `${from}..${to}`, week: '', spend: 0, leads: null };
     row.spend = Math.round((row.spend + spend) * 100) / 100;
     if (leads !== null) row.leads = (row.leads ?? 0) + leads;
