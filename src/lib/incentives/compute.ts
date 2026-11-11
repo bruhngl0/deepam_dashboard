@@ -21,10 +21,15 @@ export type IncentiveRow = IncentivePerson & {
   age: { band: number; amount: number; incentive: number }[]; ageIncentive: number;
   /** Customers per LAKH_BANDS index (0 unused) and their total incentive. */
   lakhCustomers: number[]; lakhIncentive: number;
+  /** Sum of the three incentives before rounding. */
+  calculated: number;
+  /** What is paid: `calculated` rounded down to a whole ₹10,000 (₹33,500 → ₹30,000; under ₹10,000 → nil). */
   total: number;
 };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+export const ROUND_TO = 10_000;
+export const roundDown = (n: number) => Math.floor(n / ROUND_TO) * ROUND_TO;
 
 export function computeIncentives(people: IncentivePerson[], bills: IncentiveBill[], oldStock: OldStockLine[]): IncentiveRow[] {
   const empOf = new Map(bills.map((b) => [b.billId, b.empCode]));
@@ -57,9 +62,10 @@ export function computeIncentives(people: IncentivePerson[], bills: IncentiveBil
 
     const vol = volumeIncentive(p.store, volume, p.weekendStaff);
     const ageIncentive = r2(age.reduce((s, a) => s + a.incentive, 0));
+    const calculated = r2(vol + ageIncentive + lakh);
     return {
       ...p, bills: mine.filter((b) => b.amount > 0).length, business: r2(business), oldStock: r2(oldStockValue), volume, volumeIncentive: vol,
-      age, ageIncentive, lakhCustomers, lakhIncentive: lakh, total: r2(vol + ageIncentive + lakh),
+      age, ageIncentive, lakhCustomers, lakhIncentive: lakh, calculated, total: roundDown(calculated),
     };
   });
 }
