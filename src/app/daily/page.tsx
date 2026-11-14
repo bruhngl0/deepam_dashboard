@@ -317,10 +317,10 @@ function dailyText(d: {
 
   for (const c of stores) {
     out.push(`*${c.name.toUpperCase()}*`, '');
-    block('_Walk-ins_', c.walkIns
+    block('Walk-ins', c.walkIns
       ? [`Walk-ins: ${formatNumber(c.walkIns)}`, `Converted: ${formatNumber(c.converted)} (${pct(c.converted, c.walkIns)})`]
       : ['No walk-ins']);
-    block('_Sales_', c.bills || c.sales || c.mtdSales
+    block('Sales', c.bills || c.sales || c.mtdSales
       ? [
           `Sales: ${cur(c.sales)}`,
           `Bills: ${formatNumber(c.bills)}`,
@@ -330,7 +330,7 @@ function dailyText(d: {
           `MTD sales: ${cur(c.mtdSales)}`,
         ]
       : ['No sales']);
-    block('_Driver visits_', !c.rc
+    block('Driver visits', !c.rc
       ? [UNAVAILABLE]
       : c.rc.visits || c.rc.owedVisits
         ? [
@@ -340,7 +340,7 @@ function dailyText(d: {
             ...(c.rc.owedVisits ? [`Not yet paid: ${cur(c.rc.owed)} (${formatNumber(c.rc.owedVisits)} visits)`] : []),
           ]
         : ['No driver visits']);
-    block(`_Stock at cost_${d.stockAsOf ? ` (stock report of ${d.stockAsOf})` : ''}`, c.value
+    block(`Stock at cost${d.stockAsOf ? ` (stock report of ${d.stockAsOf})` : ''}`, c.value
       ? [`Opening: ${cur(c.value.opening)}`, `Sold: ${cur(c.value.sold)}`, `Closing: ${cur(c.value.closing)}`]
       : ['Not in the stock report']);
   }
@@ -351,7 +351,7 @@ function dailyText(d: {
     `Calls: ${formatNumber(d.calls.calls)}`,
     `Connected: ${formatNumber(d.calls.connected)}`,
     `Interested: ${formatNumber(d.calls.interested)}`,
-    ...d.calls.bySalesperson.flatMap((r) => ['', `_${r.name}_`, `Calls: ${formatNumber(r.calls)}`, `Connected: ${formatNumber(r.connected)}`, `Interested: ${formatNumber(r.interested)}`]),
+    ...d.calls.bySalesperson.flatMap((r) => ['', r.name, `Calls: ${formatNumber(r.calls)}`, `Connected: ${formatNumber(r.connected)}`, `Interested: ${formatNumber(r.interested)}`]),
   ]);
 
   return out.join('\n').trim();
