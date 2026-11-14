@@ -72,7 +72,7 @@ export default async function HeroPage() {
           </span>
           <h2 className="text-lg font-semibold tracking-tight text-ink">HR Intelligence</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
-            Salespeople: what each one sold and served, their incentives, and matching names to Salesperson IDs.
+            Salespeople: what each one sold and served, and their incentives.
           </p>
         </Link>
 
