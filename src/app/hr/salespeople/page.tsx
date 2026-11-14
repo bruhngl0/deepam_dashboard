@@ -94,7 +94,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
         <Kpi label="Salespeople" value={formatNumber(list.length)} caption="With a bill, return, walk-in, driver visit or call in this period" />
         <Kpi label="Average bill" value={total.bills ? formatCurrency((total.net + total.returned) / total.bills) : '—'} caption="Credited sales bills, before returns" />
         <Kpi label="Not credited to anyone" value={uncredited ? formatNumber(uncredited.bills) : '—'}
-          caption={uncredited ? <>{formatCurrency(uncredited.sales)} on bills with no salesperson{uncredited.unmatchedNames ? <> · <Link className="font-medium text-accent hover:underline" href="/hr/match">{formatNumber(uncredited.unmatchedNames)} names to match</Link></> : ''}</> : undefined} />
+          caption={uncredited ? <>{formatCurrency(uncredited.sales)} on bills with no salesperson</> : undefined} />
       </KpiGrid>
 
       {coverage && coverage.bills > 0 && (

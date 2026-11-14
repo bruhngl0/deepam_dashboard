@@ -1,7 +1,6 @@
 /**
- * HR Intelligence module shell: the salespeople, their incentives and the matching of names to
- * Salesperson IDs. The master date+store filter sits above the Salespeople pages, which read
- * `from`/`to`/`store`; Incentives (picked by month) and Matching do not use it, so it is hidden there.
+ * HR Intelligence module shell: the salespeople and their incentives. The master date+store filter sits above the Salespeople pages, which read
+ * `from`/`to`/`store`; Incentives (picked by month) does not use it, so it is hidden there.
  */
 
 import { getSalesDateBounds } from '@/lib/queries/dashboard';
