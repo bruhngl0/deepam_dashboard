@@ -1,5 +1,5 @@
 /**
- * CSV for incentive work: every salesperson's figures (/crm/salespeople), or one salesperson's bills (?emp=EMP-0017),
+ * CSV for incentive work: every salesperson's figures (/hr/salespeople), or one salesperson's bills (?emp=EMP-0017),
  * for the same ?from=&to=&store= as the page. Plain figures (no currency symbols) so a spreadsheet can add them up.
  */
 

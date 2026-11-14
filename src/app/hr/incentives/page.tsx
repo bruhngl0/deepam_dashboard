@@ -23,7 +23,7 @@ async function toggleWeekend(form: FormData) {
   'use server';
   await requireUser();
   await setWeekendStaff(String(form.get('emp') ?? ''), form.get('on') === '1');
-  revalidatePath('/crm/salespeople/incentives');
+  revalidatePath('/hr/incentives');
 }
 
 /** Every month from the circulars' start to this month, newest first. */
@@ -46,7 +46,7 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
     const q = new URLSearchParams();
     const next = { month, store, ...changes };
     for (const [k, v] of Object.entries(next)) if (v) q.set(k, v);
-    return `/crm/salespeople/incentives?${q}`;
+    return `/hr/incentives?${q}`;
   };
 
   if (!analyticsConfigured()) {
@@ -66,7 +66,7 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
       <PageHeader
         title="Incentives"
         description="Each salesperson's incentive for the month, by the management circulars in effect from 1 September 2026."
-        meta={<>{monthName(month)}{asOf ? ` · data as of ${formatDateTime(asOf)}` : ''} · <Link href="/crm/salespeople" className="text-accent hover:underline">All salespeople</Link></>}
+        meta={<>{monthName(month)}{asOf ? ` · data as of ${formatDateTime(asOf)}` : ''} · <Link href="/hr/salespeople" className="text-accent hover:underline">All salespeople</Link></>}
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -94,7 +94,7 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
               {rows.map((r) => (
                 <tr key={r.empCode} className="border-t border-grid hover:bg-inset/50">
                   <th scope="row" className="px-3 py-2 text-left font-medium text-ink">
-                    <Link href={`/crm/salespeople/${r.empCode}?from=${monthRange(month).from}&to=${monthRange(month).to}`} className="hover:text-accent hover:underline">{r.name}</Link>
+                    <Link href={`/hr/salespeople/${r.empCode}?from=${monthRange(month).from}&to=${monthRange(month).to}`} className="hover:text-accent hover:underline">{r.name}</Link>
                     <span className="block text-xs font-normal text-ink-muted">{r.empCode}</span>
                   </th>
                   <td className="whitespace-nowrap px-3 py-2 text-ink-2">{INCENTIVE_STORES[r.store].name}</td>

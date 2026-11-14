@@ -1,5 +1,5 @@
 /**
- * Queries behind the Salespeople module (/crm/salespeople): everything a salesperson sold and served,
+ * Queries behind the Salespeople module (/hr/salespeople): everything a salesperson sold and served,
  * as the base for incentives. Reads the analytics database (migration/analytics/030_model.sql), where
  * each bill, walk-in, call and driver visit already carries the Salesperson ID (EMP-) its name matched.
  *

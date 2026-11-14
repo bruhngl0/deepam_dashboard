@@ -10,10 +10,10 @@ import { aq } from '@/lib/analytics/db';
 import { refreshAnalytics } from '@/lib/analytics/refresh';
 import { addSalesperson, matchAlias, salespersonAliases, salespersonRoster, SOURCE_LABEL, type Alias, type Salesperson } from '@/lib/analytics/salespeople';
 import { formatNumber } from '@/lib/format';
-import { Card, ReportShell, Table } from '../../report-shell';
+import { Card, HrShell, Table } from '../hr-shell';
 
 export const dynamic = 'force-dynamic';
-const PATH = '/reports/salespeople/match';
+const PATH = '/hr/match';
 
 async function afterChange() {
   await refreshAnalytics().catch((error) => console.error('[salesperson match] refresh', error instanceof Error ? error.message : error));
@@ -83,9 +83,8 @@ export default async function SalespersonMatchPage() {
   ];
 
   return (
-    <ReportShell
+    <HrShell
       title="Salesperson matching"
-      current={PATH}
       intro="Each salesperson has one Salesperson ID (EMP-), so their walk-ins, bills, calls and driver visits add up across the apps. Names that match exactly one salesperson are matched by name; match the rest here. Matches made by hand are kept."
     >
       <Card title={`Not matched yet · ${formatNumber(unmatched.length)}`} note="Times seen = bills, calls or driver visits that carry this name.">
@@ -112,6 +111,6 @@ export default async function SalespersonMatchPage() {
           <Table head={['Name or code', 'Where it comes from', 'Times seen', 'Matched', 'Change']} rows={matched.map((a) => aliasRow(a, true))} minWidth="64rem" />
         </details>
       </Card>
-    </ReportShell>
+    </HrShell>
   );
 }
