@@ -16,6 +16,8 @@ import { useLeadTypeConversions } from './lead-type-conversions-panel';
 import { CampaignBreakdown } from './campaign-breakdown';
 import { control, FilterField, textButton } from './ui';
 import { useUrlState } from '@/lib/use-url-state';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { storeCodes } from '@/lib/store-filter';
 
 type Module = MarketingModule;
 type LeadsView = 'Lead management' | 'Calling workspace' | 'Existing customers' | 'Online customers' | 'Import';
@@ -87,7 +89,7 @@ export function MarketingWorkspace() {
     {showFilters && <section aria-label="Marketing filters" className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-ink-muted">Filter</span>
       <FilterField label="From"><input type="date" className={control} max={to || undefined} value={from} onChange={e => { setFrom(e.target.value); resetPage(); }} /></FilterField>
       <FilterField label="To"><input type="date" className={control} min={from || undefined} value={to} onChange={e => { setTo(e.target.value); resetPage(); }} /></FilterField>
-      <FilterField label="Store"><select className={control} value={store} onChange={e => { setStore(e.target.value); resetPage(); }}><option value="">All stores</option>{STORES.map(s => <option key={s} value={s}>{storeName(s)}</option>)}</select></FilterField>
+      <FilterField label="Store"><StoreMultiSelect className={control} stores={STORES.map(s => ({ code: s, name: storeName(s) }))} value={storeCodes(store)} onChange={codes => { setStore(codes.join(',')); resetPage(); }} /></FilterField>
       <FilterField label="Source"><select className={control} value={source} onChange={e => { setSource(e.target.value); resetPage(); }}><option value="">All sources</option>{SOURCES.map(s => <option key={s}>{s}</option>)}</select></FilterField>
       {section === 'Leads' && leadsView === 'Lead management' && <>
         <FilterField label="Campaign"><select className={control} value={campaign} onChange={e => { setCampaign(e.target.value); resetPage(); }}><option value="">All campaigns</option>{campaigns.map(c => <option key={c}>{c}</option>)}</select></FilterField>

@@ -4,6 +4,8 @@ import { formatNumber, formatPhone } from '@/lib/format';
 import type { ExistingCustomerFilters, ExistingCustomerKpis, ExistingCustomerListRow, ExistingCustomerView } from '@/lib/marketing/existing-customer-store';
 import { button, card, dayMonthYearTimeLabel, input, money, primary } from './marketing-shared';
 import { control, FilterField, textButton } from './ui';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { storeCodes } from '@/lib/store-filter';
 
 type Response = { listName: string; total: number; assigned: number; unassigned: number; kpis: ExistingCustomerKpis; stores: string[]; filtered: number; page: number; pageSize: number; rows: ExistingCustomerListRow[] };
 
@@ -59,7 +61,7 @@ export function ExistingCustomerCallList({ list = 'exhibition' }: { list?: CallL
     <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3"><span className="text-xs font-medium text-ink-muted">Filter</span>
       <FilterField label="From"><input type="date" className={control} max={to || undefined} value={from} onChange={event => { setFrom(event.target.value); setPage(0); }} /></FilterField>
       <FilterField label="To"><input type="date" className={control} min={from || undefined} value={to} onChange={event => { setTo(event.target.value); setPage(0); }} /></FilterField>
-      <FilterField label="Store"><select className={control} value={store} onChange={event => { setStore(event.target.value); setPage(0); }}><option value="">All stores</option>{(data?.stores ?? (store ? [store] : [])).map(name => <option key={name}>{name}</option>)}</select></FilterField>
+      <FilterField label="Store"><StoreMultiSelect className={control} stores={(data?.stores ?? storeCodes(store)).map(name => ({ code: name, name }))} value={storeCodes(store)} onChange={codes => { setStore(codes.join(',')); setPage(0); }} /></FilterField>
       <button className={textButton} onClick={() => { setFrom(''); setTo(''); setStore(''); setPage(0); }}>Clear filters</button>
       <p className="w-full text-xs text-ink-muted">Dates narrow Customers called, Interested and Converted to calls and bills in that period, and Follow-ups due to those falling due in it. Customers and Pending calls are today&apos;s totals. All times IST.</p>
     </div>

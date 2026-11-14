@@ -7,6 +7,8 @@ import { LeadTypeConversionsPanel, useLeadTypeConversions } from './lead-type-co
 import { CampaignBreakdown } from './campaign-breakdown';
 import { control, textButton } from './ui';
 import { useUrlState } from '@/lib/use-url-state';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { storeCodes } from '@/lib/store-filter';
 
 function dashboardStats(data: Dataset, leads: Lead[]) {
   const stats = metrics(data, leads);
@@ -69,12 +71,12 @@ export function MarketingTeamWorkspace() {
     <section aria-label="Marketing team filters" className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-ink-muted">Filter</span>
       <label className="flex items-center gap-1.5 text-xs text-ink-muted">From<input type="date" className={control} max={to || undefined} value={from} onChange={event => setFrom(event.target.value)} /></label>
       <label className="flex items-center gap-1.5 text-xs text-ink-muted">To<input type="date" className={control} min={from || undefined} value={to} onChange={event => setTo(event.target.value)} /></label>
-      <label className="flex items-center gap-1.5 text-xs text-ink-muted">Store<select className={control} value={store} onChange={event => setStore(event.target.value)}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></label>
+      <label className="flex items-center gap-1.5 text-xs text-ink-muted">Store<StoreMultiSelect className={control} stores={STORES.map(value => ({ code: value, name: storeName(value) }))} value={storeCodes(store)} onChange={codes => setStore(codes.join(','))} /></label>
       <label className="flex items-center gap-1.5 text-xs text-ink-muted">Source<select className={control} value={source} onChange={event => setSource(event.target.value)}><option value="">All sources</option>{availableSources.map(value => <option key={value}>{value}</option>)}</select></label>
       <button className={textButton} onClick={clear}>Clear filters</button>
     </section>
     <section aria-label="Source dashboards" className="space-y-3"><div className="flex items-center gap-3"><h2 className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Source dashboards</h2><div className="h-px flex-1 bg-line" /></div><div className="flex gap-2 overflow-x-auto pb-2"><button className={source ? button : primary} onClick={() => setSource('')}>All sources</button>{availableSources.map(value => <button key={value} className={`${source === value ? primary : button} whitespace-nowrap`} onClick={() => setSource(value)}>{value}</button>)}</div></section>
-    <section className="space-y-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Dashboard</p><h2 className="mt-1 text-2xl font-semibold text-ink">{source || 'All sources'}</h2><p className="mt-1 text-sm text-ink-2">{dateLabel} · {store || 'All stores'}</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[
+    <section className="space-y-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Dashboard</p><h2 className="mt-1 text-2xl font-semibold text-ink">{source || 'All sources'}</h2><p className="mt-1 text-sm text-ink-2">{dateLabel} · {store ? storeCodes(store).map(storeName).join(', ') : 'All stores'}</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[
       ['Total leads', stats.total], ['Converted', stats.converted], ['Conversion rate', `${stats.total ? (stats.converted / stats.total * 100).toFixed(1) : '0.0'}%`],
       ['Sales', rupees(stats.sales)], ['Bills', stats.bills], ['Spend', spend === null ? '—' : rupees(spend)], ['Cost per lead', per(spend, stats.total)], ['Cost per conversion', per(spend, stats.converted)], ['Sales per ₹1 spent', spend ? `₹${(stats.sales / spend).toFixed(2)}` : '—'],
     ].map(([label, value]) => <div className={card} key={label}><p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">{label}</p><p className="tnum mt-2 text-3xl font-semibold leading-none tracking-tight text-ink">{value}</p></div>)}</div>

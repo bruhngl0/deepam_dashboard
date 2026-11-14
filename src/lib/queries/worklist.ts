@@ -340,7 +340,7 @@ export async function getSecondVisitList(
     conditions.push(sql`(s.full_name ILIKE ${term} OR s.phone_national LIKE ${term})`);
   }
   if (filters.minScore) conditions.push(sql`s.score >= ${filters.minScore}`);
-  if (store) conditions.push(sql`s.store_code = ${store}`);
+  if (store) conditions.push(sql`s.store_code = ANY(string_to_array(${store}, ','))`);
   if (!filters.includeContacted) {
     conditions.push(
       sql`(s.last_contacted_at IS NULL OR s.last_contacted_at < now() - ${sql.raw(`INTERVAL '${cooloff} days'`)})`,

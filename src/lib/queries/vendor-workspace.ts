@@ -1,7 +1,7 @@
 /** Query adapter for the vendor workspace's operational screens. */
 import { db } from '@/db';
 import { sql } from 'drizzle-orm';
-import { parseDateParam, parseStoreParam, type DateRange } from './dashboard';
+import { parseDateParam, parseStoreParam, storeInList, type DateRange } from './dashboard';
 import { LATEST_STOCK_ROWS } from './stock-ledger';
 
 type Row = Record<string, unknown>;
@@ -14,17 +14,17 @@ const number = (value: unknown) => Number(value ?? 0);
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 /** The master filter's ?from=&to=&store= (store is `stores.code`). */
 export function vendorScope(sp: Record<string, string | string[] | undefined>): DateRange {
-  return { from: parseDateParam(one(sp.from)), to: parseDateParam(one(sp.to)), store: parseStoreParam(one(sp.store)) };
+  return { from: parseDateParam(one(sp.from)), to: parseDateParam(one(sp.to)), store: parseStoreParam(sp.store) };
 }
 /** ` AND <column> BETWEEN …` for a date column. The parse functions are the injection boundary, as in dashboard.ts. */
 function dates(column: string, range: DateRange): string {
   const from = parseDateParam(range.from), to = parseDateParam(range.to);
   return (from ? ` AND ${column} >= '${from}'` : '') + (to ? ` AND ${column} <= '${to}'` : '');
 }
-/** ` AND <items>.store_id = …` for the picked store. */
+/** ` AND <items>.store_id IN (…)` for the picked stores. */
 function itemStore(alias: string, range: DateRange): string {
   const store = parseStoreParam(range.store);
-  return store ? ` AND ${alias}.store_id = (SELECT id FROM stores WHERE code = '${store}')` : '';
+  return store ? ` AND ${alias}.store_id IN (SELECT id FROM stores WHERE code IN ${storeInList(store)})` : '';
 }
 
 export type VendorWorkspaceRow = {

@@ -27,7 +27,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         <Table head={['Store', 'Units in stock', 'Stock at cost', 'Aged units', 'Aged stock at cost', 'Aged share']}
           rows={stores.map((s) => [`${s.name} (${s.storeCode})`, formatNumber(s.qty), formatCurrency(s.cost), formatNumber(s.agedQty), formatCurrency(s.agedCost), pct(s.agedQty, s.qty)])} />
         <p className="border-t border-grid px-4 py-3 text-sm text-ink-2">
-          Sell-through, all stores{period.store ? ' (not just the picked one)' : ''}: {sellThrough.rate === null ? '—' : `${(100 * sellThrough.rate).toFixed(1)}%`} ({formatNumber(sellThrough.sold)} units sold in the 30 days to {sellThrough.salesThrough ? day(sellThrough.salesThrough) : '—'}, {formatNumber(sellThrough.inStock)} in stock). Sales are not recorded per store, so this is company-wide.
+          Sell-through, all stores{period.store ? ' (not just the picked ones)' : ''}: {sellThrough.rate === null ? '—' : `${(100 * sellThrough.rate).toFixed(1)}%`} ({formatNumber(sellThrough.sold)} units sold in the 30 days to {sellThrough.salesThrough ? day(sellThrough.salesThrough) : '—'}, {formatNumber(sellThrough.inStock)} in stock). Sales are not recorded per store, so this is company-wide.
         </p>
       </Card>
       <Card title="Aged stock at cost, day by day" note="Snapshots in the period. History starts on the day the analytics database was first built.">

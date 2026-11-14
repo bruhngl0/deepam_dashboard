@@ -33,6 +33,7 @@
  * as `newLeads`/`newConverted`/`newRevenue`, never folded in.
  */
 
+import { parseStores, storeCodes } from '@/lib/store-filter';
 import { db } from '@/db';
 import { sql } from 'drizzle-orm';
 import { VALUE_TIER_LABEL, VALUE_TIER_ORDER, type ValueTierCode } from '@/lib/format';
@@ -102,20 +103,28 @@ export function dateCondition(alias: string, range: DateRange): string {
   return parts.length ? ` AND ${parts.join(' AND ')}` : '';
 }
 
-/** The only gate a store code passes through before interpolation — same shape as `parseDateParam`. */
-export function parseStoreParam(value: string | null | undefined): string | null {
-  return value && STORE_CODE_RE.test(value) ? value : null;
+/**
+ * The only gate store codes pass through before interpolation — same shape as `parseDateParam`.
+ * One or more codes, comma-joined (lib/store-filter), or null for every store.
+ */
+export function parseStoreParam(value: string | string[] | null | undefined): string | null {
+  return parseStores(value, STORE_CODE_RE);
+}
+
+/** `('A', 'B')` for SQL `IN`, from a list `parseStoreParam` has already checked. */
+export function storeInList(stores: string): string {
+  return `(${storeCodes(stores).map((code) => `'${code}'`).join(', ')})`;
 }
 
 /**
- * `AND <alias>.store_id = (SELECT id FROM stores WHERE code = ...)` for the
+ * `AND <alias>.store_id IN (SELECT id FROM stores WHERE code IN (...))` for the
  * given range, or `''` when unbounded. `alias` must reference a row that
  * itself carries a `store_id` (`sales`, chiefly) — this is the master
  * filter's store leg, `dateCondition`'s sibling.
  */
 export function storeCondition(alias: string, range: DateRange): string {
   const store = parseStoreParam(range.store);
-  return store ? ` AND ${alias}.store_id = (SELECT id FROM stores WHERE code = '${store}')` : '';
+  return store ? ` AND ${alias}.store_id IN (SELECT id FROM stores WHERE code IN ${storeInList(store)})` : '';
 }
 
 /** `dateCondition` + `storeCondition` combined — the common case for any query scoped to `sales`. */
@@ -561,7 +570,7 @@ export async function getStoreBreakdown(range: DateRange = {}): Promise<StoreRow
     FROM   stores st
     LEFT   JOIN sales s ON s.store_id = st.id${dateCondition('s', range)}
     LEFT   JOIN scoped_customers sc ON sc.customer_id = s.customer_id
-    WHERE  true${store ? ` AND st.code = '${store}'` : ''}
+    WHERE  true${store ? ` AND st.code IN ${storeInList(store)}` : ''}
     GROUP  BY st.id, st.code, st.name, st.voucher_prefix
     ORDER  BY revenue DESC`);
 

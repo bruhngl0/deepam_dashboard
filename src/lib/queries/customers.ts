@@ -187,7 +187,7 @@ function buildConditions(filters: CustomerFilters): SQL[] {
     // store filter because their one visit happened to fall outside it.
     conditions.push(sql`EXISTS (
       SELECT 1 FROM sales s2 JOIN stores st2 ON st2.id = s2.store_id
-      WHERE s2.customer_id = c.id AND st2.code = ${filters.store})`);
+      WHERE s2.customer_id = c.id AND st2.code = ANY(string_to_array(${filters.store}, ',')))`);
   }
   if (filters.channel) {
     conditions.push(sql`ca.primary_channel = ${filters.channel}::channel`);

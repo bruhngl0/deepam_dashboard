@@ -77,7 +77,7 @@ export default async function NewCustomersPage({ searchParams }: { searchParams:
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">New customers</h1>
         <p className="mt-1 max-w-[72ch] text-sm text-ink-2">
           Everyone who bought between {formatDate(from ?? bounds.earliest)} and {formatDate(to ?? bounds.latest)}
-          {store ? ' at this store' : ''} and is not on the loyalty customer sheet. Each person is in one group:
+          {store ? (store.includes(',') ? ' at these stores' : ' at this store') : ''} and is not on the loyalty customer sheet. Each person is in one group:
           a lead sheet first, then a walk-in, otherwise known only from their bill. Foreign numbers are left out.
         </p>
       </header>

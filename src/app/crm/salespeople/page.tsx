@@ -85,7 +85,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
       <PageHeader
         title="Salespeople"
         description="What each salesperson billed, returned and served: the base for incentives. Open a name for their month-by-month figures and every bill."
-        meta={<>{shownFrom && shownTo ? `Bills ${formatDate(shownFrom)} – ${formatDate(shownTo)}` : 'No bills loaded'}{period.store ? ' · one store' : ' · every store'}{asOf ? ` · data as of ${formatDateTime(asOf)}` : ''}</>}
+        meta={<>{shownFrom && shownTo ? `Bills ${formatDate(shownFrom)} – ${formatDate(shownTo)}` : 'No bills loaded'}{period.store ? (period.store.includes(',') ? ' · picked stores' : ' · one store') : ' · every store'}{asOf ? ` · data as of ${formatDateTime(asOf)}` : ''}</>}
         actions={<><Link href="/crm/salespeople/incentives" className={button}>Incentives</Link><a href={`/crm/salespeople/export${query(sp, { sort: null, dir: null })}`} className={button}>Export CSV</a></>}
       />
 

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const period = salesPeriod(Object.fromEntries(params));
   const emp = params.get('emp');
-  const stamp = `${period.from === '2000-01-01' ? 'all' : period.from}_to_${period.to}${period.store ? `_${period.store}` : ''}`;
+  const stamp = `${period.from === '2000-01-01' ? 'all' : period.from}_to_${period.to}${period.store ? `_${period.store.replaceAll(',', '+')}` : ''}`;
 
   let csv: string;
   let name: string;
