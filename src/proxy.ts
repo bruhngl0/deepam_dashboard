@@ -8,6 +8,9 @@ import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE,
 const overview: GateModule = { key: 'overview', label: 'Overview', password: () => process.env.GATE_PASSWORD_OVERVIEW };
 const customer: GateModule = { key: 'customer', label: 'Customer Intelligence', password: () => process.env.GATE_PASSWORD_CUSTOMER };
 const marketing: GateModule = { key: 'marketing', label: 'Marketing Intelligence', password: () => process.env.GATE_PASSWORD_MARKETING };
+// Salespeople and incentives. Its own sign-in, with the Customer Intelligence password until
+// GATE_PASSWORD_HR is set (salespeople used to sit inside Customer Intelligence).
+const hr: GateModule = { key: 'hr', label: 'HR Intelligence', password: () => process.env.GATE_PASSWORD_HR || process.env.GATE_PASSWORD_CUSTOMER };
 // The old in-app vendor pages; same password as the Vendor Intelligence app.
 const vendor: GateModule = { key: 'vendor', label: 'Vendor Intelligence', password: () => process.env.GATE_PASSWORD_VENDOR };
 
@@ -16,7 +19,7 @@ const under = (pathname: string, ...prefixes: string[]) =>
 
 const gate: GateConfig = {
   appName: 'Deepam by Ananta',
-  modules: [overview, customer, marketing, vendor],
+  modules: [overview, customer, hr, marketing, vendor],
   moduleFor(pathname) {
     // App Runner's health check, and server-to-server routes that carry their own tokens.
     if (under(pathname, '/api/health', '/api/integration', '/api/marketing/sheet-sync/cron', '/api/marketing/google-ads-sync')) return null;
@@ -24,7 +27,8 @@ const gate: GateConfig = {
     if (under(pathname, '/sales')) return null;
     // The public exhibition visit form, shared with customers.
     if (under(pathname, '/exhb')) return null;
-    if (under(pathname, '/flow', '/daily', '/reports')) return overview;
+    if (under(pathname, '/flow', '/daily')) return overview;
+    if (under(pathname, '/hr')) return hr;
     if (under(pathname, '/crm')) return customer;
     if (under(pathname, '/marketing', '/marketing-team')) return marketing;
     if (under(pathname, '/vendor')) return vendor;

@@ -1,5 +1,5 @@
 /**
- * Queries behind the Salespeople module (/crm/salespeople): everything a salesperson sold and served,
+ * Queries behind the Salespeople module (/hr/salespeople): everything a salesperson sold and served,
  * as the base for incentives. Reads the analytics database (migration/analytics/030_model.sql), where
  * each bill, walk-in, call and driver visit already carries the Salesperson ID (EMP-) its name matched.
  *
@@ -13,6 +13,7 @@
  * "New customer" means the customer's first bill in the loaded sales history (from 1 May 2026).
  */
 
+import { parseStores } from '@/lib/store-filter';
 import { aq } from './db';
 import { todayIst } from '@/lib/queries/daily';
 
@@ -27,8 +28,7 @@ export function salesPeriod(sp: Record<string, string | string[] | undefined>): 
   const today = todayIst();
   const to = DAY.test(one(sp.to) ?? '') && one(sp.to)! <= today ? one(sp.to)! : today;
   const from = DAY.test(one(sp.from) ?? '') && one(sp.from)! <= to ? one(sp.from)! : '2000-01-01';
-  const store = one(sp.store);
-  return { from, to, store: store && /^[A-Z0-9_]{1,40}$/.test(store) ? store : null };
+  return { from, to, store: parseStores(sp.store, /^[A-Z0-9_]{1,40}$/) };
 }
 
 export type SalespersonStats = {
@@ -42,7 +42,7 @@ export type SalespersonStats = {
 
 // $1 from, $2 to, $3 CRM store code or null, $4 Salesperson ID or null.
 const STATS_SQL = `
-WITH st AS (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3),
+WITH st AS (SELECT store_code FROM analytics.dim_store WHERE crm_code = ANY(string_to_array($3, ','))),
 lines AS (SELECT bill_id, sum(cost) FILTER (WHERE cost > 0) AS cost, bool_and(cost > 0) AS all_cost FROM analytics.fact_bill_line GROUP BY 1),
 first_bill AS (SELECT person_id, min(billed_at) AS first_at FROM analytics.fact_bill WHERE person_id IS NOT NULL AND amount > 0 GROUP BY 1),
 b AS (
@@ -130,7 +130,7 @@ export async function uncreditedBills(period: SalesPeriod): Promise<{ bills: num
            (SELECT count(*) FROM analytics.salesperson_alias WHERE emp_code IS NULL AND matched_by IS NULL AND source = 'pos') AS unmatched
     FROM analytics.fact_bill b
     WHERE b.emp_code IS NULL AND b.day BETWEEN $1 AND $2
-      AND ($3::text IS NULL OR b.store_code IN (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3))`,
+      AND ($3::text IS NULL OR b.store_code IN (SELECT store_code FROM analytics.dim_store WHERE crm_code = ANY(string_to_array($3, ','))))`,
     [period.from, period.to, period.store]);
   const r = rows?.[0];
   return r ? { bills: n(r.bills), sales: n(r.sales), unmatchedNames: n(r.unmatched) } : null;
@@ -151,7 +151,7 @@ export async function billCoverage(period: SalesPeriod): Promise<BillCoverage | 
            coalesce(sum(b.amount), 0) AS value
     FROM analytics.fact_bill b
     WHERE b.day BETWEEN $1 AND $2
-      AND ($3::text IS NULL OR b.store_code IN (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3))
+      AND ($3::text IS NULL OR b.store_code IN (SELECT store_code FROM analytics.dim_store WHERE crm_code = ANY(string_to_array($3, ','))))
     GROUP BY 1`,
     [period.from, period.to, period.store]);
   if (!rows) return null;
@@ -190,7 +190,7 @@ export type MonthRow = { month: string; bills: number; returns: number; grossSal
 /** Month by month for one salesperson (billed figures by bill date, walk-ins by visit date). */
 export async function salespersonMonths(empCode: string, period: SalesPeriod): Promise<MonthRow[]> {
   const rows = await aq<Record<string, unknown>>(`
-    WITH st AS (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3),
+    WITH st AS (SELECT store_code FROM analytics.dim_store WHERE crm_code = ANY(string_to_array($3, ','))),
     lines AS (SELECT bill_id, sum(cost) FILTER (WHERE cost > 0) AS cost, bool_and(cost > 0) AS all_cost FROM analytics.fact_bill_line GROUP BY 1),
     b AS (SELECT date_trunc('month', day)::date AS month, count(*) FILTER (WHERE amount > 0) AS bills, count(*) FILTER (WHERE amount < 0) AS returns,
                  coalesce(sum(amount) FILTER (WHERE amount > 0), 0) AS gross_sales, coalesce(-sum(amount) FILTER (WHERE amount < 0), 0) AS returned, sum(amount) AS net_sales, coalesce(sum(discount) FILTER (WHERE amount > 0), 0) AS discount,
@@ -219,7 +219,7 @@ export const BILL_PAGE_SIZE = 50;
 /** `page` 0 returns every bill (the CSV export). */
 export async function salespersonBills(empCode: string, period: SalesPeriod, page: number): Promise<{ rows: BillRow[]; total: number }> {
   const rows = await aq<Record<string, unknown>>(`
-    WITH st AS (SELECT store_code FROM analytics.dim_store WHERE crm_code = $3),
+    WITH st AS (SELECT store_code FROM analytics.dim_store WHERE crm_code = ANY(string_to_array($3, ','))),
     b AS (SELECT * FROM analytics.fact_bill WHERE emp_code = $4 AND day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code IN (SELECT store_code FROM st)))
     SELECT b.bill_id, b.day::text AS day, b.voucher, coalesce(ds.name, b.store_code) AS store_name, b.person_id, p.name AS customer_name, p.customer_code, p.phone AS customer_phone,
            b.bill_id = (SELECT f.bill_id FROM analytics.fact_bill f WHERE f.person_id = b.person_id AND f.amount > 0 ORDER BY f.billed_at, f.bill_id LIMIT 1) AS first_bill,

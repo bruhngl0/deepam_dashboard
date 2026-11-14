@@ -2,7 +2,7 @@
  * Hero — module picker.
  *
  * The modules behind this app: the cross-module Overview (`/flow`), the Daily
- * dashboard (`/daily`), Reports (`/reports`), Customer
+ * dashboard (`/daily`), HR Intelligence (`/hr`), Customer
  * Intelligence (`/crm`), Vendor Intelligence (`/vendor`), the external Driver
  * Network Management and Store Performance Tracker services, and Marketing
  * Intelligence (`/marketing`). This page is just the door between them, not
@@ -60,17 +60,19 @@ export default async function HeroPage() {
         </Link>
 
         <Link
-          href="/reports"
+          href="/hr/salespeople"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]">
-              <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" strokeLinecap="round" />
+              <circle cx="9" cy="8" r="3.5" />
+              <path d="M2.5 20a6.5 6.5 0 0 1 13 0" strokeLinecap="round" />
+              <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.5A6.5 6.5 0 0 1 21.5 20" strokeLinecap="round" />
             </svg>
           </span>
-          <h2 className="text-lg font-semibold tracking-tight text-ink">Reports</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-ink">HR Intelligence</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
-            Funnel, salespeople, payback, cohorts and stock, across every app.
+            Salespeople: what each one sold and served, their incentives, and matching names to Salesperson IDs.
           </p>
         </Link>
 

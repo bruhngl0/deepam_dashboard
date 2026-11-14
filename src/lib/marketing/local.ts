@@ -1,5 +1,6 @@
 import { campaignGroup } from './campaign-groups';
 import { normalizePhone } from '@/lib/phone';
+import { storeMatches } from '@/lib/store-filter';
 
 export const SOURCES = ['Meta ads', 'Google ads', 'Website', 'WhatsApp', 'Instagram DM', 'Influencer', 'Events', 'Referral', 'Walkin', 'AdOnMo'] as const;
 export const STORES = ['MG', 'JAYNAGAR', 'Online', 'Exhibition'] as const;
@@ -223,7 +224,7 @@ export function hasLoggedCall(lead: Lead): boolean {
 }
 export type LeadFilters = { from: string; to: string; store: string; source: string; search: string };
 export function filterLeads(leads: Lead[], filters: LeadFilters): Lead[] {
-  return leads.filter(l => (!filters.store || l.preferredStore === filters.store) && (!filters.source || l.acquisitions.some(a => a.source === filters.source)) && (!filters.from || (!!l.date && l.date >= filters.from)) && (!filters.to || (!!l.date && l.date <= filters.to)) && `${l.id} ${l.leadCode ?? ''} ${l.customerCode ?? ''} ${l.name} ${l.phone} ${l.email} ${l.acquisitions.map(a => `${a.source} ${a.campaignId}`).join(' ')}`.toLowerCase().includes(filters.search.toLowerCase()));
+  return leads.filter(l => storeMatches(filters.store, l.preferredStore) && (!filters.source || l.acquisitions.some(a => a.source === filters.source)) && (!filters.from || (!!l.date && l.date >= filters.from)) && (!filters.to || (!!l.date && l.date <= filters.to)) && `${l.id} ${l.leadCode ?? ''} ${l.customerCode ?? ''} ${l.name} ${l.phone} ${l.email} ${l.acquisitions.map(a => `${a.source} ${a.campaignId}`).join(' ')}`.toLowerCase().includes(filters.search.toLowerCase()));
 }
 export function isContacted(lead: Lead): boolean {
   return lead.interactions.some(i => i.type === 'call' && !!i.outcome?.startsWith('Connected'));

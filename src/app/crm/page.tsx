@@ -17,6 +17,7 @@
  * a number is never read without knowing what window produced it.
  */
 
+import { storesLabel } from '@/lib/store-filter';
 import { Suspense } from 'react';
 import {
   getKpis,
@@ -135,7 +136,7 @@ export default async function DashboardPage({
   const periodFrom = from ?? dateBounds.earliest;
   const periodTo = to ?? dateBounds.latest;
   const isFullPeriod = !from && !to;
-  const storeName = store ? options.stores.find((s) => s.code === store)?.name : null;
+  const storeName = store ? storesLabel(store, options.stores) : null;
   // The Online customers tile opens Buyers narrowed to the Online store, for the same dates.
   const onlineHref = (() => {
     const next = new URLSearchParams({ store: 'ONLINE' });

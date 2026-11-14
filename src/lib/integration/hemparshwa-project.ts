@@ -29,7 +29,8 @@
  * Customers follow CRM's rule: identity is a valid Indian phone. A bill without one still gets a customer,
  * a bill-only one that can never be called or messaged (lib/phone.ts billOnlyPhone), so every bill has a
  * Customer ID. Bills of staff and store accounts (internal_accounts: by phone, or for a bill with no valid
- * phone by the name before the label's colon) are not sales: they are left out, and any written earlier are removed.
+ * phone by the name before the label's colon) count as sales, as in the ERP's own totals, but on no customer:
+ * they create no customer, and the triggers keep them out of marketing conversions and calling lists.
  *
  * A Hemparshwa store is matched by its Store ID (STR-001) or, for one CRM cannot
  * number that way, by CRM's store code (EXHIBITION).
@@ -52,8 +53,8 @@ export interface ProjectionResult {
   customersTouched: number;
   /** Customers for bills with no valid phone (bill-only; never contacted). */
   billOnlyCustomers: number;
-  /** Bills of staff and store accounts, left out of sales. */
-  internalBillsSkipped: number;
+  /** Bills of staff and store accounts: kept as sales, on no customer. */
+  internalBills: number;
   /** Lines whose Store ID matches no CRM store; they are not billed. */
   unmappedStoreLines: number;
   /** Lines of an older import on a store and date a newer import covers, which the newer one dropped: not billed. */
@@ -225,16 +226,17 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
       `);
       await t.execute(sql`CREATE UNIQUE INDEX ON hp_bills (voucher_no)`);
 
-      // ── Staff and store accounts are not sales ───────────────────────────────
-      // Dropped here, so the clean-up below also removes any written earlier, with their line items.
-      const internalBillsSkipped = count(await t.execute(sql`
-        WITH gone AS (
-          DELETE FROM hp_bills b
+      // ── Staff and store accounts: sales, but on no customer ─────────────────
+      // Marked here: they make no customer below and their bills are written with none.
+      await t.execute(sql`ALTER TABLE hp_bills ADD COLUMN internal boolean NOT NULL DEFAULT false`);
+      const internalBills = count(await t.execute(sql`
+        WITH marked AS (
+          UPDATE hp_bills b SET internal = true
           WHERE EXISTS (SELECT 1 FROM internal_accounts i
                         WHERE i.phone_e164 = b.e164
                            OR (b.e164 IS NULL AND upper(trim(split_part(i.label, ':', 1))) = upper(regexp_replace(trim(coalesce(b.customer_name, '')), '\\s+', ' ', 'g'))))
           RETURNING 1)
-        SELECT count(*) AS n FROM gone
+        SELECT count(*) AS n FROM marked
       `));
 
       // ── Customers (same upsert rules as the Sales Report import, D-24) ────────
@@ -243,6 +245,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
         SELECT b.e164, min(p.national), max(b.customer_name),
                CASE WHEN max(b.customer_name) IS NOT NULL THEN 'existing' END, min(b.billed_at), max(b.billed_at)
         FROM hp_bills b JOIN hp_phone p ON p.e164 = b.e164
+        WHERE NOT b.internal
         GROUP BY b.e164
         ON CONFLICT (phone_e164) DO UPDATE SET
           full_name = CASE WHEN EXCLUDED.full_name IS NOT NULL
@@ -269,7 +272,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
         FROM (SELECT voucher_no, regexp_replace(coalesce(phone_raw, ''), '\\D', '', 'g') AS digits,
                      upper(regexp_replace(trim(coalesce(customer_name, '')), '\\s+', ' ', 'g')) AS name
               FROM hp_bills) d
-        WHERE d.voucher_no = b.voucher_no AND b.e164 IS NULL
+        WHERE d.voucher_no = b.voucher_no AND b.e164 IS NULL AND NOT b.internal
       `);
       const billOnly = await t.execute(sql`
         INSERT INTO customers (phone_e164, phone_national, full_name, name_source, first_seen_at, last_seen_at)
@@ -308,7 +311,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
         SELECT b.voucher_no, b.batch_id, b.store_id, b.billed_at, c.id, b.customer_name, b.phone_raw,
                b.qty, b.bill_amount, b.taxable_amount, b.item_disc_amount, b.salesman_code,
                jsonb_build_object('source', 'hemparshwa', 'invoice_id', b.invoice_id, 'lines', b.lines)
-        FROM hp_bills b LEFT JOIN customers c ON c.phone_e164 = COALESCE(b.e164, b.bill_key)
+        FROM hp_bills b LEFT JOIN customers c ON NOT b.internal AND c.phone_e164 = COALESCE(b.e164, b.bill_key)
         ON CONFLICT (voucher_no) DO UPDATE SET
           batch_id = EXCLUDED.batch_id, store_id = EXCLUDED.store_id, customer_id = EXCLUDED.customer_id,
           customer_name_raw = EXCLUDED.customer_name_raw, phone_raw = EXCLUDED.phone_raw, qty = EXCLUDED.qty,
@@ -373,7 +376,7 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
 
       return {
         bills, billsAdded, billsRemoved, legacyBillsRemoved, lineItems: lineItems.rows.length,
-        customersTouched: customers.rows.length, billOnlyCustomers: billOnly.rows.length, internalBillsSkipped, unmappedStoreLines, supersededLines, visitsReconciled: 0,
+        customersTouched: customers.rows.length, billOnlyCustomers: billOnly.rows.length, internalBills, unmappedStoreLines, supersededLines, visitsReconciled: 0,
       };
     });
   } finally {

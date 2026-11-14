@@ -6,6 +6,8 @@ import { button, CampaignTag, card, dateLabel, dayMonthYearLabel, input, LeadMet
 import { MarketingSalespeople } from './marketing-salespeople';
 import { control, FilterField, textButton } from './ui';
 import { useUrlState } from '@/lib/use-url-state';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { storeCodes } from '@/lib/store-filter';
 
 type ManagerTab = 'Overview' | 'All leads' | 'Team queue' | 'Follow-ups' | 'Team performance';
 const tabs: ManagerTab[] = ['Overview', 'All leads', 'Team queue', 'Follow-ups', 'Team performance'];
@@ -46,7 +48,7 @@ export function StoreManagerWorkspace({ logoutAction }: { logoutAction: () => Pr
     {tab !== 'Team performance' && <section aria-label="Lead filters" className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-ink-muted">Filter</span>
       <FilterField label="Leads from"><input type="date" className={control} max={to || undefined} value={from} onChange={event => { setFrom(event.target.value); setPage(0); }} /></FilterField>
       <FilterField label="Leads to"><input type="date" className={control} min={from || undefined} value={to} onChange={event => { setTo(event.target.value); setPage(0); }} /></FilterField>
-      <FilterField label="Store"><select className={control} value={store} onChange={event => { setStore(event.target.value); setPage(0); }}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></FilterField>
+      <FilterField label="Store"><StoreMultiSelect className={control} stores={STORES.map(value => ({ code: value, name: storeName(value) }))} value={storeCodes(store)} onChange={codes => { setStore(codes.join(',')); setPage(0); }} /></FilterField>
       <button className={textButton} onClick={() => { setFrom(''); setTo(''); setStore(''); setPage(0); }}>Clear filters</button>
       <p className="w-full text-xs text-ink-muted">By the date the lead arrived and the store they prefer.</p>
       {from && to && from > to && <p role="alert" className="w-full text-sm text-red-600">From must be on or before To.</p>}

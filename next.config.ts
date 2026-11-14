@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
         destination: '/marketing/:path*',
         permanent: true,
       },
+      // Salespeople moved out of Customer Intelligence into HR Intelligence; Reports was removed.
+      { source: '/crm/salespeople/incentives', destination: '/hr/incentives', permanent: true },
+      { source: '/crm/salespeople/:path*', destination: '/hr/salespeople/:path*', permanent: true },
+      { source: '/reports/salespeople/match', destination: '/hr/match', permanent: true },
+      { source: '/reports/salespeople', destination: '/hr/salespeople', permanent: true },
+      { source: '/reports/:path*', destination: '/', permanent: false },
     ];
   },
   // Traces only the files each route actually needs into `.next/standalone`,

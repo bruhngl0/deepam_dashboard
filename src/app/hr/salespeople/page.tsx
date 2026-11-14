@@ -1,6 +1,6 @@
 /**
  * Salespeople: every salesperson's sales, returns, discount, margin, customers and the walk-ins they served,
- * for the period and store in the CRM master filter. The base for incentives (/crm/salespeople/incentives).
+ * for the period and store in the CRM master filter. The base for incentives (/hr/incentives).
  * Figures come from the analytics database; see lib/analytics/salesperson-module.ts for each definition.
  */
 
@@ -74,7 +74,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
     const active = sortKey === key;
     const nextDir = active && dir === -1 ? 'asc' : 'desc';
     return <th key={key} scope="col" className={`whitespace-nowrap px-3 py-3 font-bold ${align === 'right' ? 'text-right' : 'text-left'}`}>
-      <Link href={`/crm/salespeople${query(sp, { sort: key, dir: key === 'name' && !active ? 'asc' : nextDir })}`} className={`hover:text-ink ${active ? 'text-ink' : ''}`} scroll={false}>
+      <Link href={`/hr/salespeople${query(sp, { sort: key, dir: key === 'name' && !active ? 'asc' : nextDir })}`} className={`hover:text-ink ${active ? 'text-ink' : ''}`} scroll={false}>
         {label}{active ? (dir === -1 ? ' ↓' : ' ↑') : ''}
       </Link>
     </th>;
@@ -85,8 +85,8 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
       <PageHeader
         title="Salespeople"
         description="What each salesperson billed, returned and served: the base for incentives. Open a name for their month-by-month figures and every bill."
-        meta={<>{shownFrom && shownTo ? `Bills ${formatDate(shownFrom)} – ${formatDate(shownTo)}` : 'No bills loaded'}{period.store ? ' · one store' : ' · every store'}{asOf ? ` · data as of ${formatDateTime(asOf)}` : ''}</>}
-        actions={<><Link href="/crm/salespeople/incentives" className={button}>Incentives</Link><a href={`/crm/salespeople/export${query(sp, { sort: null, dir: null })}`} className={button}>Export CSV</a></>}
+        meta={<>{shownFrom && shownTo ? `Bills ${formatDate(shownFrom)} – ${formatDate(shownTo)}` : 'No bills loaded'}{period.store ? (period.store.includes(',') ? ' · picked stores' : ' · one store') : ' · every store'}{asOf ? ` · data as of ${formatDateTime(asOf)}` : ''}</>}
+        actions={<><Link href="/hr/incentives" className={button}>Incentives</Link><a href={`/hr/salespeople/export${query(sp, { sort: null, dir: null })}`} className={button}>Export CSV</a></>}
       />
 
       <KpiGrid>
@@ -94,7 +94,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
         <Kpi label="Salespeople" value={formatNumber(list.length)} caption="With a bill, return, walk-in, driver visit or call in this period" />
         <Kpi label="Average bill" value={total.bills ? formatCurrency((total.net + total.returned) / total.bills) : '—'} caption="Credited sales bills, before returns" />
         <Kpi label="Not credited to anyone" value={uncredited ? formatNumber(uncredited.bills) : '—'}
-          caption={uncredited ? <>{formatCurrency(uncredited.sales)} on bills with no salesperson{uncredited.unmatchedNames ? <> · <Link className="font-medium text-accent hover:underline" href="/reports/salespeople/match">{formatNumber(uncredited.unmatchedNames)} names to match</Link></> : ''}</> : undefined} />
+          caption={uncredited ? <>{formatCurrency(uncredited.sales)} on bills with no salesperson{uncredited.unmatchedNames ? <> · <Link className="font-medium text-accent hover:underline" href="/hr/match">{formatNumber(uncredited.unmatchedNames)} names to match</Link></> : ''}</> : undefined} />
       </KpiGrid>
 
       {coverage && coverage.bills > 0 && (
@@ -138,7 +138,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
               {sorted.map((r) => (
                 <tr key={r.empCode} className="border-t border-grid hover:bg-inset/50">
                   <th scope="row" className="px-3 py-2 text-left font-medium text-ink">
-                    <Link href={`/crm/salespeople/${r.empCode}${query(sp, { sort: null, dir: null })}`} className="hover:text-accent hover:underline">{r.name}</Link>
+                    <Link href={`/hr/salespeople/${r.empCode}${query(sp, { sort: null, dir: null })}`} className="hover:text-accent hover:underline">{r.name}</Link>
                     <span className="block text-xs font-normal text-ink-muted">{r.empCode}</span>
                   </th>
                   <td className="whitespace-nowrap px-3 py-2 text-left text-ink-2">{r.storeName ?? r.storeCode ?? '—'}</td>

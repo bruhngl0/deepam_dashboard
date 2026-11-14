@@ -1,5 +1,5 @@
 /**
- * CSV for incentive work: every salesperson's figures (/crm/salespeople), or one salesperson's bills (?emp=EMP-0017),
+ * CSV for incentive work: every salesperson's figures (/hr/salespeople), or one salesperson's bills (?emp=EMP-0017),
  * for the same ?from=&to=&store= as the page. Plain figures (no currency symbols) so a spreadsheet can add them up.
  */
 
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const period = salesPeriod(Object.fromEntries(params));
   const emp = params.get('emp');
-  const stamp = `${period.from === '2000-01-01' ? 'all' : period.from}_to_${period.to}${period.store ? `_${period.store}` : ''}`;
+  const stamp = `${period.from === '2000-01-01' ? 'all' : period.from}_to_${period.to}${period.store ? `_${period.store.replaceAll(',', '+')}` : ''}`;
 
   let csv: string;
   let name: string;

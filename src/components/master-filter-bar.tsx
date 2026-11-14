@@ -9,7 +9,8 @@
  * the query string across them). Unset means the full loaded period and every
  * store — nothing narrows until someone actually picks a bound.
  *
- * Also used above `/vendor/*` (app/vendor/layout.tsx), where `notes` says per page what the filters narrow.
+ * Also used above `/vendor/*` (app/vendor/layout.tsx), where `notes` says per page what the filters narrow,
+ * and above HR Intelligence's Salespeople pages (app/hr/layout.tsx, with `onlyUnder`).
  *
  * Hidden on the import pages: nothing on them reads either param. Owns its
  * own bordered wrapper rather than `layout.tsx` owning one around it, so
@@ -21,6 +22,8 @@
 import { usePathname } from 'next/navigation';
 import { useSetParam } from '@/components/filters';
 import { control, textButton } from '@/components/ui';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { storeCodes } from '@/lib/store-filter';
 
 const selectClass = control;
 
@@ -28,17 +31,21 @@ export function MasterFilterBar({
   stores,
   dateBounds,
   notes = {},
+  onlyUnder,
 }: {
   stores: { code: string; name: string }[];
   /** The full loaded range — the `min`/`max` a date picker can't sensibly exceed. */
   dateBounds: { earliest: string | null; latest: string | null };
   /** A short line shown after the controls on the page with this pathname. */
   notes?: Record<string, string>;
+  /** Show the bar only on this path and the pages under it. */
+  onlyUnder?: string;
 }) {
   const pathname = usePathname();
   const { setParam, params, pending } = useSetParam();
 
   if (pathname.endsWith('/import')) return null;
+  if (onlyUnder && pathname !== onlyUnder && !pathname.startsWith(`${onlyUnder}/`)) return null;
 
   const from = params.get('from');
   const to = params.get('to');
@@ -52,18 +59,12 @@ export function MasterFilterBar({
       >
         <span className="text-xs font-medium text-ink-muted">Filter</span>
 
-        <select
-          value={store ?? ''}
-          onChange={(e) => setParam({ store: e.target.value || null })}
+        <StoreMultiSelect
+          stores={stores}
+          value={storeCodes(store)}
+          onChange={(codes) => setParam({ store: codes.length ? codes.join(',') : null })}
           className={selectClass}
-        >
-          <option value="">All stores</option>
-          {stores.map((s) => (
-            <option key={s.code} value={s.code}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        />
 
         <div className="flex items-center gap-1.5">
           <label htmlFor="master-date-from" className="text-xs text-ink-muted">

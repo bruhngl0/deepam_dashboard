@@ -4,6 +4,8 @@ import { calledCustomers, callLog, callSourceLabel, CUSTOMER_GROUP_LABELS, CUSTO
 import { SALESPEOPLE } from '@/lib/salespeople';
 import { dayMonthYearTimeLabel, money } from './marketing-shared';
 import { control, FilterField, textButton } from './ui';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { storeCodes, storeMatches } from '@/lib/store-filter';
 
 const KNOWN_SALESPEOPLE = SALESPEOPLE.map(({ name }) => name);
 
@@ -34,7 +36,7 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
   const everyCall = callLog([data], stored);
   const people = [...new Set([...KNOWN_SALESPEOPLE, ...everyCall.map(call => call.salesperson)])].sort();
   // A store keeps the leads whose preferred store it is, their calls and their sales. Existing customers have no store, so they drop out.
-  const storeLeads = store ? data.leads.filter(lead => lead.preferredStore === store) : data.leads;
+  const storeLeads = store ? data.leads.filter(lead => storeMatches(store, lead.preferredStore)) : data.leads;
   const storeLeadIds = new Set(storeLeads.map(lead => lead.id));
   const scoped: Dataset = store ? { ...data, leads: storeLeads } : data;
   const scopedExisting = store ? [] : existing;
@@ -49,7 +51,7 @@ export function MarketingSalespeople({ data }: { data: Dataset }) {
     <section aria-label="Salesperson filters" className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-ink-muted">Filter</span>
       <FilterField label="Salesperson"><select className={control} value={person} onChange={event => setPerson(event.target.value)}><option value="">All salespeople</option>{people.map(name => <option key={name}>{name}</option>)}</select></FilterField>
       <FilterField label="Customers"><select className={control} value={group} onChange={event => setGroup(event.target.value as CustomerGroup)}>{CUSTOMER_GROUPS.map(value => <option key={value} value={value}>{CUSTOMER_GROUP_LABELS[value]}</option>)}</select></FilterField>
-      <FilterField label="Store"><select className={control} value={store} onChange={event => setStore(event.target.value)}><option value="">All stores</option>{STORES.map(value => <option key={value} value={value}>{storeName(value)}</option>)}</select></FilterField>
+      <FilterField label="Store"><StoreMultiSelect className={control} stores={STORES.map(value => ({ code: value, name: storeName(value) }))} value={storeCodes(store)} onChange={codes => setStore(codes.join(','))} /></FilterField>
       <FilterField label="Calls from"><input type="date" className={control} max={to || undefined} value={from} onChange={event => setFrom(event.target.value)} /></FilterField>
       <FilterField label="Calls to"><input type="date" className={control} min={from || undefined} value={to} onChange={event => setTo(event.target.value)} /></FilterField>
       <FilterField label="Outcome"><select className={control} value={outcome} onChange={event => setOutcome(event.target.value)}><option value="">All outcomes</option>{OUTCOMES.map(value => <option key={value}>{value}</option>)}</select></FilterField>
