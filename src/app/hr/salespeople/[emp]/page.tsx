@@ -1,6 +1,6 @@
 /**
  * One salesperson: their figures for the period, month by month, and every bill under their name on the sales sheet.
- * Same definitions as /crm/salespeople.
+ * Same definitions as /hr/salespeople.
  */
 
 import Link from 'next/link';
@@ -64,11 +64,11 @@ export default async function SalespersonPage({ params, searchParams }: { params
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
-        eyebrow={<><Link href={`/crm/salespeople${query(sp, { page: null })}`} className="hover:text-ink">Salespeople</Link> · {profile.empCode}</>}
+        eyebrow={<><Link href={`/hr/salespeople${query(sp, { page: null })}`} className="hover:text-ink">Salespeople</Link> · {profile.empCode}</>}
         title={profile.name}
         description={profile.storeName ?? profile.storeCode ?? undefined}
         meta={profile.aliases.length ? <>Also recorded as: {profile.aliases.map((a) => `${a.display} (${SOURCE[a.source] ?? a.source})`).join(' · ')}</> : undefined}
-        actions={<a href={`/crm/salespeople/export${query(sp, { page: null, emp })}`} className={button}>Export bills (CSV)</a>}
+        actions={<a href={`/hr/salespeople/export${query(sp, { page: null, emp })}`} className={button}>Export bills (CSV)</a>}
       />
 
       <SectionLabel>Sales · from the sales sheet</SectionLabel>
@@ -192,9 +192,9 @@ export default async function SalespersonPage({ params, searchParams }: { params
           <div className="flex items-center justify-between gap-3 border-t border-grid px-4 py-3 text-sm text-ink-2">
             <span className="tnum">{formatNumber((page - 1) * BILL_PAGE_SIZE + 1)}–{formatNumber(Math.min(page * BILL_PAGE_SIZE, bills.total))} of {formatNumber(bills.total)}</span>
             <div className="flex items-center gap-2">
-              {page > 1 ? <Link className={button} href={`/crm/salespeople/${emp}${query(sp, { page: String(page - 1) })}`} scroll={false}>Previous</Link> : <span className={`${button} opacity-40`}>Previous</span>}
+              {page > 1 ? <Link className={button} href={`/hr/salespeople/${emp}${query(sp, { page: String(page - 1) })}`} scroll={false}>Previous</Link> : <span className={`${button} opacity-40`}>Previous</span>}
               <span className="tnum">Page {page} of {pages}</span>
-              {page < pages ? <Link className={button} href={`/crm/salespeople/${emp}${query(sp, { page: String(page + 1) })}`} scroll={false}>Next</Link> : <span className={`${button} opacity-40`}>Next</span>}
+              {page < pages ? <Link className={button} href={`/hr/salespeople/${emp}${query(sp, { page: String(page + 1) })}`} scroll={false}>Next</Link> : <span className={`${button} opacity-40`}>Next</span>}
             </div>
           </div>
         )}

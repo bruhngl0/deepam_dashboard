@@ -7,7 +7,7 @@
  * the tabs render at all — no signed-out flash of navigation.
  *
  * The hero page (`/`) picks between independent modules, so it shows no
- * tabs of its own; `/crm/*` and `/vendor/*` each get their own scoped set
+ * tabs of its own; `/crm/*`, `/hr/*` and `/vendor/*` each get their own scoped set
  * rather than one flat list that doesn't make sense outside its module.
  *
  * The CRM tabs carry the master date/store filter (`from`/`to`/`store`, see
@@ -22,18 +22,22 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { MARKETING_MODULES, marketingModuleHref, marketingModuleOf } from '@/lib/marketing/modules';
-import { currentReport, REPORTS } from '@/lib/report-tabs';
-import { headerTabClass } from '@/components/header-tabs';
 
 const CARRIED_PARAMS = ['from', 'to', 'store'];
 
 const CRM_TABS = [
   { href: '/crm', label: 'Home' },
   { href: '/crm/buyers', label: 'Customers' },
-  { href: '/crm/salespeople', label: 'Salespeople' },
   { href: '/crm/insights', label: 'Insights' },
   { href: '/crm/analysis', label: 'Analysis' },
   { href: '/crm/import', label: 'Import' },
+] as const;
+
+// HR Intelligence: salespeople, their incentives, and matching names to Salesperson IDs.
+const HR_TABS = [
+  { href: '/hr/salespeople', label: 'Salespeople' },
+  { href: '/hr/incentives', label: 'Incentives' },
+  { href: '/hr/match', label: 'Name matching' },
 ] as const;
 
 // Overview lives in the separately deployed vendor application; linking to it
@@ -51,20 +55,6 @@ const VENDOR_TABS = [
 export function NavTabs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  // CRM reports: one tab per report (lib/report-tabs).
-  if (pathname === '/reports' || pathname.startsWith('/reports/')) {
-    const current = currentReport(pathname);
-    return (
-      <nav aria-label="Reports" className="flex min-w-0 items-center gap-1 overflow-x-auto">
-        {REPORTS.map((r) => (
-          <Link key={r.href} href={r.href} aria-current={r.href === current ? 'page' : undefined} className={headerTabClass(r.href === current)}>
-            {r.label}
-          </Link>
-        ))}
-      </nav>
-    );
-  }
 
   // Marketing Intelligence: its four sections, kept in the URL (lib/marketing/modules).
   if (pathname === '/marketing' || pathname.startsWith('/marketing/')) {
@@ -85,7 +75,9 @@ export function NavTabs() {
 
   const tabs = pathname.startsWith('/crm')
     ? CRM_TABS
-    : pathname.startsWith('/vendor')
+    : pathname === '/hr' || pathname.startsWith('/hr/')
+      ? HR_TABS
+      : pathname.startsWith('/vendor')
       ? VENDOR_TABS
       : null;
 
