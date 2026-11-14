@@ -122,9 +122,9 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
       }
     : null;
   const whatsappText = dailyText({
-    date, scope: scopeName ?? 'All stores', columns, summary, stockTotal, stockAsOf,
-    rc: rc && rcTotal ? { total: rcTotal, unassigned: unassignedRc } : null,
-    calls: crm.calls, followups: crm.followups,
+    date, scope: scopeName ?? 'All stores', columns, summary, stockAsOf,
+    rc: rc ? { unassigned: unassignedRc } : null,
+    calls: crm.calls,
   });
   const colSpan = columns.length + 2;
   const rcCell = (pick: (r: NonNullable<Column['rc']>) => string) => (c: Column) => (c.rc ? pick(c.rc) : '—');
@@ -287,57 +287,72 @@ function buildColumns(stores: DailyStore[], rc: RcDaily | null, stock: StockAler
   });
 }
 
-/** The whole day as WhatsApp text: every section of the page, a line per store that had anything. */
+/**
+ * The whole day as WhatsApp text: the summary, then one block per store (MG Road, Jayanagar, Online,
+ * then any other store that had activity) with its walk-ins, sales, driver visits and stock at cost,
+ * then calls. One figure per line, like the summary.
+ */
 function dailyText(d: {
   date: string;
   scope: string;
   columns: Column[];
   summary: [string, string][];
-  stockTotal: { opening: number; sold: number; closing: number } | null;
   stockAsOf: string | null;
-  rc: { total: { visits: number; people: number; commission: number; owed: number; owedVisits: number }; unassigned: number } | null;
+  rc: { unassigned: number } | null;
   calls: DailyCrm['calls'];
-  followups: DailyCrm['followups'];
 }): string {
   const cur = formatCurrency;
   const pct = (part: number, whole: number) => (whole ? formatPercent(part, whole) : '—');
-  const many = d.columns.length > 1;
   const out: string[] = [`*Deepam daily · ${formatDate(`${d.date}T12:00:00+05:30`)}*`, d.scope, ''];
-  const section = (title: string, lines: string[]) => { if (lines.length) out.push(`*${title}*`, ...lines, ''); };
+  const block = (title: string, lines: string[]) => out.push(title, ...lines, '');
 
-  section('Summary', d.summary.map(([k, v]) => `${k}: ${v}`));
+  block('*Summary*', d.summary.map(([k, v]) => `${k}: ${v}`));
 
-  const walked = d.columns.filter((c) => c.walkIns);
-  section('Walk-ins (WalkTrack)', walked.length
-    ? walked.map((c) => `${many ? `${c.name}: ` : ''}${formatNumber(c.walkIns)} walk-ins, ${formatNumber(c.people)} people, ${formatNumber(c.converted)} converted (${pct(c.converted, c.walkIns)})`)
-    : ['No walk-ins']);
+  // The three main stores always appear (in Store ID order); any other store only when it had something.
+  const MAIN = ['STR-001', 'STR-002', 'STR-003'];
+  const active = (c: Column) => c.walkIns || c.bills || c.sales || c.mtdSales || c.rc?.visits || c.rc?.owed || c.value;
+  const stores = [...d.columns]
+    .filter((c) => MAIN.includes(c.storeCode) || active(c))
+    .sort((a, b) => ((MAIN.indexOf(a.storeCode) + 1 || 99) - (MAIN.indexOf(b.storeCode) + 1 || 99)) || a.storeCode.localeCompare(b.storeCode));
 
-  const sold = d.columns.filter((c) => c.bills || c.sales || c.mtdSales);
-  section('Sales (billing)', sold.length
-    ? sold.map((c) => `${many ? `${c.name}: ` : ''}${cur(c.sales)} · ${formatNumber(c.bills)} bills · avg ${c.bills ? cur(c.sales / c.bills) : '—'} · ${formatNumber(c.units)} units · prev day ${cur(c.prevSales)} · MTD ${cur(c.mtdSales)}`)
-    : ['No sales']);
+  for (const c of stores) {
+    out.push(`*${c.name.toUpperCase()}*`, '');
+    block('Walk-ins', c.walkIns
+      ? [`Walk-ins: ${formatNumber(c.walkIns)}`, `Converted: ${formatNumber(c.converted)} (${pct(c.converted, c.walkIns)})`]
+      : ['No walk-ins']);
+    block('Sales', c.bills || c.sales || c.mtdSales
+      ? [
+          `Sales: ${cur(c.sales)}`,
+          `Bills: ${formatNumber(c.bills)}`,
+          `Average bill value: ${c.bills ? cur(c.sales / c.bills) : '—'}`,
+          `Units sold: ${formatNumber(c.units)}`,
+          `Previous day sales: ${cur(c.prevSales)}`,
+          `MTD sales: ${cur(c.mtdSales)}`,
+        ]
+      : ['No sales']);
+    block('Driver visits', !c.rc
+      ? [UNAVAILABLE]
+      : c.rc.visits || c.rc.owedVisits
+        ? [
+            `Visits: ${formatNumber(c.rc.visits)}`,
+            `People: ${formatNumber(c.rc.people)}`,
+            `Commission: ${cur(c.rc.commission)}`,
+            ...(c.rc.owedVisits ? [`Not yet paid: ${cur(c.rc.owed)} (${formatNumber(c.rc.owedVisits)} visits)`] : []),
+          ]
+        : ['No driver visits']);
+    block(`Stock at cost${d.stockAsOf ? ` (stock report of ${d.stockAsOf})` : ''}`, c.value
+      ? [`Opening: ${cur(c.value.opening)}`, `Sold: ${cur(c.value.sold)}`, `Closing: ${cur(c.value.closing)}`]
+      : ['Not in the stock report']);
+  }
 
-  if (d.rc) {
-    const visited = d.columns.filter((c) => c.rc && (c.rc.visits || c.rc.owed));
-    const lines = visited.map((c) => `${many ? `${c.name}: ` : ''}${formatNumber(c.rc!.visits)} visits, ${formatNumber(c.rc!.people)} people, commission ${cur(c.rc!.commission)}${c.rc!.owedVisits ? `, not yet paid ${cur(c.rc!.owed)} (${formatNumber(c.rc!.owedVisits)} visits)` : ''}`);
-    if (d.rc.unassigned) lines.push(`No store recorded: ${formatNumber(d.rc.unassigned)} visits`);
-    if (many && lines.length) lines.push(`Total: ${formatNumber(d.rc.total.visits)} visits, ${formatNumber(d.rc.total.people)} people, commission ${cur(d.rc.total.commission)}, not yet paid ${cur(d.rc.total.owed)} (${formatNumber(d.rc.total.owedVisits)} visits)`);
-    section('Driver visits (RC Dashboard)', lines.length ? lines : ['No driver visits']);
-  } else section('Driver visits (RC Dashboard)', [UNAVAILABLE]);
+  if (d.rc?.unassigned) block('*Driver visits with no store recorded*', [`Visits: ${formatNumber(d.rc.unassigned)}`]);
 
-  const valued = d.columns.filter((c) => c.value);
-  section(`Stock at cost${d.stockAsOf ? ` (from the stock report of ${d.stockAsOf})` : ''}`, d.stockTotal
-    ? [
-        ...valued.map((c) => `${many ? `${c.name}: ` : ''}opening ${cur(c.value!.opening)}, sold ${cur(c.value!.sold)}, closing ${cur(c.value!.closing)}`),
-        ...(many ? [`Total: opening ${cur(d.stockTotal.opening)}, sold ${cur(d.stockTotal.sold)}, closing ${cur(d.stockTotal.closing)}`] : []),
-        `Stock received: ${NOT_CONNECTED}`,
-      ]
-    : ['No stock report']);
-
-  section(`Calls (all stores): ${formatNumber(d.calls.calls)}, ${formatNumber(d.calls.connected)} connected, ${formatNumber(d.calls.interested)} interested`,
-    d.calls.bySalesperson.length ? d.calls.bySalesperson.map((r) => `${r.name}: ${formatNumber(r.calls)} calls, ${formatNumber(r.connected)} connected, ${formatNumber(r.interested)} interested`) : ['No calls logged']);
-  section(`Follow-ups: ${formatNumber(d.followups.dueToday)} due, ${formatNumber(d.followups.overdue)} overdue`,
-    d.followups.byStore.length ? d.followups.byStore.map((r) => `${r.store}: ${formatNumber(r.dueToday)} due, ${formatNumber(r.overdue)} overdue`) : ['Nothing due or overdue']);
+  block('*CALLS*', [
+    `Calls: ${formatNumber(d.calls.calls)}`,
+    `Connected: ${formatNumber(d.calls.connected)}`,
+    `Interested: ${formatNumber(d.calls.interested)}`,
+    ...d.calls.bySalesperson.flatMap((r) => ['', r.name, `Calls: ${formatNumber(r.calls)}`, `Connected: ${formatNumber(r.connected)}`, `Interested: ${formatNumber(r.interested)}`]),
+  ]);
 
   return out.join('\n').trim();
 }
