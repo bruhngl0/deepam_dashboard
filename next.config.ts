@@ -11,7 +11,9 @@ const nextConfig: NextConfig = {
       // Salespeople moved out of Customer Intelligence into HR Intelligence; Reports was removed.
       { source: '/crm/salespeople/incentives', destination: '/hr/incentives', permanent: true },
       { source: '/crm/salespeople/:path*', destination: '/hr/salespeople/:path*', permanent: true },
-      { source: '/reports/salespeople/match', destination: '/hr/match', permanent: true },
+      { source: '/reports/salespeople/match', destination: '/hr/salespeople', permanent: true },
+      // Name matching was removed from HR Intelligence.
+      { source: '/hr/match', destination: '/hr/salespeople', permanent: false },
       { source: '/reports/salespeople', destination: '/hr/salespeople', permanent: true },
       { source: '/reports/:path*', destination: '/', permanent: false },
     ];

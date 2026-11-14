@@ -33,11 +33,10 @@ const CRM_TABS = [
   { href: '/crm/import', label: 'Import' },
 ] as const;
 
-// HR Intelligence: salespeople, their incentives, and matching names to Salesperson IDs.
+// HR Intelligence: salespeople and their incentives.
 const HR_TABS = [
   { href: '/hr/salespeople', label: 'Salespeople' },
   { href: '/hr/incentives', label: 'Incentives' },
-  { href: '/hr/match', label: 'Name matching' },
 ] as const;
 
 // Overview lives in the separately deployed vendor application; linking to it
