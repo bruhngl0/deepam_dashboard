@@ -21,6 +21,8 @@
 import { usePathname } from 'next/navigation';
 import { useSetParam } from '@/components/filters';
 import { control, textButton } from '@/components/ui';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { storeCodes } from '@/lib/store-filter';
 
 const selectClass = control;
 
@@ -52,18 +54,12 @@ export function MasterFilterBar({
       >
         <span className="text-xs font-medium text-ink-muted">Filter</span>
 
-        <select
-          value={store ?? ''}
-          onChange={(e) => setParam({ store: e.target.value || null })}
+        <StoreMultiSelect
+          stores={stores}
+          value={storeCodes(store)}
+          onChange={(codes) => setParam({ store: codes.length ? codes.join(',') : null })}
           className={selectClass}
-        >
-          <option value="">All stores</option>
-          {stores.map((s) => (
-            <option key={s.code} value={s.code}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        />
 
         <div className="flex items-center gap-1.5">
           <label htmlFor="master-date-from" className="text-xs text-ink-muted">

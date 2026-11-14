@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { analyticsAsOf, analyticsConfigured } from '@/lib/analytics/db';
 import { formatDateTime } from '@/lib/format';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { storeCodes } from '@/lib/store-filter';
 
 export { REPORTS } from '@/lib/report-tabs';
 
@@ -82,11 +84,8 @@ export function PeriodForm({ action, from, to, stores, store, keep = {} }: {
       <input id="period-from" type="date" name="from" defaultValue={from} max={to} className={input} />
       <label className="text-ink-2" htmlFor="period-to">To</label>
       <input id="period-to" type="date" name="to" defaultValue={to} className={input} />
-      <label className="text-ink-2" htmlFor="period-store">Store</label>
-      <select id="period-store" name="store" defaultValue={store ?? ''} className={input}>
-        <option value="">All stores</option>
-        {stores.map((s) => <option key={s.code} value={s.code}>{s.name} ({s.code})</option>)}
-      </select>
+      <span className="text-ink-2">Store</span>
+      <StoreMultiSelect name="store" stores={stores} value={storeCodes(store)} className={input} showCodes />
       <button className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Show</button>
     </form>
   );

@@ -170,7 +170,7 @@ function listQuery(filters: ExistingCustomerFilters, listKey: CallListKey) {
     LEFT JOIN calls ON calls.lead_id = ${leadIdSql}
     LEFT JOIN bills ON bills.contact_id = contact.id
     WHERE contact.list_key = ${listKey}
-      AND (${filters.store || null}::text IS NULL OR contact.branch = ${filters.store || null})`;
+      AND (${filters.store || null}::text IS NULL OR contact.branch = ANY(string_to_array(${filters.store || null}, ',')))`;
   const is: Record<Exclude<ExistingCustomerView, 'all'>, ReturnType<typeof sql>> = {
     called: sql`calls.calls > 0`,
     pending: sql`contact.assigned_to IS NOT NULL AND calls.lead_id IS NULL`,

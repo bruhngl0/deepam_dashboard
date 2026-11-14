@@ -16,6 +16,8 @@ import { dailyFromAnalytics } from '@/lib/analytics/daily';
 import { Finding, Note } from '@/components/finding-card';
 import { WhatsAppShare } from '@/components/whatsapp-share';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent } from '@/lib/format';
+import { StoreMultiSelect } from '@/components/store-multi-select';
+import { parseStores, storeCodes, storeMatches } from '@/lib/store-filter';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,8 +62,7 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
   const requested = Array.isArray(sp.date) ? sp.date[0] : sp.date;
   const today = todayIst();
   const date = isDay(requested) && requested <= today ? requested : today;
-  const requestedStore = Array.isArray(sp.store) ? sp.store[0] : sp.store;
-  const pickedStore = requestedStore && /^STR-\d{3}$/.test(requestedStore) ? requestedStore : null;
+  const pickedStore = parseStores(sp.store, /^STR-\d{3}$/);
   const dayLink = (d: string) => `/daily?${new URLSearchParams({ date: d, ...(pickedStore ? { store: pickedStore } : {}) })}`;
 
   const fromAnalytics = await dailyFromAnalytics(date).catch((error) => {
@@ -73,10 +74,12 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
   if (fromAnalytics) ({ crm, rc, stock } = { ...fromAnalytics, stock: fromAnalytics.stock ?? (await getStockAlerts()) });
   else [crm, rc, stock] = await Promise.all([getDailyCrm(date), getRcDaily(date), getStockAlerts()]);
   const allColumns = buildColumns(crm.stores, rc, stock, crm.stockValue);
-  // A picked store narrows the table, its totals and the stock alerts to that store; calls and follow-ups stay company-wide.
-  const store = allColumns.some((c) => c.storeCode === pickedStore) ? pickedStore : null;
-  const columns = store ? allColumns.filter((c) => c.storeCode === store) : allColumns;
-  const inStore = (code: string | null) => !store || code === store;
+  // Picked stores narrow the table, its totals and the stock alerts to those stores; calls and follow-ups stay company-wide.
+  const known = storeCodes(pickedStore).filter((code) => allColumns.some((c) => c.storeCode === code));
+  const store = known.length ? known.join(',') : null;
+  const columns = store ? allColumns.filter((c) => known.includes(c.storeCode)) : allColumns;
+  const inStore = (code: string | null) => storeMatches(store, code);
+  const scopeName = store ? columns.map((c) => `${c.name} (${c.storeCode})`).join(', ') : null;
   const sum = (pick: (c: Column) => number) => columns.reduce((n, c) => n + pick(c), 0);
 
   const walkIns = sum((c) => c.walkIns);
@@ -119,7 +122,7 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
       }
     : null;
   const whatsappText = dailyText({
-    date, scope: store ? `${columns[0].name} (${store})` : 'All stores', columns, summary, stockTotal, stockAsOf,
+    date, scope: scopeName ?? 'All stores', columns, summary, stockTotal, stockAsOf,
     rc: rc && rcTotal ? { total: rcTotal, unassigned: unassignedRc } : null,
     calls: crm.calls, followups: crm.followups,
   });
@@ -133,18 +136,14 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Daily dashboard</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">{formatDate(`${date}T12:00:00+05:30`)}{date === today ? ' · today' : ''}</h1>
-          <p className="mt-1 text-sm text-ink-2">{store ? `${columns[0].name} (${store})` : 'Every store'}, across WalkTrack, billing, RC Dashboard and Vendor Intelligence.</p>
+          <p className="mt-1 text-sm text-ink-2">{scopeName ?? 'Every store'}, across WalkTrack, billing, RC Dashboard and Vendor Intelligence.</p>
         </div>
         <nav aria-label="Choose day" className="flex flex-wrap items-center gap-2 text-sm">
           <Link href={dayLink(shiftDay(date, -1))} className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">← Previous day</Link>
           <form action="/daily" className="flex items-center gap-2">
             <label className="sr-only" htmlFor="daily-date">Day</label>
             <input id="daily-date" type="date" name="date" defaultValue={date} max={today} className="rounded-lg border border-line bg-surface px-3 py-2 text-ink" />
-            <label className="sr-only" htmlFor="daily-store">Store</label>
-            <select id="daily-store" name="store" defaultValue={store ?? ''} className="rounded-lg border border-line bg-surface px-3 py-2 text-ink">
-              <option value="">All stores</option>
-              {allColumns.map((c) => <option key={c.storeCode} value={c.storeCode}>{c.name} ({c.storeCode})</option>)}
-            </select>
+            <StoreMultiSelect name="store" stores={allColumns.map((c) => ({ code: c.storeCode, name: c.name }))} value={known} showCodes className="rounded-lg border border-line bg-surface px-3 py-2 text-ink" />
             <button className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Show</button>
           </form>
           {date < today && <Link href={dayLink(shiftDay(date, 1))} className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Next day →</Link>}
@@ -239,11 +238,11 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
               <tbody>{crm.followups.byStore.map((r) => <tr key={r.store} className="border-t border-grid"><td className="py-1.5 text-ink">{r.store}</td><td className="tnum py-1.5 text-right">{formatNumber(r.dueToday)}</td><td className="tnum py-1.5 text-right">{formatNumber(r.overdue)}</td></tr>)}</tbody>
             </table>
           ) : <Note>Nothing due or overdue.</Note>}
-          <Note>Open follow-ups on the existing-customer call list, by the store the customer prefers{store ? ' (every store: the preferred store is free text, so it cannot be matched to the picked one)' : ''}.</Note>
+          <Note>Open follow-ups on the existing-customer call list, by the store the customer prefers{store ? ' (every store: the preferred store is free text, so it cannot be matched to the picked stores)' : ''}.</Note>
         </Finding>
       </div>
 
-      {stock && <StockDetail stock={store ? { ...stock, stores: stock.stores.filter((s) => s.storeCode === store) } : stock} names={new Map(columns.map((c) => [c.storeCode, c.name]))} />}
+      {stock && <StockDetail stock={store ? { ...stock, stores: stock.stores.filter((s) => storeMatches(store, s.storeCode)) } : stock} names={new Map(columns.map((c) => [c.storeCode, c.name]))} />}
     </main>
   );
 }

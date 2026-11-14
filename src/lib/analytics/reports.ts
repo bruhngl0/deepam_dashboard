@@ -4,10 +4,11 @@
  * period and sum. All return [] / null when analytics is not configured.
  */
 
+import { parseStores } from '@/lib/store-filter';
 import { aq } from './db';
 import { isDay, shiftDay, todayIst } from '@/lib/queries/daily';
 
-/** `store` is a Store ID (STR-001…), or null for every store. */
+/** `store` is one or more Store IDs (STR-001…), comma-joined (see lib/store-filter), or null for every store. */
 export type Period = { from: string; to: string; store: string | null };
 const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
 
@@ -17,8 +18,7 @@ export function periodFrom(sp: Record<string, string | string[] | undefined>, da
   const today = todayIst();
   const to = isDay(one(sp.to)) && one(sp.to)! <= today ? one(sp.to)! : today;
   const from = isDay(one(sp.from)) && one(sp.from)! <= to ? one(sp.from)! : shiftDay(to, -(days - 1));
-  const store = one(sp.store);
-  return { from, to, store: store && /^STR-\d{3}$/.test(store) ? store : null };
+  return { from, to, store: parseStores(sp.store, /^STR-\d{3}$/) };
 }
 
 export type ReportStore = { code: string; name: string };
@@ -39,7 +39,7 @@ export async function funnel(period: Period, by: FunnelGroup): Promise<FunnelRow
     SELECT ${column} AS label, count(*) AS leads, count(*) FILTER (WHERE f.called) AS called, count(*) FILTER (WHERE f.walked_in) AS walked_in,
            count(*) FILTER (WHERE f.bills_after > 0) AS bought, count(*) FILTER (WHERE f.bills_after > 1) AS bought_again, sum(f.sales_after) AS sales
     FROM analytics.kpi_funnel_lead f LEFT JOIN analytics.dim_store s ON s.store_code = f.store_code
-    WHERE f.lead_day BETWEEN $1 AND $2 AND ($3::text IS NULL OR f.store_code = $3) GROUP BY 1 ORDER BY count(*) DESC, 1`, [period.from, period.to, period.store]);
+    WHERE f.lead_day BETWEEN $1 AND $2 AND ($3::text IS NULL OR f.store_code = ANY(string_to_array($3, ','))) GROUP BY 1 ORDER BY count(*) DESC, 1`, [period.from, period.to, period.store]);
   return (rows ?? []).map((r) => ({ label: String(r.label), leads: n(r.leads), called: n(r.called), walkedIn: n(r.walked_in), bought: n(r.bought), boughtAgain: n(r.bought_again), sales: n(r.sales) }));
 }
 
@@ -50,7 +50,7 @@ export async function salespeople(period: Period): Promise<SalespersonRow[]> {
   const rows = await aq<Record<string, unknown>>(`
     SELECT emp_code, name, store_code, sum(walk_ins) AS walk_ins, sum(converted) AS converted, sum(bills) AS bills, sum(total_sales) AS sales,
            sum(calls) AS calls, sum(connected) AS connected, sum(interested) AS interested
-    FROM analytics.kpi_salesperson_day WHERE day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = $3)
+    FROM analytics.kpi_salesperson_day WHERE day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = ANY(string_to_array($3, ',')))
     GROUP BY 1, 2, 3 ORDER BY sum(total_sales) DESC, sum(walk_ins) DESC, name`, [period.from, period.to, period.store]);
   return (rows ?? []).map((r) => ({
     empCode: String(r.emp_code), name: String(r.name), storeCode: (r.store_code as string | null) ?? null,
@@ -61,8 +61,8 @@ export async function salespeople(period: Period): Promise<SalespersonRow[]> {
 /** What is not credited to anyone in the period: bills and calls whose salesperson name is not matched yet. */
 export async function unattributed(period: Period): Promise<{ bills: number; sales: number; calls: number; unmatchedNames: number }> {
   const rows = await aq<Record<string, unknown>>(`
-    SELECT (SELECT count(*) FROM analytics.fact_bill WHERE emp_code IS NULL AND day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = $3)) AS bills,
-           (SELECT coalesce(sum(amount), 0) FROM analytics.fact_bill WHERE emp_code IS NULL AND day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = $3)) AS sales,
+    SELECT (SELECT count(*) FROM analytics.fact_bill WHERE emp_code IS NULL AND day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = ANY(string_to_array($3, ',')))) AS bills,
+           (SELECT coalesce(sum(amount), 0) FROM analytics.fact_bill WHERE emp_code IS NULL AND day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = ANY(string_to_array($3, ',')))) AS sales,
            (SELECT count(*) FROM analytics.fact_call WHERE emp_code IS NULL AND day BETWEEN $1 AND $2) AS calls,
            (SELECT count(*) FROM analytics.salesperson_alias WHERE emp_code IS NULL) AS unmatched`, [period.from, period.to, period.store]);
   const r = rows?.[0] ?? {};
@@ -81,7 +81,7 @@ export async function driverPayback(period: Period): Promise<DriverRow[]> {
            coalesce(sum(v.commission) FILTER (WHERE v.commission > 0 AND NOT v.paid), 0) AS owed
     FROM analytics.fact_driver_visit v JOIN analytics.dim_driver d ON d.driver_id = v.driver_id
     LEFT JOIN analytics.fact_walkin w ON w.walkin_id = v.walkin_id LEFT JOIN analytics.fact_bill b ON b.bill_id = w.bill_id
-    WHERE v.day BETWEEN $1 AND $2 AND ($3::text IS NULL OR v.store_code = $3)
+    WHERE v.day BETWEEN $1 AND $2 AND ($3::text IS NULL OR v.store_code = ANY(string_to_array($3, ',')))
     GROUP BY 1, 2 ORDER BY 6 DESC, 3 DESC, d.name`, [period.from, period.to, period.store]);
   return (rows ?? []).map((r) => ({ driverCode: String(r.driver_code), name: String(r.name), visits: n(r.visits), people: n(r.people), billedVisits: n(r.billed_visits), sales: n(r.sales), commission: n(r.commission), owed: n(r.owed) }));
 }
@@ -98,7 +98,7 @@ export async function campaignPayback(period: Period): Promise<CampaignRow[]> {
     WITH f AS (
       SELECT campaign, count(*) AS leads, count(*) FILTER (WHERE called) AS called, count(*) FILTER (WHERE walked_in) AS walked_in,
              count(*) FILTER (WHERE bills_after > 0) AS converted, coalesce(sum(sales_after), 0) AS total_sales
-      FROM analytics.kpi_funnel_lead WHERE lead_day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = $3) GROUP BY campaign)
+      FROM analytics.kpi_funnel_lead WHERE lead_day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = ANY(string_to_array($3, ','))) GROUP BY campaign)
     SELECT k.name, k.channel, k.spend, coalesce(f.leads, 0) AS leads, coalesce(f.called, 0) AS called, coalesce(f.walked_in, 0) AS walked_in,
            coalesce(f.converted, 0) AS converted, coalesce(f.total_sales, 0) AS total_sales, k.cost_per_lead, k.sales_per_rupee_spent
     FROM analytics.kpi_campaign k LEFT JOIN f ON f.campaign = k.name
@@ -125,7 +125,7 @@ export async function cohorts(period: Period): Promise<CohortRow[]> {
     picked AS (
       SELECT * FROM first
       WHERE (first_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN date_trunc('month', $1::date)::date AND $2::date
-        AND ($3::text IS NULL OR store_code = $3)),
+        AND ($3::text IS NULL OR store_code = ANY(string_to_array($3, ',')))),
     nxt AS (
       SELECT f.person_id, f.first_at, (SELECT min(b.billed_at) FROM analytics.fact_bill b WHERE b.person_id = f.person_id
         AND (b.billed_at AT TIME ZONE 'Asia/Kolkata')::date > (f.first_at AT TIME ZONE 'Asia/Kolkata')::date) AS next_at
@@ -156,7 +156,7 @@ export async function stockByStore(period: Period): Promise<{ asOf: string | nul
       SELECT k.store_code, coalesce(s.name, k.store_code) AS name, max(k.stock_as_of)::text AS as_of, sum(k.qty) AS qty, coalesce(sum(k.cost), 0) AS cost,
              coalesce(sum(k.aged_qty), 0) AS aged_qty, coalesce(sum(k.aged_cost), 0) AS aged_cost
       FROM analytics.fact_stock_day k LEFT JOIN analytics.dim_store s ON s.store_code = k.store_code
-      WHERE k.snap_day = ${AS_OF} AND ($2::text IS NULL OR k.store_code = $2)
+      WHERE k.snap_day = ${AS_OF} AND ($2::text IS NULL OR k.store_code = ANY(string_to_array($2, ',')))
       GROUP BY 1, 2 ORDER BY 1`, [period.to, period.store]),
     aq<Record<string, unknown>>(`
       WITH through AS (SELECT max(day) AS day FROM analytics.fact_item_sales_day WHERE day <= $1::date)
@@ -176,7 +176,7 @@ export async function stockByStore(period: Period): Promise<{ asOf: string | nul
 export async function stockTrend(period: Period): Promise<StockTrendRow[]> {
   const rows = await aq<Record<string, unknown>>(`
     SELECT snap_day::text AS day, store_code, stock_cost, aged_cost FROM analytics.kpi_stock_store
-    WHERE snap_day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = $3) ORDER BY snap_day, store_code`, [period.from, period.to, period.store]);
+    WHERE snap_day BETWEEN $1 AND $2 AND ($3::text IS NULL OR store_code = ANY(string_to_array($3, ','))) ORDER BY snap_day, store_code`, [period.from, period.to, period.store]);
   return (rows ?? []).map((r) => ({ day: String(r.day), storeCode: String(r.store_code), cost: n(r.stock_cost), agedCost: n(r.aged_cost) }));
 }
 
@@ -188,7 +188,7 @@ export async function slowMovers(period: Period, limit = 50): Promise<SlowMover[
     SELECT k.store_code, k.vendor, k.item, k.qty, k.cost, ls.day::text AS last_sold
     FROM analytics.fact_stock_day k JOIN latest ON k.snap_day = latest.day
     LEFT JOIN last_sold ls ON ls.vendor = k.vendor AND ls.item = k.item
-    WHERE k.qty > 0 AND (ls.day IS NULL OR ls.day <= latest.day - 90) AND ($2::text IS NULL OR k.store_code = $2)
+    WHERE k.qty > 0 AND (ls.day IS NULL OR ls.day <= latest.day - 90) AND ($2::text IS NULL OR k.store_code = ANY(string_to_array($2, ',')))
     ORDER BY k.cost DESC NULLS LAST LIMIT $3`, [period.to, period.store, limit]);
   return (rows ?? []).map((r) => ({ storeCode: String(r.store_code), vendor: String(r.vendor), item: String(r.item), qty: n(r.qty), cost: n(r.cost), lastSold: (r.last_sold as string | null) ?? null }));
 }
