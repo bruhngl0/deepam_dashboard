@@ -94,7 +94,7 @@ export default async function HeroPage() {
         </Link>
 
         <a
-          href="/__gate/go?to=https%3A%2F%2Fvendor.13-234-229-86.sslip.io%2F"
+          href="/__gate/go?to=https%3A%2F%2Fvendor.hemparshwa.com%2F"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -112,7 +112,7 @@ export default async function HeroPage() {
         </a>
 
         <a
-          href="/__gate/go?to=https%3A%2F%2Frc.13-234-229-86.sslip.io%2F"
+          href="/__gate/go?to=https%3A%2F%2Frc.hemparshwa.com%2F"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -129,7 +129,7 @@ export default async function HeroPage() {
         </a>
 
         <a
-          href="/__gate/go?to=https%3A%2F%2Fwalktrack.13-234-229-86.sslip.io%2F"
+          href="/__gate/go?to=https%3A%2F%2Fwalktrack.hemparshwa.com%2F"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -146,7 +146,7 @@ export default async function HeroPage() {
         </a>
 
         <a
-          href="https://os.13-234-229-86.sslip.io/cash"
+          href="https://os.hemparshwa.com/cash"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
