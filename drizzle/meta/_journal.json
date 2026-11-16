@@ -274,6 +274,13 @@
       "when": 1794700000000,
       "tag": "0038_employee_biometric_id",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794800000000,
+      "tag": "0039_partner_network",
+      "breakpoints": true
     }
   ]
 }
