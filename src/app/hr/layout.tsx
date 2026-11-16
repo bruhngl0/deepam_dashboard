@@ -1,5 +1,5 @@
 /**
- * HR Intelligence module shell: Overview, Employees, Performance (with the Salespeople pages), Attendance and Incentives.
+ * HR Intelligence module shell: Overview, Employees, Performance (with the Salespeople pages), Attendance, Counter targets and Incentives.
  * The master date+store filter sits above the Salespeople pages only, which read `from`/`to`/`store`; the others pick a month.
  */
 
