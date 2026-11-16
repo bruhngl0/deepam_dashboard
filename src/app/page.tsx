@@ -146,7 +146,7 @@ export default async function HeroPage() {
         </a>
 
         <a
-          href="https://nvc57svvmb.ap-south-1.awsapprunner.com/cash"
+          href="https://os.13-234-229-86.sslip.io/cash"
           rel="noreferrer"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
