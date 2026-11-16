@@ -13,13 +13,15 @@ const marketing: GateModule = { key: 'marketing', label: 'Marketing Intelligence
 const hr: GateModule = { key: 'hr', label: 'HR Intelligence', password: () => process.env.GATE_PASSWORD_HR || process.env.GATE_PASSWORD_CUSTOMER };
 // The old in-app vendor pages; same password as the Vendor Intelligence app.
 const vendor: GateModule = { key: 'vendor', label: 'Vendor Intelligence', password: () => process.env.GATE_PASSWORD_VENDOR };
+// Deepam Partners. Its own sign-in, with the Customer Intelligence password until GATE_PASSWORD_PARTNERS is set.
+const partners: GateModule = { key: 'partners', label: 'Partner Network Management', password: () => process.env.GATE_PASSWORD_PARTNERS || process.env.GATE_PASSWORD_CUSTOMER };
 
 const under = (pathname: string, ...prefixes: string[]) =>
   prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 const gate: GateConfig = {
   appName: 'Deepam by Ananta',
-  modules: [overview, customer, hr, marketing, vendor],
+  modules: [overview, customer, hr, marketing, vendor, partners],
   moduleFor(pathname) {
     // App Runner's health check, and server-to-server routes that carry their own tokens.
     if (under(pathname, '/api/health', '/api/integration', '/api/marketing/sheet-sync/cron', '/api/marketing/google-ads-sync')) return null;
@@ -27,11 +29,14 @@ const gate: GateConfig = {
     if (under(pathname, '/sales')) return null;
     // The public exhibition visit form, shared with customers.
     if (under(pathname, '/exhb')) return null;
+    // The public Deepam Partner pages: the application, customers' referral links and partners' own dashboards.
+    if (under(pathname, '/deepampartner')) return null;
     if (under(pathname, '/flow', '/daily')) return overview;
     if (under(pathname, '/hr')) return hr;
     if (under(pathname, '/crm')) return customer;
     if (under(pathname, '/marketing', '/marketing-team')) return marketing;
     if (under(pathname, '/vendor')) return vendor;
+    if (under(pathname, '/partners')) return partners;
     return 'any';
   },
   // The Hemparshwa admin also gets the store-manager workspace. Salesperson desks stay
