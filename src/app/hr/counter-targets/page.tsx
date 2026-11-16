@@ -7,10 +7,10 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { listEmployees } from '@/lib/hr/employees';
 import { resolveAssistants } from '@/lib/hr/counter-rules';
-import { evaluate, MONTH, piecesByCode, previousTargetMonth, soldRows, TARGET_STORES, targetsFor, type TargetResult } from '@/lib/hr/counter-targets';
+import { evaluate, MONTH, piecesByCode, previousTargetMonth, salesImportedUpTo, soldRows, TARGET_STORES, targetsFor, type TargetResult } from '@/lib/hr/counter-targets';
 import { monthRange } from '@/lib/incentives/store';
 import { todayIst } from '@/lib/queries/daily';
-import { formatNumber } from '@/lib/format';
+import { formatDate, formatNumber } from '@/lib/format';
 import { button, card, eyebrow, Kpi, KpiGrid, PageHeader, primaryButton, SectionLabel } from '@/components/ui';
 import { copyCounterTargets } from './actions';
 
@@ -46,10 +46,14 @@ export default async function CounterTargetsPage({ searchParams }: { searchParam
   const { from, to: end } = monthRange(month);
   const to = end > today ? today : end;
 
-  const [targets, employees, previous, ...sold] = await Promise.all([
-    targetsFor(month), listEmployees(), previousTargetMonth(month), ...TARGET_STORES.map((s) => soldRows(s.code, from, to)),
+  const [targets, employees, previous, imported, ...sold] = await Promise.all([
+    targetsFor(month), listEmployees(), previousTargetMonth(month), Promise.all(TARGET_STORES.map((s) => salesImportedUpTo(s.code))),
+    ...TARGET_STORES.map((s) => soldRows(s.code, from, to)),
   ]);
-  const stores = TARGET_STORES.map((s, i) => ({ ...s, rows: sold[i], results: evaluate(targets.filter((t) => t.storeCode === s.code), sold[i]) }));
+  const stores = TARGET_STORES.map((s, i) => ({ ...s, rows: sold[i], upTo: imported[i], results: evaluate(targets.filter((t) => t.storeCode === s.code), sold[i]) }));
+  // How far this month's figures go: the month's end if sales are imported past it, else the last imported bill date.
+  const upToLabel = (d: string | null) => !d || d < from ? `no ${label(month)} sales imported yet` : d >= end ? `every day of ${label(month)}` : formatDate(d);
+  const sameUpTo = stores.every((s) => s.upTo === stores[0].upTo);
   const all = stores.flatMap((s) => s.results);
   const hit1 = all.filter((r) => !r.error && r.sold >= r.target1).length;
   const hit2 = all.filter((r) => !r.error && r.target2 !== null && r.sold >= r.target2).length;
@@ -60,12 +64,20 @@ export default async function CounterTargetsPage({ searchParams }: { searchParam
       <PageHeader
         title="Counter targets"
         description="Each month's piece targets for the counters at MG Road and Jayanagar, and what those counters have sold. A counter is the Item Short Name on the bill (03 Mysore Silk, 15 Art Printed…)."
-        meta={`${label(month)}${month === thisMonth ? ` · ${daysGone} of ${daysInMonth} days` : ''} · sales up to the last import`}
+        meta={`${label(month)}${month === thisMonth ? ` · day ${daysGone} of ${daysInMonth}` : ''}`}
         actions={<>
           <Link href={`/hr/counter-targets?month=${shift(month, -1)}`} className={button}>← {label(shift(month, -1))}</Link>
           {month < thisMonth && <Link href={`/hr/counter-targets?month=${shift(month, 1)}`} className={button}>{label(shift(month, 1))} →</Link>}
         </>}
       />
+
+      <p className={`${card} flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3 text-sm`}>
+        <b className="text-ink">Sales imported up to</b>
+        {sameUpTo
+          ? <span className="tnum text-ink">{upToLabel(stores[0].upTo)}<span className="text-ink-muted"> · both stores</span></span>
+          : stores.map((s) => <span key={s.code} className="tnum text-ink"><span className="text-ink-muted">{s.name}:</span> {upToLabel(s.upTo)}</span>)}
+        <span className="text-xs text-ink-muted">Sold counts bills up to this date; later days fill in with the next sales import.</span>
+      </p>
 
       {targets.length > 0 && (
         <KpiGrid>
@@ -86,7 +98,7 @@ export default async function CounterTargetsPage({ searchParams }: { searchParam
       {stores.map((s) => (
         <section key={s.code} className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="flex-1"><SectionLabel>{s.name}</SectionLabel></div>
+            <div className="flex-1"><SectionLabel>{s.name} · sales up to {upToLabel(s.upTo)}</SectionLabel></div>
             <Link href={`/hr/counter-targets/edit?store=${s.code}&month=${month}`} className={button}>{s.results.length ? 'Edit targets' : 'Set targets'}</Link>
           </div>
           {s.results.length > 0 && (

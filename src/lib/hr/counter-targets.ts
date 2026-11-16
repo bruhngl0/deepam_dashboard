@@ -43,7 +43,15 @@ export async function soldRows(store: TargetStore, from: string, to: string): Pr
   return rows.map((r) => ({ code: normCode(r.code), tagPrice: Math.abs(Number(r.tag_price ?? 0)), qty: Number(r.qty ?? 0) }));
 }
 
-export type TargetResult = CounterTarget & { sold: number; byCode: [string, number][]; error: string | null };
+/** The latest bill date on the store's imported sale lines: how far the Sold figures go. Null: none imported. */
+export async function salesImportedUpTo(store: TargetStore): Promise<string | null> {
+  const r = rowsOf<{ last: string | null }>(await db.execute(sql`
+    SELECT to_char(max(li.voucher_date_raw), 'YYYY-MM-DD') AS last
+    FROM sale_line_items li JOIN stores s ON s.id = li.store_id WHERE s.code = ${store} AND li.sale_id IS NOT NULL`))[0];
+  return r?.last ?? null;
+}
+
+export type TargetResult =CounterTarget & { sold: number; byCode: [string, number][]; error: string | null };
 
 export function evaluate(targets: CounterTarget[], rows: SoldRow[]): TargetResult[] {
   return targets.map((t) => {
