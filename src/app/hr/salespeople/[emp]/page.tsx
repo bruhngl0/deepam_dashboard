@@ -4,7 +4,8 @@
  */
 
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { resolveSalesperson } from '@/lib/hr/employees';
 import { requireUser } from '@/lib/auth';
 import { analyticsConfigured } from '@/lib/analytics/db';
 import { BILL_PAGE_SIZE, billBounds, salesPeriod, salespersonBills, salespersonMonths, salespersonProfile, salespersonStatsFor, type MonthRow } from '@/lib/analytics/salesperson-module';
@@ -45,8 +46,12 @@ function query(sp: Search, changes: Record<string, string | null>) {
 
 export default async function SalespersonPage({ params, searchParams }: { params: Promise<{ emp: string }>; searchParams: Promise<Search> }) {
   await requireUser();
-  const [{ emp }, sp] = await Promise.all([params, searchParams]);
-  if (!/^EMP-\d{4}$/.test(emp) || !analyticsConfigured()) notFound();
+  const [{ emp: slug }, sp] = await Promise.all([params, searchParams]);
+  // The URL carries the Employee ID; the analytics key only for someone not on HR's employee list.
+  const who = analyticsConfigured() ? await resolveSalesperson(slug.toUpperCase()) : null;
+  if (!who) notFound();
+  if (who.employee && who.employee.employeeCode !== slug) redirect(`/hr/salespeople/${who.employee.employeeCode}${query(sp, {})}`);
+  const emp = who.key;
   const period = salesPeriod(sp);
   const page = Math.max(1, Number(one(sp.page)) || 1);
 
@@ -64,11 +69,11 @@ export default async function SalespersonPage({ params, searchParams }: { params
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
-        eyebrow={<><Link href={`/hr/salespeople${query(sp, { page: null })}`} className="hover:text-ink">Salespeople</Link> · {profile.empCode}</>}
-        title={profile.name}
+        eyebrow={<><Link href={`/hr/salespeople${query(sp, { page: null })}`} className="hover:text-ink">Salespeople</Link> · {who.employee ? <Link href={`/hr/employees/${who.employee.employeeCode}`} className="hover:text-ink">{who.employee.employeeCode}</Link> : 'No employee ID'}</>}
+        title={who.employee?.fullName ?? profile.name}
         description={profile.storeName ?? profile.storeCode ?? undefined}
         meta={profile.aliases.length ? <>Also recorded as: {profile.aliases.map((a) => `${a.display} (${SOURCE[a.source] ?? a.source})`).join(' · ')}</> : undefined}
-        actions={<a href={`/hr/salespeople/export${query(sp, { page: null, emp })}`} className={button}>Export bills (CSV)</a>}
+        actions={<a href={`/hr/salespeople/export${query(sp, { page: null, emp: who.employee?.employeeCode ?? emp })}`} className={button}>Export bills (CSV)</a>}
       />
 
       <SectionLabel>Sales · from the sales sheet</SectionLabel>
@@ -192,9 +197,9 @@ export default async function SalespersonPage({ params, searchParams }: { params
           <div className="flex items-center justify-between gap-3 border-t border-grid px-4 py-3 text-sm text-ink-2">
             <span className="tnum">{formatNumber((page - 1) * BILL_PAGE_SIZE + 1)}–{formatNumber(Math.min(page * BILL_PAGE_SIZE, bills.total))} of {formatNumber(bills.total)}</span>
             <div className="flex items-center gap-2">
-              {page > 1 ? <Link className={button} href={`/hr/salespeople/${emp}${query(sp, { page: String(page - 1) })}`} scroll={false}>Previous</Link> : <span className={`${button} opacity-40`}>Previous</span>}
+              {page > 1 ? <Link className={button} href={`/hr/salespeople/${who.employee?.employeeCode ?? emp}${query(sp, { page: String(page - 1) })}`} scroll={false}>Previous</Link> : <span className={`${button} opacity-40`}>Previous</span>}
               <span className="tnum">Page {page} of {pages}</span>
-              {page < pages ? <Link className={button} href={`/hr/salespeople/${emp}${query(sp, { page: String(page + 1) })}`} scroll={false}>Next</Link> : <span className={`${button} opacity-40`}>Next</span>}
+              {page < pages ? <Link className={button} href={`/hr/salespeople/${who.employee?.employeeCode ?? emp}${query(sp, { page: String(page + 1) })}`} scroll={false}>Next</Link> : <span className={`${button} opacity-40`}>Next</span>}
             </div>
           </div>
         )}

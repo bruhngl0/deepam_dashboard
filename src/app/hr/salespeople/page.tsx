@@ -10,6 +10,7 @@ import { analyticsAsOf, analyticsConfigured } from '@/lib/analytics/db';
 import { billBounds, billCoverage, salesPeriod, salespersonStats, uncreditedBills, type SalespersonStats } from '@/lib/analytics/salesperson-module';
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime, formatNumber, formatPercent } from '@/lib/format';
 import { button, card, eyebrow, Kpi, KpiGrid, PageHeader } from '@/components/ui';
+import { employeesBySalesperson, salespersonSlug } from '@/lib/hr/employees';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,8 +56,9 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
     </main>;
   }
 
-  const [rows, uncredited, coverage, bounds, asOf] = await Promise.all([salespersonStats(period), uncreditedBills(period), billCoverage(period), billBounds(), analyticsAsOf()]);
-  const list = rows ?? [];
+  const [rows, uncredited, coverage, bounds, asOf, ids] = await Promise.all([salespersonStats(period), uncreditedBills(period), billCoverage(period), billBounds(), analyticsAsOf(), employeesBySalesperson()]);
+  // Shown by the employee they are (Employee ID and HR name) where HR's list has them.
+  const list = (rows ?? []).map((r) => ({ ...r, name: ids.get(r.empCode)?.fullName ?? r.name }));
   const sortKey = COLUMNS.some((c) => c.key === one(sp.sort)) || one(sp.sort) === 'name' ? one(sp.sort)! : 'net';
   const dir = one(sp.dir) === 'asc' ? 1 : -1;
   const col = COLUMNS.find((c) => c.key === sortKey);
@@ -138,8 +140,8 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
               {sorted.map((r) => (
                 <tr key={r.empCode} className="border-t border-grid hover:bg-inset/50">
                   <th scope="row" className="px-3 py-2 text-left font-medium text-ink">
-                    <Link href={`/hr/salespeople/${r.empCode}${query(sp, { sort: null, dir: null })}`} className="hover:text-accent hover:underline">{r.name}</Link>
-                    <span className="block text-xs font-normal text-ink-muted">{r.empCode}</span>
+                    <Link href={`/hr/salespeople/${salespersonSlug(r.empCode, ids)}${query(sp, { sort: null, dir: null })}`} className="hover:text-accent hover:underline">{r.name}</Link>
+                    <span className="block text-xs font-normal text-ink-muted">{ids.get(r.empCode)?.employeeCode ?? 'No employee ID'}</span>
                   </th>
                   <td className="whitespace-nowrap px-3 py-2 text-left text-ink-2">{r.storeName ?? r.storeCode ?? '—'}</td>
                   {COLUMNS.map((c) => <td key={c.key} className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-2">{c.show(r)}</td>)}
@@ -152,6 +154,7 @@ export default async function SalespeoplePage({ searchParams }: { searchParams: 
       </section>
 
       <section className="space-y-1 text-xs leading-relaxed text-ink-muted">
+        <p><b className="text-ink-2">Employee ID:</b> from HR&rsquo;s employee list. A salesperson whose name on the sales sheet matches no employee shows &ldquo;No employee ID&rdquo;; link them on the employee&rsquo;s page under Employees.</p>
         <p><b className="text-ink-2">Bills, Returns, Net sales:</b> by the salesman printed on the bill. Returns are the negative bills; Net sales is sales less returns.</p>
         <p><b className="text-ink-2">Avg bill, Items, Discount:</b> sales bills only. Discount is the item discount as a share of the price before discount.</p>
         <p><b className="text-ink-2">Margin:</b> bill amount less the purchase value of its items, on bills where every item has a purchase value.</p>

@@ -33,9 +33,12 @@ const CRM_TABS = [
   { href: '/crm/import', label: 'Import' },
 ] as const;
 
-// HR Intelligence: salespeople and their incentives.
+// HR Intelligence. Performance also lights for the Salespeople pages it links to.
 const HR_TABS = [
-  { href: '/hr/salespeople', label: 'Salespeople' },
+  { href: '/hr', label: 'Overview' },
+  { href: '/hr/employees', label: 'Employees' },
+  { href: '/hr/performance', label: 'Performance', also: '/hr/salespeople' },
+  { href: '/hr/attendance', label: 'Attendance' },
   { href: '/hr/incentives', label: 'Incentives' },
 ] as const;
 
@@ -99,9 +102,11 @@ export function NavTabs() {
         // every tab at once.
         // Another app, opened through the gate's /__gate/go: a plain link, never prefetched.
         const external = tab.href.startsWith('http') || tab.href.startsWith('/__gate/');
+        const also = 'also' in tab ? tab.also : null;
         const active =
           pathname === tab.href ||
-          (tab.href !== '/crm' && !external && pathname.startsWith(`${tab.href}/`));
+          (tab.href !== '/crm' && tab.href !== '/hr' && !external && pathname.startsWith(`${tab.href}/`)) ||
+          (!!also && (pathname === also || pathname.startsWith(`${also}/`)));
         const className = `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
           active ? 'bg-inset text-ink' : 'text-ink-2 hover:bg-inset hover:text-ink'
         }`;

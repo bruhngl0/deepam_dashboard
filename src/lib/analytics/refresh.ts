@@ -1,7 +1,7 @@
 /**
  * Rebuilds the analytics database every ANALYTICS_REFRESH_MINUTES (default 5; 0 turns it off),
  * started with CRM's other timers (instrumentation.ts). POST /api/integration/analytics/refresh
- * does the same on demand. analytics.refresh() itself takes a lock, so overlapping calls queue.
+ * does the same on demand. After each run, salespeople are matched to employees by name. analytics.refresh() itself takes a lock, so overlapping calls queue.
  */
 
 import { analyticsPool } from './db';
@@ -12,7 +12,12 @@ export function refreshAnalytics(): Promise<unknown> {
   const pool = analyticsPool();
   if (!pool) return Promise.resolve(null);
   state.analyticsRunning ??= pool.query<{ refresh: unknown }>('SELECT analytics.refresh() AS refresh')
-    .then((r) => r.rows[0]?.refresh ?? null)
+    .then(async (r) => {
+      // New salespeople the refresh added get matched to employees by name (lib/hr/employees.ts).
+      await import('@/lib/hr/employees').then((m) => m.linkSalespeopleByName())
+        .catch((error) => console.error('[hr salesperson links]', error instanceof Error ? error.message : error));
+      return r.rows[0]?.refresh ?? null;
+    })
     .finally(() => { state.analyticsRunning = undefined; });
   return state.analyticsRunning;
 }
