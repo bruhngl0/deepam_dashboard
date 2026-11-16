@@ -253,6 +253,27 @@
       "when": 1794400000000,
       "tag": "0035_salesperson_incentive_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794500000000,
+      "tag": "0036_hr_employees",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794600000000,
+      "tag": "0037_counter_targets",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794700000000,
+      "tag": "0038_employee_biometric_id",
+      "breakpoints": true
     }
   ]
 }

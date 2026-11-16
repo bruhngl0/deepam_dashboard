@@ -60,7 +60,7 @@ export default async function HeroPage() {
         </Link>
 
         <Link
-          href="/hr/salespeople"
+          href="/hr"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
@@ -72,7 +72,7 @@ export default async function HeroPage() {
           </span>
           <h2 className="text-lg font-semibold tracking-tight text-ink">HR Intelligence</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
-            Salespeople: what each one sold and served, and their incentives.
+            Employees, payroll, attendance, performance and incentives.
           </p>
         </Link>
 

@@ -1,7 +1,8 @@
 /**
  * Queries behind the Salespeople module (/hr/salespeople): everything a salesperson sold and served,
  * as the base for incentives. Reads the analytics database (migration/analytics/030_model.sql), where
- * each bill, walk-in, call and driver visit already carries the Salesperson ID (EMP-) its name matched.
+ * each bill, walk-in, call and driver visit already carries the salesperson key (EMP-0001) its name matched. Pages show
+ * the Employee ID (DBYA0001) instead, through lib/hr/employees.ts.
  *
  * Two ways a bill is credited, both shown:
  *   - Billed by: the salesman printed on the bill (POS). Returns are the negative bills, credited the same way.
