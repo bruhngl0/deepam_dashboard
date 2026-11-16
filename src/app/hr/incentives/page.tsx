@@ -12,6 +12,7 @@ import { AGE_BANDS, INCENTIVE_STORES, INCENTIVES_FROM, LAKH_BANDS, VOLUME_BANDS,
 import { todayIst } from '@/lib/queries/daily';
 import { formatCurrency, formatCurrencyCompact, formatDateTime, formatNumber } from '@/lib/format';
 import { card, eyebrow, Kpi, KpiGrid, PageHeader } from '@/components/ui';
+import { employeesBySalesperson, salespersonSlug } from '@/lib/hr/employees';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,8 +57,8 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
     </main>;
   }
 
-  const [all, asOf] = await Promise.all([monthIncentives(month), analyticsAsOf()]);
-  const rows = (all ?? []).filter((r) => !store || r.store === store).sort((a, b) => b.total - a.total || b.volume - a.volume);
+  const [all, asOf, ids] = await Promise.all([monthIncentives(month), analyticsAsOf(), employeesBySalesperson()]);
+  const rows = (all ?? []).map((r) => ({ ...r, name: ids.get(r.empCode)?.fullName ?? r.name })).filter((r) => !store || r.store === store).sort((a, b) => b.total - a.total || b.volume - a.volume);
   const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((s, r) => s + f(r), 0);
   const pill = (active: boolean) => `rounded-full border px-3 py-1 text-sm ${active ? 'border-ink bg-ink text-surface' : 'border-line text-ink-2 hover:bg-inset'}`;
 
@@ -94,8 +95,8 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
               {rows.map((r) => (
                 <tr key={r.empCode} className="border-t border-grid hover:bg-inset/50">
                   <th scope="row" className="px-3 py-2 text-left font-medium text-ink">
-                    <Link href={`/hr/salespeople/${r.empCode}?from=${monthRange(month).from}&to=${monthRange(month).to}`} className="hover:text-accent hover:underline">{r.name}</Link>
-                    <span className="block text-xs font-normal text-ink-muted">{r.empCode}</span>
+                    <Link href={`/hr/salespeople/${salespersonSlug(r.empCode, ids)}?from=${monthRange(month).from}&to=${monthRange(month).to}`} className="hover:text-accent hover:underline">{r.name}</Link>
+                    <span className="block text-xs font-normal text-ink-muted">{ids.get(r.empCode)?.employeeCode ?? 'No employee ID'}</span>
                   </th>
                   <td className="whitespace-nowrap px-3 py-2 text-ink-2">{INCENTIVE_STORES[r.store].name}</td>
                   <td className="tnum px-3 py-2 text-right text-ink-2">{formatNumber(r.bills)}</td>
