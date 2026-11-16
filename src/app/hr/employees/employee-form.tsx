@@ -40,6 +40,7 @@ export function EmployeeForm({ employee, options, action, cancelHref }: {
         <Field label="Date of birth">{t('date_of_birth', e?.dateOfBirth, 'date')}</Field>
         <Field label="Contact No.">{t('contact_no', e?.contactNo, 'tel')}</Field>
         <Field label="Email">{t('email', e?.email, 'email')}</Field>
+        <Field label="Biometric ID">{t('biometric_id', e?.biometricId)}</Field>
       </Section>
 
       <Section title="Employment">

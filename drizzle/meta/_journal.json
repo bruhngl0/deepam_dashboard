@@ -267,6 +267,13 @@
       "when": 1794600000000,
       "tag": "0037_counter_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794700000000,
+      "tag": "0038_employee_biometric_id",
+      "breakpoints": true
     }
   ]
 }

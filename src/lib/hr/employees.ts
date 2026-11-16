@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { aq } from '@/lib/analytics/db';
 import { autoLinks, type SalespersonOption } from './match';
+import type { BasicDetails } from './import-details';
 
 export { nameKey, type SalespersonOption } from './match';
 
@@ -34,7 +35,7 @@ export const SALARY_PARTS = [
 ] as const;
 
 export type Employee = {
-  employeeCode: string; fullName: string; dateOfBirth: string | null; contactNo: string | null; email: string | null;
+  employeeCode: string; fullName: string; dateOfBirth: string | null; contactNo: string | null; email: string | null; biometricId: string | null;
   company: string | null; storeCode: string | null; storeName: string | null; department: string | null; designation: string | null;
   joiningDate: string | null; employmentType: string | null; reportingManager: string | null; reportingManagerName: string | null;
   monthlyCtc: number | null; salaryStructure: Record<string, number>; incentiveEligible: boolean | null;
@@ -55,7 +56,7 @@ const SELECT = sql`
 const str = (v: unknown) => (v === null || v === undefined || v === '' ? null : String(v));
 function toEmployee(r: Record<string, unknown>): Employee {
   return {
-    employeeCode: String(r.employee_code), fullName: String(r.full_name), dateOfBirth: str(r.dob), contactNo: str(r.contact_no), email: str(r.email),
+    employeeCode: String(r.employee_code), fullName: String(r.full_name), dateOfBirth: str(r.dob), contactNo: str(r.contact_no), email: str(r.email), biometricId: str(r.biometric_id),
     company: str(r.company), storeCode: str(r.store_code), storeName: str(r.store_name), department: str(r.department), designation: str(r.designation),
     joiningDate: str(r.joined), employmentType: str(r.employment_type), reportingManager: str(r.reporting_manager), reportingManagerName: str(r.manager_name),
     monthlyCtc: r.monthly_ctc === null || r.monthly_ctc === undefined ? null : Number(r.monthly_ctc),
@@ -107,12 +108,12 @@ export async function storeOptions(): Promise<{ code: string; name: string }[]> 
 export type EmployeeInput = Omit<Employee, 'employeeCode' | 'storeName' | 'reportingManagerName' | 'salespersonKey' | 'salespersonLink'>;
 
 export async function saveEmployee(code: string, e: EmployeeInput, create: boolean): Promise<void> {
-  const v = sql`${e.fullName}, ${e.dateOfBirth}, ${e.contactNo}, ${e.email}, ${e.company}, ${e.storeCode}, ${e.department}, ${e.designation},
+  const v = sql`${e.fullName}, ${e.dateOfBirth}, ${e.contactNo}, ${e.email}, ${e.biometricId},${e.company}, ${e.storeCode}, ${e.department}, ${e.designation},
     ${e.joiningDate}, ${e.employmentType}, ${e.reportingManager}, ${e.monthlyCtc}, ${JSON.stringify(e.salaryStructure)}::jsonb, ${e.incentiveEligible},
     ${e.bankName}, ${e.bankAccountHolder}, ${e.bankAccountNo}, ${e.bankIfsc}, ${e.idProofType}, ${e.idProofNumber},
     ${e.status}, ${e.statusSince}, ${e.exitDate}, ${e.exitReason}, ${e.emergencyContactName}, ${e.emergencyContactRelation}, ${e.emergencyContactNo},
     ${e.bloodGroup}, ${e.notes}`;
-  const cols = sql.raw(`full_name, date_of_birth, contact_no, email, company, store_code, department, designation,
+  const cols = sql.raw(`full_name, date_of_birth, contact_no, email, biometric_id,company, store_code, department, designation,
     joining_date, employment_type, reporting_manager, monthly_ctc, salary_structure, incentive_eligible,
     bank_name, bank_account_holder, bank_account_no, bank_ifsc, id_proof_type, id_proof_number,
     status, status_since, exit_date, exit_reason, emergency_contact_name, emergency_contact_relation, emergency_contact_no, blood_group, notes`);
@@ -121,6 +122,38 @@ export async function saveEmployee(code: string, e: EmployeeInput, create: boole
   } else {
     await db.execute(sql`UPDATE employees SET (${cols}, updated_at) = (${v}, now()) WHERE employee_code = ${code}`);
   }
+}
+
+/**
+ * Basic details from the HRMS sheet (./import-details.ts) for employees already on the list: date of birth,
+ * Contact No. and Biometric ID take the sheet's value when it has one; email only fills an empty one, so
+ * corrections HR made here stay. People not on the list are left out and reported.
+ */
+export async function applyBasicDetails(rows: BasicDetails[]) {
+  const known = new Set(rowsOf<{ employee_code: string }>(await db.execute(sql`SELECT employee_code FROM employees`)).map((r) => r.employee_code));
+  const notOnList = rows.filter((r) => !known.has(r.employeeCode)).map((r) => r.employeeCode);
+  const conflicts: string[] = [];
+  let updated = 0;
+  await db.transaction(async (tx) => {
+    for (const row of rows.filter((x) => known.has(x.employeeCode))) {
+      let bio = row.biometricId;
+      if (bio) {
+        const other = rowsOf<{ employee_code: string }>(await tx.execute(sql`SELECT employee_code FROM employees WHERE biometric_id = ${bio} AND employee_code <> ${row.employeeCode}`))[0];
+        if (other) { conflicts.push(`${row.employeeCode}: Biometric ID ${bio} is already ${other.employee_code}'s`); bio = null; }
+      }
+      const res = rowsOf(await tx.execute(sql`
+        WITH n AS (SELECT ${row.dateOfBirth}::date AS dob, ${row.contactNo}::text AS phone, ${bio}::text AS bio, ${row.email}::text AS email)
+        UPDATE employees e SET date_of_birth = COALESCE(n.dob, e.date_of_birth), contact_no = COALESCE(n.phone, e.contact_no),
+          biometric_id = COALESCE(n.bio, e.biometric_id), email = COALESCE(e.email, n.email), updated_at = now()
+        FROM n
+        WHERE e.employee_code = ${row.employeeCode}
+          AND (e.date_of_birth IS DISTINCT FROM COALESCE(n.dob, e.date_of_birth) OR e.contact_no IS DISTINCT FROM COALESCE(n.phone, e.contact_no)
+            OR e.biometric_id IS DISTINCT FROM COALESCE(n.bio, e.biometric_id) OR e.email IS DISTINCT FROM COALESCE(e.email, n.email))
+        RETURNING 1`));
+      updated += res.length;
+    }
+  });
+  return { updated, unchanged: rows.length - notOnList.length - updated, notOnList, conflicts };
 }
 
 export async function employeeExists(code: string): Promise<boolean> {

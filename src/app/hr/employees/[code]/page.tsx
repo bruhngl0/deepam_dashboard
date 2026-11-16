@@ -66,7 +66,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Basic details">
-          <Facts items={[['Employee ID', e.employeeCode], ['Name', e.fullName], ['Date of birth', e.dateOfBirth && formatDate(e.dateOfBirth)], ['Contact No.', e.contactNo], ['Email', e.email], ['Blood group', e.bloodGroup]]} />
+          <Facts items={[['Employee ID', e.employeeCode], ['Name', e.fullName], ['Date of birth', e.dateOfBirth && formatDate(e.dateOfBirth)], ['Contact No.', e.contactNo], ['Email', e.email], ['Biometric ID', e.biometricId], ['Blood group', e.bloodGroup]]} />
         </Panel>
         <Panel title="Employment and joining">
           <Facts items={[['Company', e.company], ['Store', e.storeName ?? e.storeCode], ['Department', e.department], ['Designation', e.designation],

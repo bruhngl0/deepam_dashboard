@@ -29,7 +29,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
         title="Employees"
         description="Everyone on the payroll, by Employee ID. Open a name for their full record."
         meta={`${formatNumber(rows.length)} of ${formatNumber(all.length)} employees`}
-        actions={<Link href="/hr/employees/new" className={primaryButton}>Add employee</Link>}
+        actions={<><Link href="/hr/employees/import" className={button}>Import details</Link><Link href="/hr/employees/new" className={primaryButton}>Add employee</Link></>}
       />
 
       <form className="flex flex-wrap items-center gap-2" role="search">

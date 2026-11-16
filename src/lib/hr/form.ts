@@ -44,7 +44,7 @@ export function employeeFromForm(form: FormData): EmployeeInput {
   const manager = text(form, 'reporting_manager')?.toUpperCase() ?? null;
   if (manager && !EMPLOYEE_CODE.test(manager)) throw new FormError('Reporting manager is not an Employee ID');
   return {
-    fullName, dateOfBirth: day(form, 'date_of_birth'), contactNo: text(form, 'contact_no', 30), email: text(form, 'email')?.toLowerCase() ?? null,
+    fullName, dateOfBirth: day(form, 'date_of_birth'), contactNo: text(form, 'contact_no', 30), email: text(form, 'email')?.toLowerCase() ?? null, biometricId: text(form, 'biometric_id', 40),
     company: text(form, 'company'), storeCode: text(form, 'store_code', 40), department: text(form, 'department'), designation: text(form, 'designation'),
     joiningDate: day(form, 'joining_date'), employmentType: oneOf(form, 'employment_type', EMPLOYMENT_TYPES), reportingManager: manager,
     monthlyCtc: money(form, 'monthly_ctc'), salaryStructure, incentiveEligible: eligible === 'yes' ? true : eligible === 'no' ? false : null,
