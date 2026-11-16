@@ -145,6 +145,25 @@ export default async function HeroPage() {
           </p>
         </a>
 
+        <a
+          href="https://nvc57svvmb.ap-south-1.awsapprunner.com/cash"
+          rel="noreferrer"
+          className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]">
+              <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 7.5V18a1 1 0 0 0 1 1h15V8H6.5A2.5 2.5 0 0 1 4 7.5Z" strokeLinejoin="round" />
+              <path d="M16 13.5h1.5" strokeLinecap="round" />
+            </svg>
+          </span>
+          <h2 className="text-lg font-semibold tracking-tight text-ink">Cash Management &amp; Payment Approvals</h2>
+          <p className="max-w-[36ch] text-sm text-ink-2">
+            Daily store closings and deposits, payment requests and approvals, payments, cheques and bank balances.
+            Opens in Hemparshwa OS with your own sign-in.
+          </p>
+        </a>
+
         <Link
           href="/marketing"
           className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
