@@ -43,6 +43,15 @@ const HR_TABS = [
   { href: '/hr/incentives', label: 'Incentives' },
 ] as const;
 
+// Partner Network Management (Deepam Partners). Partners also lights for a partner's own page.
+const PARTNER_TABS = [
+  { href: '/partners', label: 'Overview' },
+  { href: '/partners/list', label: 'Partners', pattern: /^\/partners\/(?!referrals|payouts|rules)[^/]+$/ },
+  { href: '/partners/referrals', label: 'Referrals' },
+  { href: '/partners/payouts', label: 'Payouts' },
+  { href: '/partners/rules', label: 'Rules' },
+] as const;
+
 // Overview lives in the separately deployed vendor application; linking to it
 // directly avoids the hop through `/vendor`, which only redirects there.
 const VENDOR_TABS = [
@@ -82,6 +91,8 @@ export function NavTabs() {
       ? HR_TABS
       : pathname.startsWith('/vendor')
       ? VENDOR_TABS
+      : pathname === '/partners' || pathname.startsWith('/partners/')
+      ? PARTNER_TABS
       : null;
 
   if (!tabs) return null;
@@ -104,9 +115,11 @@ export function NavTabs() {
         // Another app, opened through the gate's /__gate/go: a plain link, never prefetched.
         const external = tab.href.startsWith('http') || tab.href.startsWith('/__gate/');
         const also = 'also' in tab ? tab.also : null;
+        const pattern = 'pattern' in tab ? tab.pattern : null;
         const active =
           pathname === tab.href ||
-          (tab.href !== '/crm' && tab.href !== '/hr' && !external && pathname.startsWith(`${tab.href}/`)) ||
+          (!!pattern && pattern.test(pathname)) ||
+          (tab.href !== '/crm' && tab.href !== '/hr' && tab.href !== '/partners' && !external && pathname.startsWith(`${tab.href}/`)) ||
           (!!also && (pathname === also || pathname.startsWith(`${also}/`)));
         const className = `shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
           active ? 'bg-inset text-ink' : 'text-ink-2 hover:bg-inset hover:text-ink'
