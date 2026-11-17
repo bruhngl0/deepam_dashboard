@@ -8,9 +8,10 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { requireUser } from '@/lib/auth';
 import { listEmployees } from '@/lib/hr/employees';
+import { HALF_DAY_HOURS, punchStatus } from '@/lib/hr/attendance-punches';
 import { monthToDate, pickRange, pickStores, rangeLabel } from '@/lib/module-filters';
 import { storeMatches } from '@/lib/store-filter';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { formatDateTime, formatNumber, formatPercent } from '@/lib/format';
 import { card, Kpi, KpiGrid, PageHeader } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -39,11 +40,15 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const days: string[] = [];
   for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
 
-  const [all, marks] = await Promise.all([
+  const [all, marks, machine] = await Promise.all([
     listEmployees(),
-    db.execute(sql`SELECT employee_code, to_char(day, 'YYYY-MM-DD') AS day, status, source FROM attendance_days WHERE day BETWEEN ${from} AND ${to}`),
+    db.execute(sql`SELECT employee_code, to_char(day, 'YYYY-MM-DD') AS day, status, source,
+      to_char(in_at AT TIME ZONE 'Asia/Kolkata', 'HH24:MI') AS in_t, to_char(out_at AT TIME ZONE 'Asia/Kolkata', 'HH24:MI') AS out_t
+      FROM attendance_days WHERE day BETWEEN ${from} AND ${to}`),
+    punchStatus(from, to).catch(() => null),
   ]);
-  const byKey = new Map(rowsOf<{ employee_code: string; day: string; status: string; source: string }>(marks).map((r) => [`${r.employee_code}|${r.day}`, r]));
+  const byKey = new Map(rowsOf<{ employee_code: string; day: string; status: string; source: string; in_t: string | null; out_t: string | null }>(marks).map((r) => [`${r.employee_code}|${r.day}`, r]));
+  const noBiometric = all.filter((e) => (e.status === 'Active' || e.status === 'On leave') && !e.biometricId).length;
   const marked = new Set([...byKey.values()].map((r) => r.employee_code));
   const people = all.filter((e) => (e.status === 'Active' || e.status === 'On leave' || marked.has(e.employeeCode)) && (!dept || e.department === dept) && storeMatches(stores, e.storeCode));
   const shown = new Set(people.map((e) => e.employeeCode));
@@ -60,12 +65,28 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         meta={`${rangeLabel(from, to)}${capped ? ` · the last ${MAX_DAYS} days of the period picked` : ''}`}
       />
 
-      {!byKey.size && (
+      {machine?.lastReceived ? (
+        <p className={`${card} flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3 text-sm`}>
+          <b className="text-ink">Punch machine</b>
+          <span className="text-ink-2">Last punch <span className="tnum text-ink">{formatDateTime(machine.lastPunch!)}</span></span>
+          <span className="text-ink-2">Last received <span className="tnum text-ink">{formatDateTime(machine.lastReceived)}</span></span>
+          <span className="text-xs text-ink-muted">Present from the first IN and last OUT punch; under {HALF_DAY_HOURS} hours between them is a half day. Days without punches stay empty.</span>
+        </p>
+      ) : (
         <p className={`${card} border-dashed p-4 text-sm text-ink-2`}>
-          <b className="text-ink">Biometric not connected yet.</b> Once the device&rsquo;s punches are linked, each employee&rsquo;s in and out times land here
-          by Employee ID, and the attendance figure on the overview fills in.
+          <b className="text-ink">No punches received yet.</b> Once the job on the office PC is running, each punch on the machine lands here within minutes,
+          matched to the employee by their Biometric ID.
         </p>
       )}
+
+      {(machine?.unmatched.length ?? 0) > 0 && (
+        <section className={`${card} border-amber-500/40 p-4 text-sm`}>
+          <p className="text-ink"><b>{formatNumber(machine!.unmatched.length)} machine {machine!.unmatched.length === 1 ? 'ID has' : 'IDs have'} punches but no employee.</b>{' '}
+            <span className="text-ink-2">Enter the ID as the employee&rsquo;s Biometric ID (Employees → open the person → Edit) and their days fill in on the next sync.</span></p>
+          <p className="tnum mt-2 text-xs text-ink-2">{machine!.unmatched.slice(0, 40).map((u) => `${u.id} (${u.punches})`).join(' · ')}{machine!.unmatched.length > 40 ? ' …' : ''}</p>
+        </section>
+      )}
+      {noBiometric > 0 && <p className="text-xs text-ink-muted">{formatNumber(noBiometric)} employees on the payroll have no Biometric ID yet, so their punches can&rsquo;t be matched.</p>}
 
       <KpiGrid columns={5}>
         <Kpi label="Attendance" value={counted.length ? formatPercent(present, counted.length) : '—'} caption="Days present ÷ working days" />
@@ -101,7 +122,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                       const r = byKey.get(`${e.employeeCode}|${d}`);
                       if (r?.status === 'Present') p += 1; else if (r?.status === 'Half day') p += 0.5;
                       const m = r ? MARK[r.status] : null;
-                      return <td key={d} title={r ? `${r.status} (${r.source})` : undefined} className={`w-7 px-0.5 py-1.5 text-center font-semibold ${m?.tone ?? 'text-line'} ${new Date(`${d}T00:00:00Z`).getUTCDay() === 0 ? 'bg-inset/60' : ''}`}>{m?.short ?? '·'}</td>;
+                      return <td key={d} title={r ? `${r.status}${r.in_t ? ` · in ${r.in_t}` : ''}${r.out_t ? ` · out ${r.out_t}` : ''} (${r.source})` : undefined} className={`w-7 px-0.5 py-1.5 text-center font-semibold ${m?.tone ?? 'text-line'} ${new Date(`${d}T00:00:00Z`).getUTCDay() === 0 ? 'bg-inset/60' : ''}`}>{m?.short ?? '·'}</td>;
                     })}
                     <td className="tnum px-3 py-1.5 text-right text-ink-2">{byKey.size ? formatNumber(p) : '—'}</td>
                   </tr>
