@@ -7,9 +7,11 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { listEmployees } from '@/lib/hr/employees';
 import { resolveAssistants } from '@/lib/hr/counter-rules';
-import { evaluate, MONTH, piecesByCode, previousTargetMonth, salesImportedUpTo, soldRows, TARGET_STORES, targetsFor, type TargetResult } from '@/lib/hr/counter-targets';
+import { evaluate, piecesByCode, previousTargetMonth, salesImportedUpTo, soldRows, TARGET_STORES, targetsFor, type TargetResult } from '@/lib/hr/counter-targets';
 import { monthRange } from '@/lib/incentives/store';
 import { todayIst } from '@/lib/queries/daily';
+import { pickMonth, pickStores } from '@/lib/module-filters';
+import { storeMatches } from '@/lib/store-filter';
 import { formatDate, formatNumber } from '@/lib/format';
 import { button, card, eyebrow, Kpi, KpiGrid, PageHeader, primaryButton, SectionLabel } from '@/components/ui';
 import { copyCounterTargets } from './actions';
@@ -42,15 +44,17 @@ export default async function CounterTargetsPage({ searchParams }: { searchParam
   await requireUser();
   const sp = await searchParams;
   const today = todayIst(), thisMonth = today.slice(0, 7);
-  const month = typeof sp.month === 'string' && MONTH.test(sp.month) && sp.month <= thisMonth ? sp.month : thisMonth;
+  const month = pickMonth(sp);
+  const picked = pickStores(sp);
+  const shownStores = TARGET_STORES.filter((s) => storeMatches(picked, s.code));
   const { from, to: end } = monthRange(month);
   const to = end > today ? today : end;
 
   const [targets, employees, previous, imported, ...sold] = await Promise.all([
-    targetsFor(month), listEmployees(), previousTargetMonth(month), Promise.all(TARGET_STORES.map((s) => salesImportedUpTo(s.code))),
-    ...TARGET_STORES.map((s) => soldRows(s.code, from, to)),
+    targetsFor(month), listEmployees(), previousTargetMonth(month), Promise.all(shownStores.map((s) => salesImportedUpTo(s.code))),
+    ...shownStores.map((s) => soldRows(s.code, from, to)),
   ]);
-  const stores = TARGET_STORES.map((s, i) => ({ ...s, rows: sold[i], upTo: imported[i], results: evaluate(targets.filter((t) => t.storeCode === s.code), sold[i]) }));
+  const stores = shownStores.map((s, i) => ({ ...s, rows: sold[i], upTo: imported[i], results: evaluate(targets.filter((t) => t.storeCode === s.code), sold[i]) }));
   // How far this month's figures go: the month's end if sales are imported past it, else the last imported bill date.
   const upToLabel = (d: string | null) => !d || d < from ? `no ${label(month)} sales imported yet` : d >= end ? `every day of ${label(month)}` : formatDate(d);
   const sameUpTo = stores.every((s) => s.upTo === stores[0].upTo);
@@ -66,8 +70,8 @@ export default async function CounterTargetsPage({ searchParams }: { searchParam
         description="Each month's piece targets for the counters at MG Road and Jayanagar, and what those counters have sold. A counter is the Item Short Name on the bill (03 Mysore Silk, 15 Art Printed…)."
         meta={`${label(month)}${month === thisMonth ? ` · day ${daysGone} of ${daysInMonth}` : ''}`}
         actions={<>
-          <Link href={`/hr/counter-targets?month=${shift(month, -1)}`} className={button}>← {label(shift(month, -1))}</Link>
-          {month < thisMonth && <Link href={`/hr/counter-targets?month=${shift(month, 1)}`} className={button}>{label(shift(month, 1))} →</Link>}
+          <Link href={`/hr/counter-targets?month=${shift(month, -1)}${picked ? `&store=${picked}` : ''}`} className={button}>← {label(shift(month, -1))}</Link>
+          {month < thisMonth && <Link href={`/hr/counter-targets?month=${shift(month, 1)}${picked ? `&store=${picked}` : ''}`} className={button}>{label(shift(month, 1))} →</Link>}
         </>}
       />
 
