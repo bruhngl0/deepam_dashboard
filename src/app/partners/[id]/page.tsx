@@ -11,22 +11,14 @@ import { partnerDashboardBase, partnerLinkBase } from '@/lib/partners/links';
 import { getPartner, getRules, listReferrals } from '@/lib/partners/queries';
 import { refreshReferrals } from '@/lib/partners/store';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
-import { button, card, control, eyebrow, Kpi, KpiGrid, PageHeader, primaryButton, SectionLabel } from '@/components/ui';
+import { button, card, control, eyebrow, primaryButton } from '@/components/ui';
 import { WhatsAppShare } from '@/components/whatsapp-share';
 import { approveAction, detailsAction, documentsAction, levelAction, rejectAction, rotateLinkAction, suspendAction } from '../actions';
 import { ReferralTable } from '../referral-table';
-import { Notices, PartnerBadge } from '../ui';
+import { Avatar, Callout, Icon, IconTile, Notices, Panel, PartnerBadge, Stat } from '../ui';
 
 export const dynamic = 'force-dynamic';
 
-function Panel({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <section className={`${card} p-5`}>
-      <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-ink">{title}</h2>{action}</div>
-      <div className="mt-3">{children}</div>
-    </section>
-  );
-}
 const field = `${control} w-full`;
 
 export default async function PartnerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -48,25 +40,53 @@ export default async function PartnerPage({ params, searchParams }: { params: Pr
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <PageHeader eyebrow={<><Link href="/partners/list" className="hover:text-ink">Partners</Link>{p.code ? ` · ${p.code}` : ''}</>}
-        title={p.fullName} description={`${p.category} · ${p.city}`} meta={<PartnerBadge status={p.status} />} />
+      <Link href="/partners/list" className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-1 pr-3 pl-2 text-xs font-medium text-ink-2 shadow-sm transition-colors hover:bg-inset hover:text-ink">
+        <Icon name="back" className="size-3.5" />Partners
+      </Link>
+      <section className={`${card} flex flex-wrap items-center justify-between gap-5 p-5 sm:p-6`}>
+        <div className="flex min-w-0 items-center gap-4">
+          <Avatar name={p.fullName} size="xl" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-ink">{p.fullName}</h1>
+              <PartnerBadge status={p.status} />
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
+              <span className="inline-flex items-center gap-1.5"><Icon name="grid" className="size-3.5 text-ink-muted" />{p.category}</span>
+              <span className="inline-flex items-center gap-1.5"><Icon name="map" className="size-3.5 text-ink-muted" />{p.city}</span>
+              <span className="tnum inline-flex items-center gap-1.5"><Icon name="phone" className="size-3.5 text-ink-muted" />{formatPhone(p.phone)}</span>
+              <span className="inline-flex min-w-0 items-center gap-1.5"><Icon name="mail" className="size-3.5 text-ink-muted" /><span className="truncate">{p.email}</span></span>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <div className="rounded-xl border border-line bg-inset/50 px-4 py-2">
+            <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Partner ID</p>
+            <p className="tnum text-lg font-semibold text-ink">{p.code ?? '—'}</p>
+          </div>
+          <div className="rounded-xl border border-line bg-inset/50 px-4 py-2">
+            <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Level</p>
+            <p className="text-lg font-semibold text-ink">{p.levelName}{p.levelPercent !== null && <span className="tnum ml-1 text-sm font-normal text-ink-2">{p.levelPercent}%</span>}</p>
+          </div>
+        </div>
+      </section>
       <Notices sp={sp} />
 
       {(p.status === 'applied' || p.status === 'rejected') && (
-        <Panel title={p.status === 'applied' ? 'Decide this application' : 'Rejected application'}>
+        <Panel title={p.status === 'applied' ? 'Decide this application' : 'Rejected application'} icon="inbox" tone="wait">
           {p.status === 'rejected' && <p className="mb-3 text-sm text-ink-2">Rejected {p.decidedAt ? formatDate(p.decidedAt) : ''}{p.statusNote ? `: “${p.statusNote}”` : ''}. It can still be approved.</p>}
           <div className="grid gap-4 md:grid-cols-2">
-            <form action={approveAction} className="space-y-2 rounded-xl border border-line p-4">
+            <form action={approveAction} className="space-y-3 rounded-xl border border-emerald-600/25 bg-emerald-600/5 p-4">
               {hidden}
-              <p className="text-sm text-ink">Approve: issues the Deepam Partner ID, the referral link and the partner dashboard. Collect the legal documents next.</p>
+              <p className="flex gap-2 text-sm text-ink"><Icon name="check" className="mt-0.5 size-4 text-emerald-600" /><span><strong className="font-semibold">Approve</strong>: issues the Deepam Partner ID, the referral link and the partner dashboard. Collect the legal documents next.</span></p>
               <label className="block text-xs text-ink-muted">Commission level<select name="level" defaultValue={p.level} className={`${field} mt-1`}>{levelOptions}</select></label>
               <label className="block text-xs text-ink-muted">Note (optional)<input name="note" maxLength={500} className={`${field} mt-1`} /></label>
               <button type="submit" className={primaryButton}>Approve partner</button>
             </form>
             {p.status === 'applied' && (
-              <form action={rejectAction} className="space-y-2 rounded-xl border border-line p-4">
+              <form action={rejectAction} className="space-y-3 rounded-xl border border-line p-4">
                 {hidden}
-                <p className="text-sm text-ink">Reject: no Partner ID is issued. The applicant is not told automatically.</p>
+                <p className="text-sm text-ink"><strong className="font-semibold">Reject</strong>: no Partner ID is issued. The applicant is not told automatically.</p>
                 <label className="block text-xs text-ink-muted">Reason<input name="note" maxLength={500} className={`${field} mt-1`} /></label>
                 <button type="submit" className={button}>Reject application</button>
               </form>
@@ -77,20 +97,19 @@ export default async function PartnerPage({ params, searchParams }: { params: Pr
 
       {(p.status === 'approved' || p.status === 'suspended') && referralLink && dashboardLink && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Partner ID and links">
+          <Panel title="Partner ID and links" icon="link">
             <dl className="space-y-3 text-sm">
-              <div><dt className={eyebrow}>Deepam Partner ID</dt><dd className="tnum mt-0.5 text-lg font-semibold text-ink">{p.code}</dd></div>
-              <div><dt className={eyebrow}>Referral link (for customers)</dt><dd className="mt-0.5 break-all text-ink"><a href={referralLink} target="_blank" rel="noreferrer" className="hover:text-accent hover:underline">{referralLink}</a></dd></div>
-              <div><dt className={eyebrow}>Partner dashboard (private to the partner)</dt><dd className="mt-0.5 break-all text-ink"><a href={dashboardLink} target="_blank" rel="noreferrer" className="hover:text-accent hover:underline">{dashboardLink}</a></dd></div>
+              <div className="rounded-xl bg-inset/50 px-3 py-2.5"><dt className={eyebrow}>Referral link (for customers)</dt><dd className="mt-0.5 break-all text-ink"><a href={referralLink} target="_blank" rel="noreferrer" className="hover:text-accent hover:underline">{referralLink}</a></dd></div>
+              <div className="rounded-xl bg-inset/50 px-3 py-2.5"><dt className={eyebrow}>Partner dashboard (private to the partner)</dt><dd className="mt-0.5 break-all text-ink"><a href={dashboardLink} target="_blank" rel="noreferrer" className="hover:text-accent hover:underline">{dashboardLink}</a></dd></div>
             </dl>
             <div className="mt-4 flex flex-wrap gap-2">
               <WhatsAppShare text={welcome} to={p.phone.replace(/\D/g, '')} label={`Send to ${firstName} on WhatsApp`} />
               <form action={rotateLinkAction}>{hidden}<button type="submit" className={button} title="Use if the dashboard link was shared by mistake">New dashboard link</button></form>
             </div>
-            {p.status === 'suspended' && <p className="mt-3 text-sm text-red-700 dark:text-red-300">Suspended{p.statusNote ? `: “${p.statusNote}”` : ''}. The referral link does not accept registrations; the dashboard still opens.</p>}
+            {p.status === 'suspended' && <Callout tone="bad" className="mt-3" title="Suspended">{p.statusNote ? `“${p.statusNote}”. ` : ''}The referral link does not accept registrations; the dashboard still opens.</Callout>}
           </Panel>
 
-          <Panel title="Level and status">
+          <Panel title="Level and status" icon="sliders">
             <form action={levelAction} className="flex flex-wrap items-end gap-2">
               {hidden}
               <label className="text-xs text-ink-muted">Commission level<select name="level" defaultValue={p.level} className={`${control} mt-1 block`}>{levelOptions}</select></label>
@@ -115,20 +134,20 @@ export default async function PartnerPage({ params, searchParams }: { params: Pr
         </div>
       )}
 
-      <KpiGrid>
-        <Kpi label="Referred" value={formatNumber(p.referrals)} caption={`${formatNumber(p.registered)} inside the window · ${formatNumber(p.declined)} not accepted`} />
-        <Kpi label="Purchased" value={formatNumber(p.converted)} caption={`${formatCurrency(p.salesValue)} in bills`} />
-        <Kpi label="To validate" value={formatNumber(p.billsToValidate)} caption={p.levelPercent !== null ? `≈ ${formatCurrency(p.commissionPending)} at ${p.levelPercent}%` : `${p.levelName} has no commission % yet`} />
-        <Kpi label="Commission" value={formatCurrency(p.commissionValidated + p.commissionPaid)} caption={`${formatCurrency(p.commissionPaid)} paid · ${formatCurrency(p.commissionValidated)} to pay`} />
-      </KpiGrid>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat icon="link" tone="info" label="Referred" value={formatNumber(p.referrals)} caption={`${formatNumber(p.registered)} inside the window · ${formatNumber(p.declined)} not accepted`} />
+        <Stat icon="bag" tone="good" label="Purchased" value={formatNumber(p.converted)} caption={`${formatCurrency(p.salesValue)} in bills`} />
+        <Stat icon="receipt" tone="wait" label="To validate" value={formatNumber(p.billsToValidate)} highlight={p.billsToValidate > 0} caption={p.levelPercent !== null ? `≈ ${formatCurrency(p.commissionPending)} at ${p.levelPercent}%` : `${p.levelName} has no commission % yet`} />
+        <Stat icon="wallet" tone="good" label="Commission" value={formatCurrency(p.commissionValidated + p.commissionPaid)} caption={`${formatCurrency(p.commissionPaid)} paid · ${formatCurrency(p.commissionValidated)} to pay`} />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {(p.status === 'approved' || p.status === 'suspended') && (
-          <Panel title="Legal documents" action={<span className={`text-xs ${p.documentsComplete ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>{p.documentsComplete ? 'All required received' : 'Required documents pending'}</span>}>
+          <Panel title="Legal documents" icon="file" tone={p.documentsComplete ? 'good' : 'wait'} actions={<span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${p.documentsComplete ? 'bg-emerald-600/10 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>{p.documentsComplete ? 'All required received' : 'Required documents pending'}</span>}>
             <form action={documentsAction} className="space-y-2">
               {hidden}
               {PARTNER_DOCUMENTS.map((d) => (
-                <label key={d.key} className="flex items-center gap-2 text-sm text-ink">
+                <label key={d.key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink transition-colors hover:bg-inset/60">
                   <input type="checkbox" name="documents" value={d.key} defaultChecked={!!p.documents[d.key]} className="size-4 accent-accent" />
                   {d.label}
                   {p.documents[d.key] && <span className="tnum text-xs text-ink-muted">received {formatDate(p.documents[d.key])}</span>}
@@ -140,7 +159,7 @@ export default async function PartnerPage({ params, searchParams }: { params: Pr
           </Panel>
         )}
 
-        <Panel title="Details">
+        <Panel title="Details" icon="user">
           <dl className="mb-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             <div><dt className={eyebrow}>Contact number</dt><dd className="tnum mt-0.5 text-ink">{formatPhone(p.phone)}</dd></div>
             <div><dt className={eyebrow}>Applied</dt><dd className="mt-0.5 text-ink">{formatDateTime(p.appliedAt)} · agreed to the terms</dd></div>
@@ -159,7 +178,7 @@ export default async function PartnerPage({ params, searchParams }: { params: Pr
         </Panel>
       </div>
 
-      <SectionLabel>Referrals</SectionLabel>
+      <h2 className="flex items-center gap-2.5 pt-2 text-base font-semibold tracking-tight text-ink"><IconTile name="link" tone="info" size="sm" />Referrals<span className="tnum inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-inset px-1.5 text-xs font-semibold text-ink-2">{referrals.length}</span></h2>
       <ReferralTable referrals={referrals} back={self} showPartner={false} empty={p.code ? 'No one has registered on this partner’s link yet.' : 'Referrals start once the partner is approved.'} />
     </main>
   );

@@ -10,6 +10,8 @@ import { analyticsAsOf, analyticsConfigured } from '@/lib/analytics/db';
 import { monthIncentives, monthRange, setWeekendStaff } from '@/lib/incentives/store';
 import { AGE_BANDS, INCENTIVE_STORES, INCENTIVES_FROM, LAKH_BANDS, VOLUME_BANDS, WEEKEND, type IncentiveStore } from '@/lib/incentives/slabs';
 import { todayIst } from '@/lib/queries/daily';
+import { pickMonth, pickStores } from '@/lib/module-filters';
+import { storeCodes } from '@/lib/store-filter';
 import { formatCurrency, formatCurrencyCompact, formatDateTime, formatNumber } from '@/lib/format';
 import { card, eyebrow, Kpi, KpiGrid, PageHeader } from '@/components/ui';
 import { employeesBySalesperson, salespersonSlug } from '@/lib/hr/employees';
@@ -41,14 +43,12 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
   await requireUser();
   const sp = await searchParams;
   const list = months();
-  const month = list.includes(one(sp.month) ?? '') ? one(sp.month)! : list[0];
-  const store = (one(sp.store) === 'STR-002' ? 'STR-002' : one(sp.store) === 'STR-001' ? 'STR-001' : null) as IncentiveStore | null;
-  const href = (changes: Record<string, string | null>) => {
-    const q = new URLSearchParams();
-    const next = { month, store, ...changes };
-    for (const [k, v] of Object.entries(next)) if (v) q.set(k, v);
-    return `/hr/incentives?${q}`;
-  };
+  const asked = pickMonth(sp);
+  const month = list.includes(asked) ? asked : asked < list[list.length - 1] ? list[list.length - 1] : list[0];
+  // The strip picks stores by stores.code; incentives key them STR-001 (MG Road) / STR-002 (Jayanagar).
+  const BY_CODE: Record<string, IncentiveStore> = { MG_ROAD: 'STR-001', JAYANAGAR: 'STR-002', 'STR-001': 'STR-001', 'STR-002': 'STR-002' };
+  const picked = storeCodes(pickStores(sp) ?? one(sp.store) ?? null).map((c) => BY_CODE[c]).filter(Boolean);
+  const storeSet = picked.length ? new Set(picked) : null;
 
   if (!analyticsConfigured()) {
     return <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -58,24 +58,17 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
   }
 
   const [all, asOf, ids] = await Promise.all([monthIncentives(month), analyticsAsOf(), employeesBySalesperson()]);
-  const rows = (all ?? []).map((r) => ({ ...r, name: ids.get(r.empCode)?.fullName ?? r.name })).filter((r) => !store || r.store === store).sort((a, b) => b.total - a.total || b.volume - a.volume);
+  const rows = (all ?? []).map((r) => ({ ...r, name: ids.get(r.empCode)?.fullName ?? r.name })).filter((r) => !storeSet || storeSet.has(r.store)).sort((a, b) => b.total - a.total || b.volume - a.volume);
   const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((s, r) => s + f(r), 0);
-  const pill = (active: boolean) => `rounded-full border px-3 py-1 text-sm ${active ? 'border-ink bg-ink text-surface' : 'border-line text-ink-2 hover:bg-inset'}`;
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Incentives"
         description="Each salesperson's incentive for the month, by the management circulars in effect from 1 September 2026."
-        meta={<>{monthName(month)}{asOf ? ` · data as of ${formatDateTime(asOf)}` : ''} · <Link href="/hr/salespeople" className="text-accent hover:underline">All salespeople</Link></>}
+        meta={<>{monthName(month)}{month !== asked ? ` (incentives start ${monthName(FIRST_MONTH)})` : ''}{asOf ? ` · data as of ${formatDateTime(asOf)}` : ''} · <Link href="/hr/salespeople" className="text-accent hover:underline">All salespeople</Link></>}
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {list.map((m) => <Link key={m} href={href({ month: m })} className={pill(m === month)} scroll={false}>{monthName(m)}</Link>)}
-        <span className="mx-2 h-5 w-px bg-line" />
-        {([[null, 'Both stores'], ['STR-001', 'MG Road'], ['STR-002', 'Jayanagar']] as const).map(([code, label]) =>
-          <Link key={label} href={href({ store: code })} className={pill(store === code)} scroll={false}>{label}</Link>)}
-      </div>
 
       <KpiGrid>
         <Kpi label="Total incentive" value={formatCurrency(sum((r) => r.total))} caption={`${formatNumber(rows.length)} salespeople · rounded down to ₹10,000 each`} />

@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
-import { listEmployees, STATUSES } from '@/lib/hr/employees';
+import { listEmployees } from '@/lib/hr/employees';
 import { formatDate, formatNumber } from '@/lib/format';
-import { button, card, control, eyebrow, PageHeader, primaryButton } from '@/components/ui';
+import { button, card, eyebrow, PageHeader, primaryButton } from '@/components/ui';
+import { pickRange, pickStores } from '@/lib/module-filters';
+import { storeMatches } from '@/lib/store-filter';
 import { StatusBadge } from '../status-badge';
 
 export const dynamic = 'force-dynamic';
@@ -16,12 +18,14 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   await requireUser();
   const sp = await searchParams;
   const q = one(sp.q).trim(), dept = one(sp.department), status = one(sp.status);
+  const stores = pickStores(sp);
+  const joined = pickRange(sp, { from: null, to: null });
   const all = await listEmployees();
-  const departments = [...new Set(all.map((e) => e.department).filter((d): d is string => !!d))].sort();
   const needle = q.toUpperCase();
   const rows = all.filter((e) =>
     (!needle || e.fullName.toUpperCase().includes(needle) || e.employeeCode.includes(needle) || (e.designation ?? '').toUpperCase().includes(needle))
-    && (!dept || e.department === dept) && (!status || e.status === status));
+    && (!dept || e.department === dept) && (!status || e.status === status) && storeMatches(stores, e.storeCode)
+    && (!joined.picked || (!!e.joiningDate && (!joined.from || e.joiningDate >= joined.from) && (!joined.to || e.joiningDate <= joined.to))));
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -32,19 +36,6 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
         actions={<><Link href="/hr/employees/import" className={button}>Import details</Link><Link href="/hr/employees/new" className={primaryButton}>Add employee</Link></>}
       />
 
-      <form className="flex flex-wrap items-center gap-2" role="search">
-        <input name="q" defaultValue={q} placeholder="Name, ID or designation" className={`${control} w-64`} aria-label="Search employees" />
-        <select name="department" defaultValue={dept} className={control} aria-label="Department">
-          <option value="">Every department</option>
-          {departments.map((d) => <option key={d}>{d}</option>)}
-        </select>
-        <select name="status" defaultValue={status} className={control} aria-label="Status">
-          <option value="">Any status</option>
-          {STATUSES.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <button type="submit" className={button}>Show</button>
-        {(q || dept || status) && <Link href="/hr/employees" className="text-sm text-accent hover:underline">Clear</Link>}
-      </form>
 
       <section className={`${card} overflow-hidden`}>
         <div className="overflow-x-auto">

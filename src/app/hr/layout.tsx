@@ -1,21 +1,41 @@
 /**
  * HR Intelligence module shell: Overview, Employees, Performance (with the Salespeople pages), Attendance, Counter targets and Incentives.
- * The master date+store filter sits above the Salespeople pages only, which read `from`/`to`/`store`; the others pick a month.
+ * One filter strip above every list page (components/module-filters.tsx), in the same order everywhere: Store, then
+ * From/To (Month on the monthly pages: Counter targets, Incentives), then Department / Status, then search.
  */
 
 import { getSalesDateBounds } from '@/lib/queries/dashboard';
 import { getFilterOptions } from '@/lib/queries/customers';
-import { MasterFilterBar } from '@/components/master-filter-bar';
+import { ModuleFilters, type FilterField, type FilterPage } from '@/components/module-filters';
 import { requireUser } from '@/lib/auth';
+import { listEmployees, STATUSES } from '@/lib/hr/employees';
+import { todayIst } from '@/lib/queries/daily';
+
+const MAIN_STORES = ['MG_ROAD', 'JAYANAGAR'];
 
 export default async function HrLayout({ children }: { children: React.ReactNode }) {
   await requireUser();
 
-  const [dateBounds, options] = await Promise.all([getSalesDateBounds(), getFilterOptions()]);
+  const [dateBounds, options, employees] = await Promise.all([getSalesDateBounds(), getFilterOptions(), listEmployees().catch(() => [])]);
+  const departments = [...new Set(employees.map((e) => e.department).filter((d): d is string => !!d))].sort();
+  const department: FilterField = { kind: 'select', param: 'department', label: 'Department', all: 'Every department', options: departments.map((d) => ({ value: d, label: d })) };
+  const mainStores = options.stores.filter((s) => MAIN_STORES.includes(s.code));
+
+  const pages: FilterPage[] = [
+    { path: '/hr', store: true, period: 'range', fields: [department], note: 'Narrows employees by store and department; attendance, sales and joiners/exits by the dates. Default: this month to date.' },
+    { path: '/hr/employees', store: true, period: 'range', periodLabel: 'Joined', fields: [department,
+      { kind: 'select', param: 'status', label: 'Status', all: 'Any status', options: STATUSES.map((s) => ({ value: s, label: s })) },
+      { kind: 'search', param: 'q', placeholder: 'Name, ID or designation' }] },
+    { path: '/hr/performance', store: true, period: 'range', fields: [department], note: 'Sales and calling KPIs for the dates and stores picked. Default: this month to date.' },
+    { path: '/hr/attendance', store: true, period: 'range', fields: [department], note: 'Default: this month. Up to 62 days at a time.' },
+    { path: '/hr/salespeople', prefix: true, store: true, period: 'range' },
+    { path: '/hr/counter-targets', store: true, stores: mainStores, period: 'month' },
+    { path: '/hr/incentives', store: true, stores: mainStores, period: 'month' },
+  ];
 
   return (
     <>
-      <MasterFilterBar stores={options.stores} dateBounds={dateBounds} onlyUnder="/hr/salespeople" />
+      <ModuleFilters pages={pages} stores={options.stores} dateBounds={dateBounds} thisMonth={todayIst().slice(0, 7)} />
       {children}
     </>
   );

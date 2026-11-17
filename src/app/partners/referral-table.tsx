@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { DECLINE_LABEL, monthLabel } from '@/lib/partners/constants';
 import type { Referral } from '@/lib/partners/queries';
 import { formatCurrency, formatDate, formatPhone } from '@/lib/format';
-import { card, control, eyebrow } from '@/components/ui';
+import { card, control } from '@/components/ui';
 import { rejectCommissionAction, reopenCommissionAction } from './actions';
-import { CommissionBadge, ReferralBadge, td, th } from './ui';
+import { CommissionBadge, Empty, Icon, ReferralBadge, td, th, tr, Who } from './ui';
 
 export function ReferralTable({ referrals, back, showPartner = true, empty }: { referrals: Referral[]; back: string; showPartner?: boolean; empty: string }) {
   const heads = ['Customer', ...(showPartner ? ['Partner'] : []), 'Visit', 'Registered', 'Status', 'Bills and commission'];
@@ -14,14 +14,13 @@ export function ReferralTable({ referrals, back, showPartner = true, empty }: { 
     <section className={`${card} overflow-hidden`}>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm" style={{ minWidth: '72rem' }}>
-          <thead><tr className={eyebrow}>{heads.map((h) => <th key={h} scope="col" className={`${th} text-left`}>{h}</th>)}</tr></thead>
+          <thead><tr>{heads.map((h) => <th key={h} scope="col" className={`${th} text-left`}>{h}</th>)}</tr></thead>
           <tbody>
-            {referrals.length === 0 && <tr><td colSpan={heads.length} className={`${td} py-6 text-center text-ink-muted`}>{empty}</td></tr>}
+            {referrals.length === 0 && <tr><td colSpan={heads.length}><Empty icon="link">{empty}</Empty></td></tr>}
             {referrals.map((r) => (
-              <tr key={r.id} className="border-t border-grid hover:bg-inset/50">
-                <th scope="row" className={`${td} text-left font-medium text-ink`}>
-                  {r.customerCode ? <Link href={`/crm/buyers/${r.customerCode}`} className="hover:text-accent hover:underline">{r.fullName}</Link> : r.fullName}
-                  <span className="tnum block text-xs font-normal text-ink-muted">{formatPhone(r.phone)}{r.customerCode ? ` · ${r.customerCode}` : ''}</span>
+              <tr key={r.id} className={tr}>
+                <th scope="row" className={`${td} text-left font-normal`}>
+                  <Who name={r.fullName} sub={`${formatPhone(r.phone)}${r.customerCode ? ` · ${r.customerCode}` : ''}`} href={r.customerCode ? `/crm/buyers/${r.customerCode}` : undefined} />
                 </th>
                 {showPartner && <td className={td}><Link href={`/partners/${r.partnerCode ?? r.partnerId}`} className="text-ink hover:text-accent hover:underline">{r.partnerName}</Link><span className="tnum block text-xs text-ink-muted">{r.partnerCode}</span></td>}
                 <td className={`${td} text-ink-2`}>{r.occasion}<span className="block text-xs text-ink-muted">{[r.storeName, r.appointmentDate && formatDate(r.appointmentDate)].filter(Boolean).join(' · ')}</span></td>
@@ -31,11 +30,11 @@ export function ReferralTable({ referrals, back, showPartner = true, empty }: { 
                   {r.commissions.length === 0 ? <span className="text-ink-muted">—</span> : (
                     <ul className="space-y-2">
                       {r.commissions.map((c) => (
-                        <li key={c.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="tnum text-ink">{c.voucherNo}</span>
+                        <li key={c.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-inset/50 px-3 py-2">
+                          <span className="tnum inline-flex items-center gap-1 font-medium text-ink"><Icon name="receipt" className="size-3.5 text-ink-muted" />{c.voucherNo}</span>
                           <span className="tnum text-ink-2">{formatDate(c.billedAt)} · {formatCurrency(c.billAmount)}{c.storeName ? ` · ${c.storeName}` : ''}</span>
                           <CommissionBadge status={c.status} />
-                          {c.amount !== null && <span className="tnum text-ink">{formatCurrency(c.amount)} <span className="text-xs text-ink-muted">({c.percent}%{c.payoutMonth ? `, ${monthLabel(c.payoutMonth)}` : ''})</span></span>}
+                          {c.amount !== null && <span className="tnum font-semibold text-ink">{formatCurrency(c.amount)} <span className="text-xs text-ink-muted">({c.percent}%{c.payoutMonth ? `, ${monthLabel(c.payoutMonth)}` : ''})</span></span>}
                           {c.estimate !== null && <span className="tnum text-xs text-ink-muted">≈ {formatCurrency(c.estimate)} at current level</span>}
                           {c.reference && <span className="text-xs text-ink-muted">Ref {c.reference}</span>}
                           {c.note && <span className="text-xs text-ink-muted">“{c.note}”</span>}
