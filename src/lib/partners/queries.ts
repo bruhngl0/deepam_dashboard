@@ -10,6 +10,25 @@ const numOrNull = (v: unknown) => (v === null || v === undefined ? null : Number
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? String(v) : null);
 const day = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : v ? String(v).slice(0, 10) : null);
 
+/** The module filter strip's period and stores (lib/module-filters.ts): IST dates, stores.code values comma-joined. */
+export type Scope = { from?: string | null; to?: string | null; stores?: string | null };
+const istDay = (col: SQL) => sql`(${col} AT TIME ZONE 'Asia/Kolkata')::date`;
+function scoped(f: Scope, dateCol: SQL, storeIdCol: SQL): SQL[] {
+  const out: SQL[] = [];
+  if (f.from) out.push(sql`${istDay(dateCol)} >= ${f.from}::date`);
+  if (f.to) out.push(sql`${istDay(dateCol)} <= ${f.to}::date`);
+  if (f.stores) out.push(sql`${storeIdCol} IN (SELECT id FROM stores WHERE code = ANY(string_to_array(${f.stores}, ',')))`);
+  return out;
+}
+/** Referrals in scope: registered in the period, preferred store picked (or a bill at it). */
+const referralScope = (f: Scope, r = sql.raw('r')) => [
+  ...scoped({ from: f.from, to: f.to }, sql`${r}.registered_at`, sql`0`),
+  ...(f.stores ? [sql`(${sql.join(scoped({ stores: f.stores }, sql``, sql`${r}.preferred_store_id`), sql``)} OR EXISTS (SELECT 1 FROM partner_commissions x WHERE x.referral_id = ${r}.id AND ${sql.join(scoped({ stores: f.stores }, sql``, sql`x.store_id`), sql``)}))`] : []),
+];
+/** Commission lines in scope: billed in the period, at a picked store. */
+const commissionScope = (f: Scope, pc = sql.raw('pc')) => scoped(f, sql`${pc}.billed_at`, sql`${pc}.store_id`);
+const where_ = (conds: SQL[]) => (conds.length ? sql.join(conds, sql` AND `) : sql`true`);
+
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
 export type Level = { level: number; name: string; percent: number | null; notes: string | null };
@@ -74,12 +93,14 @@ function toPartner(r: PartnerRow): Partner {
   };
 }
 
-export type PartnerFilters = { status?: string; category?: string; search?: string };
+export type PartnerFilters = Scope & { status?: string; category?: string; search?: string };
 
 export async function listPartners(f: PartnerFilters = {}): Promise<Partner[]> {
   const where: SQL[] = [sql`true`];
   if (f.status) where.push(sql`p.status = ${f.status}`);
   if (f.category) where.push(sql`p.category = ${f.category}`);
+  where.push(...scoped({ from: f.from, to: f.to }, sql`p.applied_at`, sql`0`));
+  if (f.stores) where.push(sql`EXISTS (SELECT 1 FROM partner_referrals r WHERE r.partner_id = p.id AND ${where_(referralScope({ stores: f.stores }))})`);
   const q = f.search?.trim();
   if (q) {
     const digits = q.replace(/\D/g, '');
@@ -114,12 +135,13 @@ export type Referral = {
   registeredAt: string; windowEndsOn: string; convertedAt: string | null; commissions: Commission[];
 };
 
-export type ReferralFilters = { status?: string; partnerId?: number; search?: string; limit?: number };
+export type ReferralFilters = Scope & { status?: string; partnerId?: number; search?: string; limit?: number };
 
 export async function listReferrals(f: ReferralFilters = {}): Promise<Referral[]> {
   const where: SQL[] = [sql`true`];
   if (f.status) where.push(sql`r.status = ${f.status}`);
   if (f.partnerId) where.push(sql`r.partner_id = ${f.partnerId}`);
+  where.push(...referralScope(f));
   const q = f.search?.trim();
   if (q) {
     const digits = q.replace(/\D/g, '');
@@ -169,7 +191,7 @@ export type PendingCommission = {
   voucherNo: string; storeName: string | null; billedAt: string; billAmount: number; estimate: number | null;
 };
 
-export async function pendingCommissions(): Promise<PendingCommission[]> {
+export async function pendingCommissions(f: Scope = {}): Promise<PendingCommission[]> {
   const rows = rowsOf<Record<string, unknown>>(await db.execute(sql`
     SELECT pc.id, pc.partner_id, p.partner_code, p.full_name AS partner_name, p.level, l.commission_percent,
       r.full_name AS customer_name, c.customer_code, r.phone_e164, r.registered_at, pc.voucher_no, st.name AS store_name, pc.billed_at, pc.bill_amount
@@ -179,7 +201,7 @@ export async function pendingCommissions(): Promise<PendingCommission[]> {
     JOIN partner_levels l ON l.level = p.level
     LEFT JOIN customers c ON c.id = r.customer_id
     LEFT JOIN stores st ON st.id = pc.store_id
-    WHERE pc.status = 'pending'
+    WHERE pc.status = 'pending' AND ${where_(commissionScope(f))}
     ORDER BY pc.billed_at, pc.id`));
   return rows.map((r) => {
     const percent = numOrNull(r.commission_percent);
@@ -197,12 +219,15 @@ export async function pendingCommissions(): Promise<PendingCommission[]> {
 export type Overview = {
   applied: number; approved: number; suspended: number; rejected: number;
   referrals: number; open: number; converted: number; expired: number; declined: number; salesValue: number;
-  toValidate: number; toValidateValue: number; validatedUnpaid: number; paidThisMonth: number;
+  toValidate: number; toValidateValue: number; validatedUnpaid: number; /** Paid commission on bills in scope. */ paidThisMonth: number;
   byCategory: { category: string; partners: number; referrals: number; converted: number; salesValue: number }[];
   topPartners: { id: number; code: string | null; name: string; category: string; referrals: number; converted: number; salesValue: number }[];
 };
 
-export async function overview(month: string): Promise<Overview> {
+/** Partner counts are as they stand now; referrals and bills are those in scope (period and stores). */
+export async function overview(f: Scope = {}): Promise<Overview> {
+  const rf = sql`(SELECT r.* FROM partner_referrals r WHERE ${where_(referralScope(f))})`;
+  const cm = sql`(SELECT pc.* FROM partner_commissions pc WHERE ${where_(commissionScope(f))})`;
   const [counts, categories, top] = await Promise.all([
     db.execute(sql`
       SELECT
@@ -210,27 +235,27 @@ export async function overview(month: string): Promise<Overview> {
         (SELECT count(*) FROM partners WHERE status = 'approved') AS approved,
         (SELECT count(*) FROM partners WHERE status = 'suspended') AS suspended,
         (SELECT count(*) FROM partners WHERE status = 'rejected') AS rejected,
-        (SELECT count(*) FROM partner_referrals WHERE status <> 'declined') AS referrals,
-        (SELECT count(*) FROM partner_referrals WHERE status = 'registered') AS open,
-        (SELECT count(*) FROM partner_referrals WHERE status = 'converted') AS converted,
-        (SELECT count(*) FROM partner_referrals WHERE status = 'expired') AS expired,
-        (SELECT count(*) FROM partner_referrals WHERE status = 'declined') AS declined,
-        (SELECT coalesce(sum(bill_amount), 0) FROM partner_commissions WHERE status <> 'rejected') AS sales_value,
-        (SELECT count(*) FROM partner_commissions WHERE status = 'pending') AS to_validate,
-        (SELECT coalesce(sum(bill_amount), 0) FROM partner_commissions WHERE status = 'pending') AS to_validate_value,
-        (SELECT coalesce(sum(commission_amount), 0) FROM partner_commissions WHERE status = 'validated') AS validated_unpaid,
-        (SELECT coalesce(sum(commission_amount), 0) FROM partner_commissions WHERE status = 'paid' AND payout_month = ${month}) AS paid_this_month`),
+        (SELECT count(*) FROM ${rf} r WHERE status <> 'declined') AS referrals,
+        (SELECT count(*) FROM ${rf} r WHERE status = 'registered') AS open,
+        (SELECT count(*) FROM ${rf} r WHERE status = 'converted') AS converted,
+        (SELECT count(*) FROM ${rf} r WHERE status = 'expired') AS expired,
+        (SELECT count(*) FROM ${rf} r WHERE status = 'declined') AS declined,
+        (SELECT coalesce(sum(bill_amount), 0) FROM ${cm} pc WHERE status <> 'rejected') AS sales_value,
+        (SELECT count(*) FROM ${cm} pc WHERE status = 'pending') AS to_validate,
+        (SELECT coalesce(sum(bill_amount), 0) FROM ${cm} pc WHERE status = 'pending') AS to_validate_value,
+        (SELECT coalesce(sum(commission_amount), 0) FROM ${cm} pc WHERE status = 'validated') AS validated_unpaid,
+        (SELECT coalesce(sum(commission_amount), 0) FROM ${cm} pc WHERE status = 'paid') AS paid_this_month`),
     db.execute(sql`
       SELECT p.category, count(DISTINCT p.id) FILTER (WHERE p.status = 'approved') AS partners,
-        (SELECT count(*) FROM partner_referrals r JOIN partners p2 ON p2.id = r.partner_id WHERE p2.category = p.category AND r.status <> 'declined') AS referrals,
-        (SELECT count(*) FROM partner_referrals r JOIN partners p2 ON p2.id = r.partner_id WHERE p2.category = p.category AND r.status = 'converted') AS converted,
-        (SELECT coalesce(sum(pc.bill_amount), 0) FROM partner_commissions pc JOIN partners p2 ON p2.id = pc.partner_id WHERE p2.category = p.category AND pc.status <> 'rejected') AS sales_value
+        (SELECT count(*) FROM ${rf} r JOIN partners p2 ON p2.id = r.partner_id WHERE p2.category = p.category AND r.status <> 'declined') AS referrals,
+        (SELECT count(*) FROM ${rf} r JOIN partners p2 ON p2.id = r.partner_id WHERE p2.category = p.category AND r.status = 'converted') AS converted,
+        (SELECT coalesce(sum(pc.bill_amount), 0) FROM ${cm} pc JOIN partners p2 ON p2.id = pc.partner_id WHERE p2.category = p.category AND pc.status <> 'rejected') AS sales_value
       FROM partners p GROUP BY p.category ORDER BY p.category`),
     db.execute(sql`
       SELECT p.id, p.partner_code, p.full_name, p.category,
-        (SELECT count(*) FROM partner_referrals r WHERE r.partner_id = p.id AND r.status <> 'declined') AS referrals,
-        (SELECT count(*) FROM partner_referrals r WHERE r.partner_id = p.id AND r.status = 'converted') AS converted,
-        (SELECT coalesce(sum(bill_amount), 0) FROM partner_commissions pc WHERE pc.partner_id = p.id AND pc.status <> 'rejected') AS sales_value
+        (SELECT count(*) FROM ${rf} r WHERE r.partner_id = p.id AND r.status <> 'declined') AS referrals,
+        (SELECT count(*) FROM ${rf} r WHERE r.partner_id = p.id AND r.status = 'converted') AS converted,
+        (SELECT coalesce(sum(bill_amount), 0) FROM ${cm} pc WHERE pc.partner_id = p.id AND pc.status <> 'rejected') AS sales_value
       FROM partners p WHERE p.status IN ('approved', 'suspended')
       ORDER BY sales_value DESC, referrals DESC, p.partner_code LIMIT 10`),
   ]);

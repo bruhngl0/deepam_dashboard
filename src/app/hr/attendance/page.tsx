@@ -8,10 +8,10 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { requireUser } from '@/lib/auth';
 import { listEmployees } from '@/lib/hr/employees';
-import { monthRange } from '@/lib/incentives/store';
-import { todayIst } from '@/lib/queries/daily';
+import { monthToDate, pickRange, pickStores, rangeLabel } from '@/lib/module-filters';
+import { storeMatches } from '@/lib/store-filter';
 import { formatNumber, formatPercent } from '@/lib/format';
-import { button, card, control, Kpi, KpiGrid, PageHeader } from '@/components/ui';
+import { card, Kpi, KpiGrid, PageHeader } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,45 +24,40 @@ const MARK: Record<string, { short: string; tone: string }> = {
   'Week off': { short: 'W', tone: 'text-ink-muted' },
   Holiday: { short: 'H', tone: 'text-ink-muted' },
 };
-const shift = (month: string, by: number) => {
-  const [y, m] = month.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + by, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-};
+const MAX_DAYS = 62;
+const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 
 export default async function AttendancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireUser();
   const sp = await searchParams;
-  const thisMonth = todayIst().slice(0, 7);
-  const asked = typeof sp.month === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.month) ? sp.month : thisMonth;
-  const month = asked > thisMonth ? thisMonth : asked;
+  const picked = pickRange(sp, monthToDate());
+  const to = picked.to!;
+  const capped = addDays(to, -(MAX_DAYS - 1)) > picked.from!;
+  const from = capped ? addDays(to, -(MAX_DAYS - 1)) : picked.from!;
+  const stores = pickStores(sp);
   const dept = typeof sp.department === 'string' ? sp.department : '';
-  const { from, to } = monthRange(month);
-  const days = Array.from({ length: Number(to.slice(8)) }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`);
+  const days: string[] = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
 
   const [all, marks] = await Promise.all([
     listEmployees(),
     db.execute(sql`SELECT employee_code, to_char(day, 'YYYY-MM-DD') AS day, status, source FROM attendance_days WHERE day BETWEEN ${from} AND ${to}`),
   ]);
   const byKey = new Map(rowsOf<{ employee_code: string; day: string; status: string; source: string }>(marks).map((r) => [`${r.employee_code}|${r.day}`, r]));
-  const departments = [...new Set(all.map((e) => e.department).filter((d): d is string => !!d))].sort();
   const marked = new Set([...byKey.values()].map((r) => r.employee_code));
-  const people = all.filter((e) => (e.status === 'Active' || e.status === 'On leave' || marked.has(e.employeeCode)) && (!dept || e.department === dept));
+  const people = all.filter((e) => (e.status === 'Active' || e.status === 'On leave' || marked.has(e.employeeCode)) && (!dept || e.department === dept) && storeMatches(stores, e.storeCode));
+  const shown = new Set(people.map((e) => e.employeeCode));
+  for (const [k, r] of byKey) if (!shown.has(r.employee_code)) byKey.delete(k);
   const counted = [...byKey.values()].filter((r) => r.status !== 'Week off' && r.status !== 'Holiday');
   const present = counted.reduce((s, r) => s + (r.status === 'Present' ? 1 : r.status === 'Half day' ? 0.5 : 0), 0);
   const count = (status: string) => [...byKey.values()].filter((r) => r.status === status).length;
-  const monthLabel = new Date(`${month}-01T00:00:00Z`).toLocaleString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   return (
     <main className="mx-auto w-full max-w-[110rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Attendance"
         description="Each employee's day: present, absent, half day, leave, week off or holiday. Filled from the biometric device once it is connected."
-        meta={monthLabel}
-        actions={<>
-          <Link href={`/hr/attendance?month=${shift(month, -1)}${dept ? `&department=${encodeURIComponent(dept)}` : ''}`} className={button}>← Previous</Link>
-          {month < thisMonth && <Link href={`/hr/attendance?month=${shift(month, 1)}${dept ? `&department=${encodeURIComponent(dept)}` : ''}`} className={button}>Next →</Link>}
-        </>}
+        meta={`${rangeLabel(from, to)}${capped ? ` · the last ${MAX_DAYS} days of the period picked` : ''}`}
       />
 
       {!byKey.size && (
@@ -80,15 +75,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         <Kpi label="Half days" value={byKey.size ? formatNumber(count('Half day')) : '—'} />
       </KpiGrid>
 
-      <form className="flex flex-wrap items-center gap-2">
-        <input type="hidden" name="month" value={month} />
-        <select name="department" defaultValue={dept} className={control} aria-label="Department">
-          <option value="">Every department</option>
-          {departments.map((d) => <option key={d}>{d}</option>)}
-        </select>
-        <button type="submit" className={button}>Show</button>
-        <span className="text-xs text-ink-muted">{Object.entries(MARK).map(([k, v]) => `${v.short} ${k}`).join(' · ')}</span>
-      </form>
+      <p className="text-xs text-ink-muted">{Object.entries(MARK).map(([k, v]) => `${v.short} ${k}`).join(' · ')}</p>
 
       <section className={`${card} overflow-hidden`}>
         <div className="overflow-x-auto">
@@ -97,7 +84,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
               <th scope="col" className="sticky left-0 z-10 bg-surface px-3 py-2 text-left font-bold">Employee</th>
               {days.map((d) => {
                 const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
-                return <th key={d} scope="col" className={`tnum w-7 px-0.5 py-2 text-center font-semibold ${wd === 0 ? 'bg-inset/60' : ''}`}>{Number(d.slice(8))}</th>;
+                return <th key={d} scope="col" className={`tnum w-7 px-0.5 py-2 text-center font-semibold ${wd === 0 ? 'bg-inset/60' : ''}`}>{Number(d.slice(8))}{d.slice(8) === '01' || d === from ? <span className="block text-[9px] font-normal text-ink-muted">{new Date(`${d}T00:00:00Z`).toLocaleString('en-IN', { month: 'short', timeZone: 'UTC' })}</span> : null}</th>;
               })}
               <th scope="col" className="px-3 py-2 text-right font-bold">Present</th>
             </tr></thead>
