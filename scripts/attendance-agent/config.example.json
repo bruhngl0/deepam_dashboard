@@ -1,0 +1,9 @@
+{
+  "sqlConnectionString": "Server=ADMIN-PC\\MATRIXDB;Database=cosec;User Id=YOUR_SQL_LOGIN;Password=YOUR_SQL_PASSWORD;TrustServerCertificate=True;Connect Timeout=30",
+  "deviceName": "cosec",
+  "startFrom": "2026-11-01 00:00:00",
+  "targets": [
+    { "name": "app-runner", "url": "https://wpepwwz4uy.ap-south-1.awsapprunner.com/api/integration/attendance/punches", "token": "ATTENDANCE_SYNC_TOKEN from the CRM" },
+    { "name": "ec2", "url": "https://crm.hemparshwa.com/api/integration/attendance/punches", "token": "ATTENDANCE_SYNC_TOKEN from the CRM" }
+  ]
+}
