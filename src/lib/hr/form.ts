@@ -36,7 +36,8 @@ export function employeeCodeFrom(form: FormData): string {
 }
 
 export function employeeFromForm(form: FormData): EmployeeInput {
-  const fullName = text(form, 'full_name');
+  // Names are kept in capitals, as on the ERP and attendance sheets.
+  const fullName = text(form, 'full_name')?.replace(/\s+\.$/, '').toUpperCase() ?? null;
   if (!fullName) throw new FormError('Name is required');
   const eligible = text(form, 'incentive_eligible');
   const salaryStructure: Record<string, number> = {};
