@@ -212,6 +212,8 @@ async function adminPassValid(req: NextRequest, pass: string | null) {
 
 /** The admin session this app keeps once a pass has been accepted (see ADMIN_COOKIE). */
 const adminSession = (req: NextRequest) => readSigned(req.cookies.get(ADMIN_COOKIE)?.value);
+/** Whether the request carries the Hemparshwa admin's session (CRM uses it to keep the admin out of the salesperson lock). */
+export const hasAdminSession = async (req: NextRequest) => !!(await adminSession(req));
 
 /** Every cookie that signs the admin in here: each module, the app's own logins, the admin session and the freshness marker. */
 async function adminCookies(cfg: GateConfig, claims: AdminClaims): Promise<GateCookie[]> {
