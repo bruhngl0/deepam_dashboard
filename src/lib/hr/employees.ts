@@ -19,6 +19,11 @@ export const SALESPERSON_KEY = /^EMP-[0-9]{4}$/;
 
 export const STATUSES = ['Active', 'On leave', 'Resigned', 'Exited'] as const;
 export const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Intern', 'Weekend staff'] as const;
+export const GENDERS = ['Male', 'Female', 'Other'] as const;
+export const MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed'] as const;
+/** L0 directors, L1 department heads, L2 managers and senior staff, L3 everyone else (the "Employee Levels" sheet). */
+export const LEVELS = ['L0', 'L1', 'L2', 'L3'] as const;
+export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
 export const HISTORY_KINDS = ['Transfer', 'Promotion', 'Increment', 'Other'] as const;
 export const DOCUMENT_KINDS = ['Appointment letter', 'ID proof', 'Bank details', 'Other'] as const;
@@ -44,6 +49,7 @@ export type Employee = {
   status: (typeof STATUSES)[number]; statusSince: string | null; exitDate: string | null; exitReason: string | null;
   emergencyContactName: string | null; emergencyContactRelation: string | null; emergencyContactNo: string | null;
   bloodGroup: string | null; notes: string | null;
+  gender: string | null; maritalStatus: string | null; employeeLevel: string | null; team: string | null; shift: string | null; weeklyOff: string | null;
   salespersonKey: string | null; salespersonLink: 'auto' | 'manual' | 'none' | null;
 };
 
@@ -67,6 +73,7 @@ function toEmployee(r: Record<string, unknown>): Employee {
     status: String(r.status) as Employee['status'], statusSince: str(r.since), exitDate: str(r.exited), exitReason: str(r.exit_reason),
     emergencyContactName: str(r.emergency_contact_name), emergencyContactRelation: str(r.emergency_contact_relation), emergencyContactNo: str(r.emergency_contact_no),
     bloodGroup: str(r.blood_group), notes: str(r.notes),
+    gender: str(r.gender), maritalStatus: str(r.marital_status), employeeLevel: str(r.employee_level), team: str(r.team), shift: str(r.shift), weeklyOff: str(r.weekly_off),
     salespersonKey: str(r.salesperson_key), salespersonLink: str(r.salesperson_link) as Employee['salespersonLink'],
   };
 }
@@ -112,11 +119,12 @@ export async function saveEmployee(code: string, e: EmployeeInput, create: boole
     ${e.joiningDate}, ${e.employmentType}, ${e.reportingManager}, ${e.monthlyCtc}, ${JSON.stringify(e.salaryStructure)}::jsonb, ${e.incentiveEligible},
     ${e.bankName}, ${e.bankAccountHolder}, ${e.bankAccountNo}, ${e.bankIfsc}, ${e.idProofType}, ${e.idProofNumber},
     ${e.status}, ${e.statusSince}, ${e.exitDate}, ${e.exitReason}, ${e.emergencyContactName}, ${e.emergencyContactRelation}, ${e.emergencyContactNo},
-    ${e.bloodGroup}, ${e.notes}`;
+    ${e.bloodGroup}, ${e.notes}, ${e.gender}, ${e.maritalStatus}, ${e.employeeLevel}, ${e.team}, ${e.shift}, ${e.weeklyOff}`;
   const cols = sql.raw(`full_name, date_of_birth, contact_no, email, biometric_id,company, store_code, department, designation,
     joining_date, employment_type, reporting_manager, monthly_ctc, salary_structure, incentive_eligible,
     bank_name, bank_account_holder, bank_account_no, bank_ifsc, id_proof_type, id_proof_number,
-    status, status_since, exit_date, exit_reason, emergency_contact_name, emergency_contact_relation, emergency_contact_no, blood_group, notes`);
+    status, status_since, exit_date, exit_reason, emergency_contact_name, emergency_contact_relation, emergency_contact_no, blood_group, notes,
+    gender, marital_status, employee_level, team, shift, weekly_off`);
   if (create) {
     await db.execute(sql`INSERT INTO employees (employee_code, ${cols}) VALUES (${code}, ${v})`);
   } else {
