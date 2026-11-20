@@ -4,7 +4,7 @@ import { SALES_SESSION_COOKIE, salesSessionToken, verifySalesSessionToken } from
 
 export const SALES_LOGIN_ROUTE = '/sales';
 /** Everyone signs in at Hemparshwa OS; a salesperson arrives from there at /sales/sso, signed in to their desk. */
-export const HEMPARSHWA_OS_URL = 'https://nvc57svvmb.ap-south-1.awsapprunner.com/';
+export const HEMPARSHWA_OS_URL = 'https://os.hemparshwa.com/';
 export const SALES_WORKSPACE_ROUTE = '/sales/workspace';
 
 // Path "/" so the workspace's calls to /api/marketing/* carry the session too.
