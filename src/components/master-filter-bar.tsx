@@ -12,9 +12,8 @@
  * Also used above `/vendor/*` (app/vendor/layout.tsx), where `notes` says per page what the filters narrow,
  * and above HR Intelligence's Salespeople pages (app/hr/layout.tsx, with `onlyUnder`).
  *
- * Hidden on the import pages: nothing on them reads either param. Owns its
- * own bordered wrapper rather than `layout.tsx` owning one around it, so
- * hiding it there leaves no empty strip behind.
+ * Hidden on the import pages: nothing on them reads either param. Shown in the page header's filter slot, on the
+ * right of the title (components/filter-box.tsx), like every filter in every app.
  */
 
 'use client';
@@ -24,6 +23,7 @@ import { useSetParam } from '@/components/filters';
 import { control, textButton } from '@/components/ui';
 import { StoreMultiSelect } from '@/components/store-multi-select';
 import { storeCodes } from '@/lib/store-filter';
+import { FilterBox, filterLabel, PlacedFilters } from '@/components/filter-box';
 
 const selectClass = control;
 
@@ -53,57 +53,17 @@ export function MasterFilterBar({
   const active = [from, to, store].filter(Boolean).length;
 
   return (
-    <div className="border-b border-line bg-surface/60">
-      <div
-        className={`mx-auto flex w-full max-w-[92rem] flex-wrap items-center gap-2 px-4 py-3 sm:px-6 lg:px-8 ${pending ? 'opacity-70' : ''}`}
-      >
-        <span className="text-xs font-medium text-ink-muted">Filter</span>
-
-        <StoreMultiSelect
-          stores={stores}
-          value={storeCodes(store)}
-          onChange={(codes) => setParam({ store: codes.length ? codes.join(',') : null })}
-          className={selectClass}
-        />
-
-        <div className="flex items-center gap-1.5">
-          <label htmlFor="master-date-from" className="text-xs text-ink-muted">
-            From
-          </label>
-          <input
-            id="master-date-from"
-            type="date"
-            value={from ?? ''}
-            min={dateBounds.earliest ?? undefined}
-            max={to ?? dateBounds.latest ?? undefined}
-            onChange={(e) => setParam({ from: e.target.value || null })}
-            className={selectClass}
-          />
-          <label htmlFor="master-date-to" className="text-xs text-ink-muted">
-            To
-          </label>
-          <input
-            id="master-date-to"
-            type="date"
-            value={to ?? ''}
-            min={from ?? dateBounds.earliest ?? undefined}
-            max={dateBounds.latest ?? undefined}
-            onChange={(e) => setParam({ to: e.target.value || null })}
-            className={selectClass}
-          />
-        </div>
-
-        {active > 0 && (
-          <button
-            type="button"
-            onClick={() => setParam({ from: null, to: null, store: null })}
-            className={textButton}
-          >
-            Clear
-          </button>
-        )}
-        {notes[pathname] && <span className="w-full text-xs text-ink-muted sm:w-auto">{notes[pathname]}</span>}
-      </div>
-    </div>
+    <PlacedFilters>
+      <FilterBox pending={pending} note={notes[pathname]}>
+        <StoreMultiSelect stores={stores} value={storeCodes(store)} onChange={(codes) => setParam({ store: codes.length ? codes.join(',') : null })} className={selectClass} />
+        <label htmlFor="master-date-from" className={filterLabel}>From</label>
+        <input id="master-date-from" type="date" value={from ?? ''} min={dateBounds.earliest ?? undefined} max={to ?? dateBounds.latest ?? undefined}
+          onChange={(e) => setParam({ from: e.target.value || null })} className={selectClass} />
+        <label htmlFor="master-date-to" className={filterLabel}>To</label>
+        <input id="master-date-to" type="date" value={to ?? ''} min={from ?? dateBounds.earliest ?? undefined} max={dateBounds.latest ?? undefined}
+          onChange={(e) => setParam({ to: e.target.value || null })} className={selectClass} />
+        {active > 0 && <button type="button" onClick={() => setParam({ from: null, to: null, store: null })} className={textButton}>Clear</button>}
+      </FilterBox>
+    </PlacedFilters>
   );
 }

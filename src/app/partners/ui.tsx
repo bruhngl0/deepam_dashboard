@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { COMMISSION_STATUS_LABEL, PARTNER_STATUS_LABEL, REFERRAL_STATUS_LABEL, type CommissionStatus, type PartnerStatus, type ReferralStatus } from '@/lib/partners/constants';
+import { FilterSlot } from '@/components/filter-box';
 
 /* ---------- Icons (inline, stroke-based, 24px grid) ---------- */
 
@@ -140,7 +141,10 @@ export function PartnerHeader({ icon, eyebrow, title, description, meta, actions
           {meta && <div className="tnum mt-1.5 text-xs text-ink-muted">{meta}</div>}
         </div>
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      <div className="flex min-w-0 flex-wrap items-end justify-end gap-2">
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        <FilterSlot />
+      </div>
     </header>
   );
 }

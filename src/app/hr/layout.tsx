@@ -1,7 +1,7 @@
 /**
  * HR Intelligence module shell: Overview, Employees, Performance (with the Salespeople pages), Attendance, Counter targets and Incentives.
- * One filter strip above every list page (components/module-filters.tsx), in the same order everywhere: Store, then
- * From/To (Month on the monthly pages: Counter targets, Incentives), then Department / Status, then search.
+ * One filter box on the right of every list page title (components/module-filters.tsx), in the same order everywhere:
+ * Department / Status and search, then Store, then From/To (Month on the monthly pages: Counter targets, Incentives).
  */
 
 import { getSalesDateBounds } from '@/lib/queries/dashboard';

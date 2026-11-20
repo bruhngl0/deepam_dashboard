@@ -26,6 +26,7 @@ import {
   type ValueTierCode,
 } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
+import { FilterSlot } from '@/components/filter-box';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,13 +83,16 @@ export default async function BuyersPage({ searchParams }: { searchParams: Searc
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Customers</h1>
-        <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
-          Everyone who has placed a bill, whether or not they ever appeared on a lead sheet.
-          Open any name for their full profile — spend, cadence, tender, branch, staff and
-          prior history.
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Customers</h1>
+          <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
+            Everyone who has placed a bill, whether or not they ever appeared on a lead sheet.
+            Open any name for their full profile — spend, cadence, tender, branch, staff and
+            prior history.
+          </p>
+        </div>
+        <FilterSlot />
       </header>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

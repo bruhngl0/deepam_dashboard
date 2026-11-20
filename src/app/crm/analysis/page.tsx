@@ -23,6 +23,7 @@ import { Finding, Note, Bar } from '@/components/finding-card';
 import { ReportSelect } from '@/components/report-select';
 import { formatCurrency, formatDate, formatNumber, CHANNEL_LABEL } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
+import { FilterSlot } from '@/components/filter-box';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,7 +106,10 @@ export default async function AnalysisPage({
               : `Showing every sales report loaded — ${formatNumber(reports.length)} report${reports.length === 1 ? '' : 's'}${earliestLoaded && latestLoaded ? `, ${formatDate(earliestLoaded)} – ${formatDate(latestLoaded)}` : ''}.`}
           </p>
         </div>
-        <ReportSelect reports={reports} />
+        <div className="flex flex-col items-end gap-2">
+          <FilterSlot />
+          <ReportSelect reports={reports} />
+        </div>
       </header>
 
       <div className="grid gap-3 lg:grid-cols-2">
