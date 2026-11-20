@@ -80,6 +80,8 @@ export async function crmIdsFor(masters: Masters): Promise<{ customers: Pair[]; 
   const registered = await registerVendorAndCategoryNames(
     [...new Set(masters.vendors.map((v) => v.name.trim()).filter(Boolean))],
     [...new Set(masters.categories.map((c) => c.name.trim()).filter(Boolean))],
+    // Hemparshwa's categories are its product groups and short names: look them up, never add them (drizzle/0041).
+    { registerCategories: false },
   );
   const vendors = masters.vendors.flatMap((v) => (registered.vendors[v.name.trim()] ? [{ id: v.id, code: registered.vendors[v.name.trim()] }] : []));
   const categories = masters.categories.flatMap((c) => (registered.categories[c.name.trim()] ? [{ id: c.id, code: registered.categories[c.name.trim()] }] : []));
