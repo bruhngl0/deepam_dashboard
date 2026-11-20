@@ -21,6 +21,7 @@ import { SalesBySourcePanel } from '@/components/sales-by-source';
 import { StatTile } from '@/components/stat-tiles';
 import { formatCurrency, formatCurrencyCompact, formatDate, formatNumber } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
+import { FilterSlot } from '@/components/filter-box';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,14 +73,17 @@ export default async function NewCustomersPage({ searchParams }: { searchParams:
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <Link href={back} className="text-sm font-medium text-accent hover:underline">← Dashboard</Link>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">New customers</h1>
-        <p className="mt-1 max-w-[72ch] text-sm text-ink-2">
-          Everyone who bought between {formatDate(from ?? bounds.earliest)} and {formatDate(to ?? bounds.latest)}
-          {store ? (store.includes(',') ? ' at these stores' : ' at this store') : ''} and is not on the loyalty customer sheet. Each person is in one group:
-          a lead sheet first, then a walk-in, otherwise known only from their bill. Foreign numbers are left out.
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <Link href={back} className="text-sm font-medium text-accent hover:underline">← Dashboard</Link>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">New customers</h1>
+          <p className="mt-1 max-w-[72ch] text-sm text-ink-2">
+            Everyone who bought between {formatDate(from ?? bounds.earliest)} and {formatDate(to ?? bounds.latest)}
+            {store ? (store.includes(',') ? ' at these stores' : ' at this store') : ''} and is not on the loyalty customer sheet. Each person is in one group:
+            a lead sheet first, then a walk-in, otherwise known only from their bill. Foreign numbers are left out.
+          </p>
+        </div>
+        <FilterSlot />
       </header>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

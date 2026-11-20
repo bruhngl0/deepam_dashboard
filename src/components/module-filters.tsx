@@ -1,7 +1,7 @@
 /**
- * One filter strip for a whole module (HR Intelligence, Partner Network), under the tabs on every page, always in the
- * same order: Store → period (From/To, or Month on monthly pages) → the page's own filters (department, status…) →
- * search → Clear. Each page says which of these it uses in `pages`; a page not listed shows no strip.
+ * One filter box for a whole module (HR Intelligence, Partner Network), on the right of every page's title
+ * (components/filter-box.tsx), always in the same order: the page's own filters (department, status…, search) →
+ * Store → period (From/To, or Month on monthly pages) → Clear. Each page says which of these it uses in `pages`; a page not listed shows no strip.
  *
  * State lives in the URL like the CRM master filter (`from`, `to`, `store`, `month`, plus each field's param), so a
  * filtered view is shareable and `from`/`to`/`store` carry across the module's tabs (nav-tabs.tsx). Unset means the
@@ -16,6 +16,7 @@ import { useSetParam } from '@/components/filters';
 import { StoreMultiSelect } from '@/components/store-multi-select';
 import { control, textButton } from '@/components/ui';
 import { storeCodes } from '@/lib/store-filter';
+import { FilterBox, filterLabel, PlacedFilters } from '@/components/filter-box';
 
 export type FilterField =
   | { kind: 'select'; param: string; label: string; all: string; options: { value: string; label: string }[] }
@@ -81,35 +82,10 @@ export function ModuleFilters({ pages, stores, dateBounds, thisMonth }: {
   const label = page.periodLabel ? `${page.periodLabel} ` : '';
 
   return (
-    <div className="border-b border-line bg-surface/60">
-      <div className={`mx-auto flex w-full max-w-[92rem] flex-wrap items-center gap-2 px-4 py-3 sm:px-6 lg:px-8 ${pending ? 'opacity-70' : ''}`} role="search" aria-label="Filters">
-        <span className="text-xs font-medium text-ink-muted">Filter</span>
-
-        {page.store && (
-          <StoreMultiSelect stores={page.stores ?? stores} value={storeCodes(store)} className={control}
-            onChange={(codes) => setParam({ store: codes.length ? codes.join(',') : null })} />
-        )}
-
-        {page.period === 'range' && (
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="mf-from" className="text-xs text-ink-muted">{label}From</label>
-            <input id="mf-from" type="date" value={from ?? ''} min={dateBounds?.earliest ?? undefined} max={to ?? dateBounds?.latest ?? undefined}
-              onChange={(e) => setParam({ from: e.target.value || null })} className={control} />
-            <label htmlFor="mf-to" className="text-xs text-ink-muted">To</label>
-            <input id="mf-to" type="date" value={to ?? ''} min={from ?? dateBounds?.earliest ?? undefined} max={dateBounds?.latest ?? undefined}
-              onChange={(e) => setParam({ to: e.target.value || null })} className={control} />
-          </div>
-        )}
-
-        {page.period === 'month' && (
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="mf-month" className="text-xs text-ink-muted">{label}Month</label>
-            <input id="mf-month" type="month" value={month ?? ''} max={thisMonth} onChange={(e) => setParam({ month: e.target.value || null })} className={control} />
-          </div>
-        )}
-
+    <PlacedFilters>
+      <FilterBox pending={pending} note={page.note}>
         {fields.map((f) => f.kind === 'select' ? (
-          <label key={f.param} className="flex items-center gap-1.5 text-xs text-ink-muted">
+          <label key={f.param} className={`flex items-center gap-1.5 ${filterLabel}`}>
             {f.label}
             <select value={params.get(f.param) ?? ''} onChange={(e) => setParam({ [f.param]: e.target.value || null })} className={control}>
               <option value="">{f.all}</option>
@@ -120,9 +96,27 @@ export function ModuleFilters({ pages, stores, dateBounds, thisMonth }: {
           <SearchBox key={f.param} param={f.param} placeholder={f.placeholder} value={params.get(f.param) ?? ''} onSearch={(v) => setParam({ [f.param]: v || null })} />
         ))}
 
+        {page.store && (
+          <StoreMultiSelect stores={page.stores ?? stores} value={storeCodes(store)} className={control}
+            onChange={(codes) => setParam({ store: codes.length ? codes.join(',') : null })} />
+        )}
+
+        {page.period === 'range' && (<>
+          <label htmlFor="mf-from" className={filterLabel}>{label}From</label>
+          <input id="mf-from" type="date" value={from ?? ''} min={dateBounds?.earliest ?? undefined} max={to ?? dateBounds?.latest ?? undefined}
+            onChange={(e) => setParam({ from: e.target.value || null })} className={control} />
+          <label htmlFor="mf-to" className={filterLabel}>To</label>
+          <input id="mf-to" type="date" value={to ?? ''} min={from ?? dateBounds?.earliest ?? undefined} max={dateBounds?.latest ?? undefined}
+            onChange={(e) => setParam({ to: e.target.value || null })} className={control} />
+        </>)}
+
+        {page.period === 'month' && (<>
+          <label htmlFor="mf-month" className={filterLabel}>{label}Month</label>
+          <input id="mf-month" type="month" value={month ?? ''} max={thisMonth} onChange={(e) => setParam({ month: e.target.value || null })} className={control} />
+        </>)}
+
         {active && <button type="button" onClick={clear} className={textButton}>Clear</button>}
-        {page.note && <span className="w-full text-xs text-ink-muted">{page.note}</span>}
-      </div>
-    </div>
+      </FilterBox>
+    </PlacedFilters>
   );
 }

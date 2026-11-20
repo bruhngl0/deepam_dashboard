@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
+import { hasAdminSession, siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
 import { SALES_ONLY_HEADER, SALES_SESSION_COOKIE, verifySalesSessionToken } from '@/lib/sales-session';
 import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from '@/lib/store-manager-session';
 
@@ -49,12 +49,32 @@ const gate: GateConfig = {
 
 // The sales workspace loads and saves through these, under the salesperson's own login.
 const SALES_APIS = ['/api/marketing/dataset', '/api/marketing/calls'];
+// Where the calling desk lives. Someone signed in on the sales login sees only this.
+const SALES_DESK = '/sales/workspace';
+
+/**
+ * A request from someone signed in on the sales login (an employee's calling desk): they may open their desk and
+ * what it loads, and nothing else. The hub, every module, every other API and the password form send them back to
+ * the desk, even when the browser also holds a module password. The Hemparshwa admin is never locked.
+ */
+async function salesLock(req: NextRequest) {
+  if (!(await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value))) return null;
+  const { pathname } = req.nextUrl;
+  if (under(pathname, '/sales') || SALES_APIS.includes(pathname) || under(pathname, '/api/health')) return null;
+  if (await hasAdminSession(req)) return null;
+  if (under(pathname, '/api')) return NextResponse.json({ error: 'The calling desk login opens the calling desk only.' }, { status: 403 });
+  const proto = req.headers.get('x-forwarded-proto')?.split(',')[0].trim() || req.nextUrl.protocol.replace(':', '');
+  const host = req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host') || req.nextUrl.host;
+  return NextResponse.redirect(new URL(SALES_DESK, `${proto}://${host}`), { status: 303, headers: { 'Cache-Control': 'no-store' } });
+}
 
 export default async function proxy(req: NextRequest) {
   // Only this proxy may say a request came in on a salesperson login alone; a header the browser sent is dropped.
   const headers = new Headers(req.headers);
   headers.delete(SALES_ONLY_HEADER);
   const pass = () => NextResponse.next({ request: { headers } });
+  const locked = await salesLock(req);
+  if (locked) return locked;
   const gated = await siteGate(req, gate);
   if (!gated) return pass();
   if (SALES_APIS.includes(req.nextUrl.pathname)) {

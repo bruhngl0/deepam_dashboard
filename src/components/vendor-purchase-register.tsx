@@ -1,5 +1,6 @@
 import { formatCurrency, formatNumber } from '@/lib/format';
 import type { PurchaseRegisterRow } from '@/lib/queries/vendor-workspace';
+import { FilterSlot } from '@/components/filter-box';
 
 export function VendorPurchaseRegister({ rows }: { rows: PurchaseRegisterRow[] }) {
   return (
@@ -10,7 +11,7 @@ export function VendorPurchaseRegister({ rows }: { rows: PurchaseRegisterRow[] }
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">Purchase register</h1>
           <p className="mt-1 max-w-[68ch] text-sm text-ink-2">PO, receipt, QC, returns and branch allocation at SKU level.</p>
         </div>
-        <a href="/__gate/go?to=https%3A%2F%2Fvendor.hemparshwa.com%2F" className="text-sm font-medium text-accent">← Dashboard</a>
+        <div className="flex flex-col items-end gap-2"><a href="/__gate/go?to=https%3A%2F%2Fvendor.hemparshwa.com%2F" className="text-sm font-medium text-accent">← Dashboard</a><FilterSlot /></div>
       </header>
       <section className="card overflow-x-auto rounded-2xl border border-line bg-surface">
         <table className="w-full min-w-[98rem] text-sm">

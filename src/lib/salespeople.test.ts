@@ -3,9 +3,9 @@ import { authenticateSalesperson, getSalesperson, isSalespersonLogin, SALESPEOPL
 
 describe('salespeople', () => {
   it('has unique routes and employee numbers for every salesperson', () => {
-    expect(SALESPEOPLE).toHaveLength(25);
-    expect(new Set(SALESPEOPLE.map(({ slug }) => slug)).size).toBe(25);
-    expect(new Set(SALESPEOPLE.map(({ employeeNumber }) => employeeNumber)).size).toBe(25);
+    expect(SALESPEOPLE).toHaveLength(44);
+    expect(new Set(SALESPEOPLE.map(({ slug }) => slug)).size).toBe(44);
+    expect(new Set(SALESPEOPLE.map(({ employeeNumber }) => employeeNumber)).size).toBe(44);
   });
 
   it('uses the employee number without an email extension and its matching password', () => {

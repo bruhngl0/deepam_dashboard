@@ -6,6 +6,7 @@
  */
 
 import type { ReactNode } from 'react';
+import { FilterSlot } from './filter-box';
 
 /** Selects, date and text inputs. Add `w-full` where a control should fill its column (forms). */
 export const control =
@@ -34,7 +35,10 @@ export function PageHeader({ eyebrow: kicker, title, description, meta, actions 
         {description && <p className="mt-1 max-w-3xl text-sm text-ink-2">{description}</p>}
         {meta && <p className="tnum mt-1 text-xs text-ink-muted">{meta}</p>}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      <div className="flex min-w-0 flex-wrap items-end justify-end gap-2">
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        <FilterSlot />
+      </div>
     </header>
   );
 }
