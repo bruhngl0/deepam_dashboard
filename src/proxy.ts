@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { hasAdminSession, siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
+import { siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
 import { SALES_ONLY_HEADER, SALES_SESSION_COOKIE, verifySalesSessionToken } from '@/lib/sales-session';
 import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from '@/lib/store-manager-session';
 
@@ -54,13 +54,13 @@ const SALES_DESK = '/sales/workspace';
 /**
  * A request from someone signed in on the sales login (an employee's calling desk): they may open their desk and
  * what it loads, and nothing else. The hub, every module, every other API and the password form send them back to
- * the desk, even when the browser also holds a module password. The Hemparshwa admin is never locked.
+ * the desk, even when the browser also holds a module password or the Hemparshwa admin's login: to get back to
+ * everything, sign out of the desk.
  */
 async function salesLock(req: NextRequest) {
   if (!(await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value))) return null;
   const { pathname } = req.nextUrl;
   if (under(pathname, '/sales') || SALES_APIS.includes(pathname) || under(pathname, '/api/health')) return null;
-  if (await hasAdminSession(req)) return null;
   if (under(pathname, '/api')) return NextResponse.json({ error: 'The calling desk login opens the calling desk only.' }, { status: 403 });
   const proto = req.headers.get('x-forwarded-proto')?.split(',')[0].trim() || req.nextUrl.protocol.replace(':', '');
   const host = req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host') || req.nextUrl.host;
