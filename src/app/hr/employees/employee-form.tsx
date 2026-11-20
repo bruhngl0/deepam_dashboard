@@ -1,7 +1,7 @@
 /** The employee form, for adding (/hr/employees/new) and editing (/hr/employees/[code]/edit). Every field but the name may stay empty. */
 
 import Link from 'next/link';
-import { BLOOD_GROUPS, EMPLOYMENT_TYPES, ID_PROOF_TYPES, SALARY_PARTS, STATUSES, type Employee } from '@/lib/hr/employees';
+import { BLOOD_GROUPS, EMPLOYMENT_TYPES, GENDERS, ID_PROOF_TYPES, LEVELS, MARITAL_STATUSES, SALARY_PARTS, STATUSES, WEEKDAYS, type Employee } from '@/lib/hr/employees';
 import { button, card, control, primaryButton } from '@/components/ui';
 
 type Options = { stores: { code: string; name: string }[]; departments: string[]; managers: { employeeCode: string; fullName: string }[] };
@@ -41,6 +41,8 @@ export function EmployeeForm({ employee, options, action, cancelHref }: {
         <Field label="Contact No.">{t('contact_no', e?.contactNo, 'tel')}</Field>
         <Field label="Email">{t('email', e?.email, 'email')}</Field>
         <Field label="Biometric ID">{t('biometric_id', e?.biometricId)}</Field>
+        <Field label="Gender">{select('gender', e?.gender, GENDERS)}</Field>
+        <Field label="Marital status">{select('marital_status', e?.maritalStatus, MARITAL_STATUSES)}</Field>
       </Section>
 
       <Section title="Employment">
@@ -49,6 +51,10 @@ export function EmployeeForm({ employee, options, action, cancelHref }: {
         <Field label="Department">{t('department', e?.department, 'text', { list: 'hr-departments' })}</Field>
         <datalist id="hr-departments">{options.departments.map((d) => <option key={d} value={d} />)}</datalist>
         <Field label="Designation">{t('designation', e?.designation)}</Field>
+        <Field label="Level">{select('employee_level', e?.employeeLevel, LEVELS)}</Field>
+        <Field label="Team">{t('team', e?.team)}</Field>
+        <Field label="Shift">{t('shift', e?.shift, 'text', { placeholder: 'Shift 1' })}</Field>
+        <Field label="Weekly off">{select('weekly_off', e?.weeklyOff, WEEKDAYS)}</Field>
       </Section>
 
       <Section title="Joining">
