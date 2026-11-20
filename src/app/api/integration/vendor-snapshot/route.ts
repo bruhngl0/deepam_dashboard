@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         COALESCE(SUM(l.net_sales_amt),0)::float8 AS sales_value, COALESCE(SUM(l.net_purc_amt),0)::float8 AS cost_value,
         COALESCE(SUM(l.net_purc_amt)/NULLIF(SUM(l.net_purc_qty),0),0)::float8 AS unit_cost,
         COALESCE(SUM(l.cl_mrp)/NULLIF(SUM(l.cl_qty),0),0)::float8 AS mrp
-      FROM latest l JOIN vendors v ON v.id=l.vendor_id LEFT JOIN categories cat ON lower(cat.name)=lower(l.item_name)
+      FROM latest l JOIN vendors v ON v.id=l.vendor_id LEFT JOIN category_aliases ca ON ca.alias=lower(trim(l.item_name)) LEFT JOIN categories cat ON cat.id=ca.category_id OR (ca.category_id IS NULL AND lower(cat.name)=lower(l.item_name))
       GROUP BY v.name,l.item_name,cat.category_code`),
     db.execute(sql`WITH latest AS (${sql.raw(LATEST_STOCK_ROWS)})
       SELECT v.name AS brand, COALESCE(max(l.item_name),'Unclassified') AS name, l.barcode, COALESCE(SUM(l.cl_qty),0)::float8 AS quantity,

@@ -288,6 +288,13 @@
       "when": 1794900000000,
       "tag": "0040_attendance_punches",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794986400000,
+      "tag": "0041_item_master_categories",
+      "breakpoints": true
     }
   ]
 }
