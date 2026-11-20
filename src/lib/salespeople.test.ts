@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authenticateSalesperson, getSalesperson, isSalespersonLogin, SALESPEOPLE } from './salespeople';
+import { getSalesperson, getSalespersonByEmployeeNumber, SALESPEOPLE } from './salespeople';
 
 describe('salespeople', () => {
   it('has unique routes and employee numbers for every salesperson', () => {
@@ -8,33 +8,10 @@ describe('salespeople', () => {
     expect(new Set(SALESPEOPLE.map(({ employeeNumber }) => employeeNumber)).size).toBe(44);
   });
 
-  it('uses the employee number without an email extension and its matching password', () => {
-    const salesperson = getSalesperson('mary-josephine')!;
-    expect(isSalespersonLogin(salesperson, 'DBYA0013', 'Ananta0013')).toBe(true);
-    expect(isSalespersonLogin(salesperson, 'dbya0013', 'Ananta0013')).toBe(true);
-    expect(isSalespersonLogin(salesperson, 'DBYA0013@deepam.local', 'Ananta0013')).toBe(false);
-    expect(isSalespersonLogin(salesperson, 'DBYA0013', 'password')).toBe(false);
-  });
-
-  it('identifies the salesperson from the shared login form', () => {
-    expect(authenticateSalesperson('DBYA0021', 'Ananta0021')?.name).toBe('Yasar Arafat');
-    expect(authenticateSalesperson('DBYA0021@deepam.local', 'Ananta0021')).toBeUndefined();
-    expect(authenticateSalesperson('DBYA0021', 'wrong')).toBeUndefined();
-    expect(authenticateSalesperson('DBYA0009', 'Ananta0009')?.name).toBe('Sandhya');
-  });
-
-  it('signs the Chennai desk in with its own password only', () => {
-    expect(authenticateSalesperson('DBYACHENNAI', 'chennai')?.name).toBe('Chennai');
-    expect(authenticateSalesperson('dbyachennai', 'chennai')?.name).toBe('Chennai');
-    expect(authenticateSalesperson('DBYACHENNAI', 'AnantaNNAI')).toBeUndefined();
-  });
-
-  it('accepts the matching Ananta password for every employee', () => {
-    for (const salesperson of SALESPEOPLE.filter(person => !('password' in person))) {
-      expect(authenticateSalesperson(
-        salesperson.employeeNumber,
-        `Ananta${salesperson.employeeNumber.slice(-4)}`,
-      )).toBe(salesperson);
-    }
+  it('finds a desk by employee number, ignoring case and spaces', () => {
+    expect(getSalespersonByEmployeeNumber('DBYA0021')?.name).toBe('Yasar Arafat');
+    expect(getSalespersonByEmployeeNumber(' dbya0027 ')?.name).toBe('Sheeja');
+    expect(getSalespersonByEmployeeNumber('DBYA0021@deepam.local')).toBeUndefined();
+    expect(getSalesperson('mary-josephine')?.employeeNumber).toBe('DBYA0013');
   });
 });

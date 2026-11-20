@@ -2,8 +2,6 @@ export type Salesperson = {
   employeeNumber: string;
   name: string;
   slug: string;
-  /** A shared desk's own password; people sign in with Ananta + the last four digits of their number. */
-  password?: string;
 };
 
 export const SALESPEOPLE = [
@@ -52,7 +50,7 @@ export const SALESPEOPLE = [
   { employeeNumber: 'DBYA0067', name: 'Vikash Kumar', slug: 'vikash-kumar' },
   { employeeNumber: 'DBYA0068', name: 'Komal R', slug: 'komal-r' },
   // Shared desk for the Chennai campaign leads (see SHEET_ROUTES).
-  { employeeNumber: 'DBYACHENNAI', name: 'Chennai', slug: 'chennai', password: 'chennai' },
+  { employeeNumber: 'DBYACHENNAI', name: 'Chennai', slug: 'chennai' },
 ] as const satisfies readonly Salesperson[];
 
 export function getSalesperson(slug: string) {
@@ -62,14 +60,4 @@ export function getSalesperson(slug: string) {
 export function getSalespersonByEmployeeNumber(employeeNumber: string) {
   const normalized = employeeNumber.trim().toUpperCase();
   return SALESPEOPLE.find((salesperson) => salesperson.employeeNumber === normalized);
-}
-
-export function isSalespersonLogin(salesperson: Salesperson, employeeNumber: string, password: string) {
-  const expectedPassword = salesperson.password ?? `Ananta${salesperson.employeeNumber.slice(-4)}`;
-  return employeeNumber.trim().toUpperCase() === salesperson.employeeNumber && password === expectedPassword;
-}
-
-export function authenticateSalesperson(employeeNumber: string, password: string) {
-  const salesperson = getSalespersonByEmployeeNumber(employeeNumber);
-  return salesperson && isSalespersonLogin(salesperson, employeeNumber, password) ? salesperson : undefined;
 }
