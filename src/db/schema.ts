@@ -143,13 +143,21 @@ export const categories = pgTable(
   'categories',
   {
     id: serial('id').primaryKey(),
-    /** Category ID: CAT-0001, assigned by trigger on insert (drizzle/0017). */
+    /** Category ID: CAT-<short name> for Item Master items (CAT-14, drizzle/0041); other names get CAT-0001 from the trigger (drizzle/0017). */
     categoryCode: text('category_code').unique(),
+    /** The ERP Item Master's Short Name (e.g. 14); null for names not on the Item Master. */
+    shortName: text('short_name'),
     name: text('name').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('categories_name_uidx').on(sql`lower(${t.name})`)],
+  (t) => [uniqueIndex('categories_name_uidx').on(sql`lower(${t.name})`), uniqueIndex('categories_short_name_uidx').on(t.shortName)],
 );
+
+/** Other names for an Item Master category: its short name ("14", "010") or an old name. Lower-case, trimmed (drizzle/0041). */
+export const categoryAliases = pgTable('category_aliases', {
+  alias: text('alias').primaryKey(),
+  categoryId: integer('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
+});
 
 // ── Ingestion audit ──────────────────────────────────────────────────────────
 
