@@ -408,6 +408,9 @@ export const sales = pgTable(
     // POS reports can contain fractional quantities (for example, 1.25 m).
     qty: numeric('qty', { precision: 12, scale: 2 }),
     billAmount: numeric('bill_amount', { precision: 12, scale: 2 }).notNull(), // D-13, D-68
+    /** What later return vouchers took back from this bill (lib/integration/bill-returns.ts). */
+    returnedAmount: numeric('returned_amount', { precision: 14, scale: 2 }).notNull().default('0'),
+    fullyReturned: boolean('fully_returned').notNull().default(false),
     taxableAmount: numeric('taxable_amount', { precision: 12, scale: 2 }),
     itemDiscAmount: numeric('item_disc_amount', { precision: 12, scale: 2 }),
     salesmanCode: text('salesman_code'),
@@ -899,6 +902,8 @@ export const storeVisits = pgTable(
     stoppedAt: timestamp('stopped_at', { withTimezone: true }),
     staffConverted: boolean('staff_converted').notNull().default(false),
     posSaleId: bigint('pos_sale_id', { mode: 'number' }).references(() => sales.id),
+    /** The bill this walk-in was matched to, once it was fully returned. Not a conversion. */
+    returnedSaleId: bigint('returned_sale_id', { mode: 'number' }).references(() => sales.id, { onDelete: 'set null' }),
     source: text('source'),
     shoppingIntent: text('shopping_intent'),
     people: integer('people').notNull().default(1),
