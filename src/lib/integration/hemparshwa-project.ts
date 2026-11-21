@@ -182,6 +182,11 @@ export async function projectHemparshwaSales(): Promise<ProjectionResult> {
           SELECT 1 FROM span s JOIN hemparshwa_imports n ON n.import_id = s.import_id
           WHERE s.store_id = l.store_id AND l.invoice_date BETWEEN s.first_day AND s.last_day
             AND (n.imported_at, n.import_id) > (i.imported_at, i.import_id))
+          -- Wholesale documents are in the export but are not sales.
+          AND NOT EXISTS (
+          SELECT 1 FROM sales_excluded_documents x
+          WHERE x.store_id = l.store_id AND x.invoice_id = l.invoice_id AND x.invoice_date = l.invoice_date
+            AND x.sales_type = lower(l.sales_type))
       `);
       const supersededLines = count(await t.execute(sql`
         SELECT (SELECT count(*) FROM hemparshwa_sales_lines) - (SELECT count(*) FROM hp_lines) AS n
