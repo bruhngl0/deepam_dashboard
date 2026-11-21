@@ -79,7 +79,9 @@ export async function POST(request: Request) {
         ON CONFLICT (source_system, external_id) DO UPDATE SET
           store_id=excluded.store_id, customer_id=COALESCE(excluded.customer_id, store_visits.customer_id),
           external_customer_ref=excluded.external_customer_ref, visited_at=excluded.visited_at,
-          stopped_at=excluded.stopped_at, staff_converted=excluded.staff_converted, source=excluded.source,
+          stopped_at=excluded.stopped_at,
+          -- A fully returned bill is not a conversion, even if a late event still says Converted.
+          staff_converted=excluded.staff_converted AND store_visits.returned_sale_id IS NULL, source=excluded.source,
           shopping_intent=excluded.shopping_intent, people=excluded.people, driver_code=excluded.driver_code,
           raw=excluded.raw, source_updated_at=excluded.source_updated_at, deleted_at=NULL, updated_at=now()
         WHERE excluded.source_updated_at >= store_visits.source_updated_at

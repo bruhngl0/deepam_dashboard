@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { syncBillReturns } from './bill-returns';
 
 /**
  * Match one sale to at most one WalkTrack visit and vice versa. Customer, store,
@@ -24,6 +25,8 @@ export async function reconcileStoreVisits(externalId?: string): Promise<number>
     UPDATE store_visits sv SET customer_id=c.id, updated_at=now() FROM customers c
     WHERE ${unlinked} AND c.customer_code = upper(trim(sv.external_customer_ref))
   `);
+  // A full run (after a sales import) first applies what was returned since the last one.
+  if (!externalId) await syncBillReturns();
   const filter = externalId ? sql`AND sv.external_id = ${externalId}` : sql``;
   const result = await db.execute(sql`
     WITH candidates AS (
@@ -33,13 +36,15 @@ export async function reconcileStoreVisits(externalId?: string): Promise<number>
       FROM store_visits sv
       JOIN sales s ON s.customer_id = sv.customer_id AND s.store_id = sv.store_id
         AND (s.billed_at AT TIME ZONE 'Asia/Kolkata')::date = (sv.visited_at AT TIME ZONE 'Asia/Kolkata')::date
+        -- A return voucher or a fully returned bill is not a conversion.
+        AND s.bill_amount > 0 AND NOT s.fully_returned
       WHERE sv.deleted_at IS NULL AND sv.customer_id IS NOT NULL AND sv.pos_sale_id IS NULL ${filter}
         -- A bill already tied to another visit is taken (one visit per bill, store_visits_pos_sale_uidx).
         AND NOT EXISTS (SELECT 1 FROM store_visits taken WHERE taken.pos_sale_id = s.id)
     ), chosen AS (
       SELECT visit_id, sale_id FROM candidates WHERE visit_rank=1 AND sale_rank=1
     )
-    UPDATE store_visits sv SET pos_sale_id=chosen.sale_id, updated_at=now()
+    UPDATE store_visits sv SET pos_sale_id=chosen.sale_id, returned_sale_id=NULL, updated_at=now()
     FROM chosen WHERE sv.id=chosen.visit_id
     RETURNING sv.id
   `);
