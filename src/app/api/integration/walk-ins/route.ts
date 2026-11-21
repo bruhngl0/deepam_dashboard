@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_WALK_INS = 5000;
-type Row = { id: string; code: string | null; lead: string | null; invoice: string | null; amount: string | null; billed_at: string | null };
+type Row = { id: string; code: string | null; lead: string | null; invoice: string | null; amount: string | null; billed_at: string | null; returned: string | null; status: string | null };
 const resultRows = (result: unknown) => (Array.isArray(result) ? result : (result as { rows: unknown[] }).rows) as Row[];
 
 /**
@@ -29,16 +29,20 @@ export async function POST(request: Request) {
   // that was taken back from a lead. The bill is the one reconcileStoreVisits tied to the visit.
   const found = resultRows(await db.execute(sql`
     SELECT sv.external_id AS id, c.customer_code AS code, person_lead_code(c.id) AS lead,
-      s.voucher_no AS invoice, s.bill_amount::text AS amount, s.billed_at::text AS billed_at
+      s.voucher_no AS invoice, s.bill_amount::text AS amount, s.billed_at::text AS billed_at,
+      s.returned_amount::text AS returned,
+      CASE WHEN s.id IS NULL THEN NULL WHEN s.fully_returned THEN 'returned' WHEN s.returned_amount > 0 THEN 'partly_returned' ELSE 'billed' END AS status
     FROM store_visits sv
     JOIN json_array_elements_text(${JSON.stringify(walkIns)}::json) n ON n.value = sv.external_id
     LEFT JOIN customers c ON c.id = sv.customer_id
-    LEFT JOIN sales s ON s.id = sv.pos_sale_id
+    LEFT JOIN sales s ON s.id = COALESCE(sv.pos_sale_id, sv.returned_sale_id)
     WHERE sv.source_system = 'walktrack' AND sv.deleted_at IS NULL
   `));
   return Response.json({
+    // Tells WalkTrack that `bills` carries each bill's status, and that a walk-in missing from it has no bill.
+    returnsAware: true,
     customerIds: Object.fromEntries(found.filter((r) => r.code).map((r) => [r.id, r.code])),
     people: Object.fromEntries(found.map((r) => [r.id, { customerCode: r.code, leadCode: r.lead }])),
-    bills: Object.fromEntries(found.filter((r) => r.invoice).map((r) => [r.id, { invoice: r.invoice, amount: r.amount, billedAt: r.billed_at }])),
+    bills: Object.fromEntries(found.filter((r) => r.invoice).map((r) => [r.id, { invoice: r.invoice, amount: r.amount, billedAt: r.billed_at, status: r.status, returnedAmount: r.returned }])),
   });
 }

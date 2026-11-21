@@ -17,14 +17,14 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) 
 export default async function EmployeesPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requireUser();
   const sp = await searchParams;
-  const q = one(sp.q).trim(), dept = one(sp.department), status = one(sp.status);
+  const q = one(sp.q).trim(), dept = one(sp.department), status = one(sp.status), level = one(sp.level);
   const stores = pickStores(sp);
   const joined = pickRange(sp, { from: null, to: null });
   const all = await listEmployees();
   const needle = q.toUpperCase();
   const rows = all.filter((e) =>
     (!needle || e.fullName.toUpperCase().includes(needle) || e.employeeCode.includes(needle) || (e.designation ?? '').toUpperCase().includes(needle))
-    && (!dept || e.department === dept) && (!status || e.status === status) && storeMatches(stores, e.storeCode)
+    && (!dept || e.department === dept) && (!level || e.employeeLevel === level) && (!status || e.status === status) && storeMatches(stores, e.storeCode)
     && (!joined.picked || (!!e.joiningDate && (!joined.from || e.joiningDate >= joined.from) && (!joined.to || e.joiningDate <= joined.to))));
 
   return (
@@ -41,7 +41,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm" style={{ minWidth: '60rem' }}>
             <thead><tr className={eyebrow}>
-              {['Employee ID', 'Name', 'Department', 'Designation', 'Store', 'Contact No.', 'Joined', 'Status'].map((h) =>
+              {['Employee ID', 'Name', 'Level', 'Department', 'Designation', 'Store', 'Contact No.', 'Joined', 'Status'].map((h) =>
                 <th key={h} scope="col" className="whitespace-nowrap px-3 py-3 text-left font-bold">{h}</th>)}
             </tr></thead>
             <tbody>
@@ -51,6 +51,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
                   <th scope="row" className="px-3 py-2 text-left font-medium text-ink">
                     <Link href={`/hr/employees/${e.employeeCode}`} className="hover:text-accent hover:underline">{e.fullName}</Link>
                   </th>
+                  <td className="whitespace-nowrap px-3 py-2 text-ink-2" title={e.team ?? undefined}>{e.employeeLevel ?? '—'}</td>
                   <td className="px-3 py-2 text-ink-2">{e.department ?? '—'}</td>
                   <td className="px-3 py-2 text-ink-2">{e.designation ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-ink-2">{e.storeName ?? '—'}</td>
@@ -59,7 +60,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
                   <td className="px-3 py-2"><StatusBadge status={e.status} /></td>
                 </tr>
               ))}
-              {!rows.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-ink-muted">No employee matches.</td></tr>}
+              {!rows.length && <tr><td colSpan={9} className="px-3 py-8 text-center text-ink-muted">No employee matches.</td></tr>}
             </tbody>
           </table>
         </div>

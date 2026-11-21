@@ -2,8 +2,6 @@ export type Salesperson = {
   employeeNumber: string;
   name: string;
   slug: string;
-  /** A shared desk's own password; people sign in with Ananta + the last four digits of their number. */
-  password?: string;
 };
 
 export const SALESPEOPLE = [
@@ -31,8 +29,28 @@ export const SALESPEOPLE = [
   { employeeNumber: 'DBYA0011', name: 'Swetha N', slug: 'swetha-n' },
   { employeeNumber: 'DBYA0021', name: 'Yasar Arafat', slug: 'yasar-arafat' },
   { employeeNumber: 'DBYA0009', name: 'Sandhya', slug: 'sandhya' },
+  // Junior Sales Executives and Sales Assistants (and Anitha, Senior Sales Executive) from HR's Keka employee master, 20 Nov 2026.
+  { employeeNumber: 'DBYA0041', name: 'Nisar Ahmed', slug: 'nisar-ahmed' },
+  { employeeNumber: 'DBYA0042', name: 'Yuvaraj S', slug: 'yuvaraj-s' },
+  { employeeNumber: 'DBYA0043', name: 'Venugopal S', slug: 'venugopal-s' },
+  { employeeNumber: 'DBYA0044', name: 'Annapurna N', slug: 'annapurna-n' },
+  { employeeNumber: 'DBYA0046', name: 'Vijay Kumar', slug: 'vijay-kumar' },
+  { employeeNumber: 'DBYA0047', name: 'Ajith Kumar', slug: 'ajith-kumar' },
+  { employeeNumber: 'DBYA0048', name: 'Anitha', slug: 'anitha' },
+  { employeeNumber: 'DBYA0050', name: 'Pavithra K', slug: 'pavithra-k' },
+  { employeeNumber: 'DBYA0051', name: 'Thangaivelu D', slug: 'thangaivelu-d' },
+  { employeeNumber: 'DBYA0052', name: 'Rakesh Kumar', slug: 'rakesh-kumar' },
+  { employeeNumber: 'DBYA0053', name: 'Rajeev Kumar', slug: 'rajeev-kumar' },
+  { employeeNumber: 'DBYA0054', name: 'Vinayaka Savanur', slug: 'vinayaka-savanur' },
+  { employeeNumber: 'DBYA0061', name: 'Madfuz MD', slug: 'madfuz-md' },
+  { employeeNumber: 'DBYA0062', name: 'Shahzad M D', slug: 'shahzad-m-d' },
+  { employeeNumber: 'DBYA0063', name: 'Raj Kumar', slug: 'raj-kumar' },
+  { employeeNumber: 'DBYA0064', name: 'Rohith', slug: 'rohith' },
+  { employeeNumber: 'DBYA0066', name: 'Manjesh Kumar', slug: 'manjesh-kumar' },
+  { employeeNumber: 'DBYA0067', name: 'Vikash Kumar', slug: 'vikash-kumar' },
+  { employeeNumber: 'DBYA0068', name: 'Komal R', slug: 'komal-r' },
   // Shared desk for the Chennai campaign leads (see SHEET_ROUTES).
-  { employeeNumber: 'DBYACHENNAI', name: 'Chennai', slug: 'chennai', password: 'chennai' },
+  { employeeNumber: 'DBYACHENNAI', name: 'Chennai', slug: 'chennai' },
 ] as const satisfies readonly Salesperson[];
 
 export function getSalesperson(slug: string) {
@@ -42,14 +60,4 @@ export function getSalesperson(slug: string) {
 export function getSalespersonByEmployeeNumber(employeeNumber: string) {
   const normalized = employeeNumber.trim().toUpperCase();
   return SALESPEOPLE.find((salesperson) => salesperson.employeeNumber === normalized);
-}
-
-export function isSalespersonLogin(salesperson: Salesperson, employeeNumber: string, password: string) {
-  const expectedPassword = salesperson.password ?? `Ananta${salesperson.employeeNumber.slice(-4)}`;
-  return employeeNumber.trim().toUpperCase() === salesperson.employeeNumber && password === expectedPassword;
-}
-
-export function authenticateSalesperson(employeeNumber: string, password: string) {
-  const salesperson = getSalespersonByEmployeeNumber(employeeNumber);
-  return salesperson && isSalespersonLogin(salesperson, employeeNumber, password) ? salesperson : undefined;
 }

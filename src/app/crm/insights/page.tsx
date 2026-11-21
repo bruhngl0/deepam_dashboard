@@ -23,6 +23,7 @@ import { StoreChannelBars } from '@/components/store-channel-mix';
 import { Finding, Note, Bar } from '@/components/finding-card';
 import { formatCurrency, formatNumber, CHANNEL_LABEL } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
+import { FilterSlot } from '@/components/filter-box';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,12 +85,15 @@ export default async function InsightsPage({
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Insights</h1>
-        <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
-          What the current data supports, and what to build next. Every figure is read live
-          from the database, so this page moves when the data does.
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Insights</h1>
+          <p className="mt-1 max-w-[68ch] text-sm text-ink-2">
+            What the current data supports, and what to build next. Every figure is read live
+            from the database, so this page moves when the data does.
+          </p>
+        </div>
+        <FilterSlot />
       </header>
 
       {/* ── Findings ─────────────────────────────────────────────────────── */}

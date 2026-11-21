@@ -1,6 +1,6 @@
 /** Reads and checks the employee form (/hr/employees/[code]/edit and /hr/employees/new). */
 
-import { BLOOD_GROUPS, EMPLOYEE_CODE, EMPLOYMENT_TYPES, SALARY_PARTS, STATUSES, type EmployeeInput } from './employees';
+import { BLOOD_GROUPS, EMPLOYEE_CODE, EMPLOYMENT_TYPES, GENDERS, LEVELS, MARITAL_STATUSES, SALARY_PARTS, STATUSES, WEEKDAYS, type EmployeeInput } from './employees';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -36,7 +36,8 @@ export function employeeCodeFrom(form: FormData): string {
 }
 
 export function employeeFromForm(form: FormData): EmployeeInput {
-  const fullName = text(form, 'full_name');
+  // Names are kept in capitals, as on the ERP and attendance sheets.
+  const fullName = text(form, 'full_name')?.replace(/\s+\.$/, '').toUpperCase() ?? null;
   if (!fullName) throw new FormError('Name is required');
   const eligible = text(form, 'incentive_eligible');
   const salaryStructure: Record<string, number> = {};
@@ -53,5 +54,7 @@ export function employeeFromForm(form: FormData): EmployeeInput {
     status: oneOf(form, 'status', STATUSES) ?? 'Active', statusSince: day(form, 'status_since'), exitDate: day(form, 'exit_date'), exitReason: text(form, 'exit_reason', 500),
     emergencyContactName: text(form, 'emergency_contact_name'), emergencyContactRelation: text(form, 'emergency_contact_relation', 60),
     emergencyContactNo: text(form, 'emergency_contact_no', 30), bloodGroup: oneOf(form, 'blood_group', BLOOD_GROUPS), notes: text(form, 'notes', 2000),
+    gender: oneOf(form, 'gender', GENDERS), maritalStatus: oneOf(form, 'marital_status', MARITAL_STATUSES), employeeLevel: oneOf(form, 'employee_level', LEVELS),
+    team: text(form, 'team', 80), shift: text(form, 'shift', 40), weeklyOff: oneOf(form, 'weekly_off', WEEKDAYS),
   };
 }

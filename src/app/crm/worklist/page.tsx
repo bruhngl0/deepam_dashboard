@@ -29,6 +29,7 @@ import { Pagination } from '@/components/filters';
 import { StatTile } from '@/components/stat-tiles';
 import { formatCurrency, formatNumber, formatDate, REMARK_LABEL } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
+import { FilterSlot } from '@/components/filter-box';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,12 +133,15 @@ export default async function WorklistPage({ searchParams }: { searchParams: Sea
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Worklist</h1>
-        <p className="mt-1 max-w-[72ch] text-sm text-ink-2">
-          Who to call today. Every outcome logged here is appended to the contact history, so a
-          person who has been reached drops off the list and the next person moves up.
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Worklist</h1>
+          <p className="mt-1 max-w-[72ch] text-sm text-ink-2">
+            Who to call today. Every outcome logged here is appended to the contact history, so a
+            person who has been reached drops off the list and the next person moves up.
+          </p>
+        </div>
+        <FilterSlot />
       </header>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

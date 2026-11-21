@@ -55,7 +55,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       <PageHeader
         eyebrow={<><Link href="/hr/employees" className="hover:text-ink">Employees</Link> · {e.employeeCode}</>}
         title={e.fullName}
-        description={[e.designation, e.department, e.storeName].filter(Boolean).join(' · ') || undefined}
+        description={[e.employeeLevel, e.designation, e.department, e.storeName].filter(Boolean).join(' · ') || undefined}
         meta={<StatusBadge status={e.status} />}
         actions={<>
           {e.salespersonKey && <Link href={`/hr/salespeople/${e.employeeCode}`} className={button}>Sales performance</Link>}
@@ -66,11 +66,11 @@ export default async function EmployeePage({ params, searchParams }: { params: P
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Basic details">
-          <Facts items={[['Employee ID', e.employeeCode], ['Name', e.fullName], ['Date of birth', e.dateOfBirth && formatDate(e.dateOfBirth)], ['Contact No.', e.contactNo], ['Email', e.email], ['Biometric ID', e.biometricId], ['Blood group', e.bloodGroup]]} />
+          <Facts items={[['Employee ID', e.employeeCode], ['Name', e.fullName], ['Date of birth', e.dateOfBirth && formatDate(e.dateOfBirth)], ['Contact No.', e.contactNo], ['Email', e.email], ['Biometric ID', e.biometricId], ['Gender', e.gender], ['Marital status', e.maritalStatus], ['Blood group', e.bloodGroup]]} />
         </Panel>
         <Panel title="Employment and joining">
-          <Facts items={[['Company', e.company], ['Store', e.storeName ?? e.storeCode], ['Department', e.department], ['Designation', e.designation],
-            ['Joining date', e.joiningDate && formatDate(e.joiningDate)], ['Employment type', e.employmentType],
+          <Facts items={[['Company', e.company], ['Store', e.storeName ?? e.storeCode], ['Department', e.department], ['Designation', e.designation], ['Level', e.employeeLevel], ['Team', e.team],
+            ['Joining date', e.joiningDate && formatDate(e.joiningDate)], ['Employment type', e.employmentType], ['Shift', e.shift], ['Weekly off', e.weeklyOff],
             ['Reporting manager', e.reportingManager && <Link href={`/hr/employees/${e.reportingManager}`} className="text-accent hover:underline">{e.reportingManagerName ?? e.reportingManager}</Link>]]} />
         </Panel>
         <Panel title="Compensation">

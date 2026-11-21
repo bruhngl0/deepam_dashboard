@@ -52,6 +52,7 @@ import {
   type ValueTierCode,
 } from '@/lib/format';
 import { requireUser } from '@/lib/auth';
+import { FilterSlot } from '@/components/filter-box';
 
 export const dynamic = 'force-dynamic';
 
@@ -157,21 +158,24 @@ export default async function DashboardPage({
 
   return (
     <main className="mx-auto w-full max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Dashboard</h1>
-        <p className="mt-1 text-sm text-ink-2">
-          Lead-to-sale attribution across Meta, WhatsApp, Google Ads and other sources.
-        </p>
-        {periodFrom && periodTo && (
-          <p className="tnum mt-2 text-xs text-ink-muted">
-            Showing {formatDate(periodFrom)} – {formatDate(periodTo)}
-            {isFullPeriod
-              ? ' — every bill loaded.'
-              : ` of ${formatDate(dateBounds.earliest)} – ${formatDate(dateBounds.latest)} loaded.`}
-            {storeName && ` · ${storeName} only.`}
-            {' '}Leads and the Customer value panel are unaffected — see their own notes.
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Dashboard</h1>
+          <p className="mt-1 text-sm text-ink-2">
+            Lead-to-sale attribution across Meta, WhatsApp, Google Ads and other sources.
           </p>
-        )}
+          {periodFrom && periodTo && (
+            <p className="tnum mt-2 text-xs text-ink-muted">
+              Showing {formatDate(periodFrom)} – {formatDate(periodTo)}
+              {isFullPeriod
+                ? ' — every bill loaded.'
+                : ` of ${formatDate(dateBounds.earliest)} – ${formatDate(dateBounds.latest)} loaded.`}
+              {storeName && ` · ${storeName} only.`}
+              {' '}Leads and the Customer value panel are unaffected — see their own notes.
+            </p>
+          )}
+        </div>
+        <FilterSlot />
       </header>
 
       <KpiRow

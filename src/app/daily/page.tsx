@@ -18,6 +18,8 @@ import { WhatsAppShare } from '@/components/whatsapp-share';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent } from '@/lib/format';
 import { StoreMultiSelect } from '@/components/store-multi-select';
 import { parseStores, storeCodes, storeMatches } from '@/lib/store-filter';
+import { filterBox, filterLabel } from '@/components/filter-box';
+import { control, textButton } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -140,11 +142,12 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
         </div>
         <nav aria-label="Choose day" className="flex flex-wrap items-center gap-2 text-sm">
           <Link href={dayLink(shiftDay(date, -1))} className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">← Previous day</Link>
-          <form action="/daily" className="flex items-center gap-2">
-            <label className="sr-only" htmlFor="daily-date">Day</label>
-            <input id="daily-date" type="date" name="date" defaultValue={date} max={today} className="rounded-lg border border-line bg-surface px-3 py-2 text-ink" />
-            <StoreMultiSelect name="store" stores={allColumns.map((c) => ({ code: c.storeCode, name: c.name }))} value={known} showCodes className="rounded-lg border border-line bg-surface px-3 py-2 text-ink" />
-            <button className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Show</button>
+          <form action="/daily" role="search" aria-label="Filters" className={filterBox}>
+            <span className="text-xs font-medium text-ink-muted">Filter</span>
+            <StoreMultiSelect name="store" stores={allColumns.map((c) => ({ code: c.storeCode, name: c.name }))} value={known} showCodes className={control} />
+            <label className={filterLabel} htmlFor="daily-date">Day</label>
+            <input id="daily-date" type="date" name="date" defaultValue={date} max={today} className={control} />
+            <button className={textButton}>Show</button>
           </form>
           {date < today && <Link href={dayLink(shiftDay(date, 1))} className="rounded-lg border border-line px-3 py-2 font-medium text-ink hover:bg-inset">Next day →</Link>}
           <WhatsAppShare text={whatsappText} to={process.env.DAILY_WHATSAPP_TO?.replace(/[^0-9]/g, '') || null} label="WhatsApp export" />
