@@ -814,6 +814,15 @@ export const hemparshwaImports = pgTable('hemparshwa_imports', {
   syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** ERP documents that are not sales (wholesale). Their imported lines are kept but do not count. */
+export const salesExcludedDocuments = pgTable('sales_excluded_documents', {
+  storeId: text('store_id').notNull(),
+  invoiceId: text('invoice_id').notNull(),
+  invoiceDate: date('invoice_date').notNull(),
+  salesType: text('sales_type').notNull(),
+  reason: text('reason').notNull(),
+}, (t) => [primaryKey({ columns: [t.storeId, t.invoiceId, t.invoiceDate, t.salesType] })]);
+
 /** One row per invoice line, as Hemparshwa holds it. `details` carries every mapped column of the source row. */
 export const hemparshwaSalesLines = pgTable(
   'hemparshwa_sales_lines',
