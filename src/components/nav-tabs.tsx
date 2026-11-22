@@ -43,7 +43,7 @@ const HR_TABS = [
   { href: '/hr/incentives', label: 'Incentives' },
 ] as const;
 
-// Partner Network Management (Deepam Partners). Partners also lights for a partner's own page.
+// Ananta Partner (Deepam Partners). Partners also lights for a partner's own page.
 const PARTNER_TABS = [
   { href: '/partners', label: 'Overview' },
   { href: '/partners/list', label: 'Partners', pattern: /^\/partners\/(?!referrals|payouts|rules)[^/]+$/ },

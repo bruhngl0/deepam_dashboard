@@ -5,7 +5,7 @@
  * dashboard (`/daily`), HR Intelligence (`/hr`), Customer
  * Intelligence (`/crm`), Vendor Intelligence (`/vendor`), the external Driver
  * Network Management and Store Performance Tracker services, Marketing
- * Intelligence (`/marketing`). Partner Network Management (`/partners`) opens from Ananta Retail in Hemparshwa OS.
+ * Intelligence (`/marketing`). Ananta Partner (`/partners`) opens from Ananta Retail in Hemparshwa OS.
  * This page is just the door between them, not
  * a dashboard of its own, so `NavTabs` shows nothing here (see
  * `components/nav-tabs.tsx`).
