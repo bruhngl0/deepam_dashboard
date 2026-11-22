@@ -5,7 +5,8 @@
  * dashboard (`/daily`), HR Intelligence (`/hr`), Customer
  * Intelligence (`/crm`), Vendor Intelligence (`/vendor`), the external Driver
  * Network Management and Store Performance Tracker services, Marketing
- * Intelligence (`/marketing`) and Partner Network Management (`/partners`). This page is just the door between them, not
+ * Intelligence (`/marketing`). Partner Network Management (`/partners`) opens from Ananta Retail in Hemparshwa OS.
+ * This page is just the door between them, not
  * a dashboard of its own, so `NavTabs` shows nothing here (see
  * `components/nav-tabs.tsx`).
  */
@@ -177,22 +178,6 @@ export default async function HeroPage() {
           <h2 className="text-lg font-semibold tracking-tight text-ink">Marketing Intelligence</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
             Campaign leads, the calling queue and salesperson follow-up.
-          </p>
-        </Link>
-        <Link
-          href="/partners"
-          className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]">
-              <path d="M8 12.5 10.5 15a2 2 0 0 0 2.8 0l4.2-4.2a2 2 0 0 0 0-2.8L15 5.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="m16 11.5-2.5-2.5a2 2 0 0 0-2.8 0L6.5 13.2a2 2 0 0 0 0 2.8L9 18.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2.5 9.5 6 6M21.5 14.5 18 18" strokeLinecap="round" />
-            </svg>
-          </span>
-          <h2 className="text-lg font-semibold tracking-tight text-ink">Partner Network Management</h2>
-          <p className="max-w-[36ch] text-sm text-ink-2">
-            Deepam Partners: applications, referral links, referred customers and monthly commission payouts.
           </p>
         </Link>
       </div>
