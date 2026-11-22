@@ -25,7 +25,7 @@ export default async function PartnerListPage({ searchParams }: { searchParams: 
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <PartnerHeader icon="users" eyebrow="Ananta Partner" title="Partners" description="Applications from the public form and every approved partner. Open one to approve it, collect documents and send the links."
+      <PartnerHeader icon="users" eyebrow="Ananta Partner Network" title="Partners" description="Applications from the public form and every approved partner. Open one to approve it, collect documents and send the links."
         meta={`${formatNumber(partners.length)} ${filtered ? 'matching' : 'in all'}${from || to ? ` · applied ${rangeLabel(from, to)}` : ''}`} actions={<a href="/deepampartner" target="_blank" rel="noreferrer" className={button}><Icon name="plus" />Add an application</a>} />
       <Notices sp={sp} />
 

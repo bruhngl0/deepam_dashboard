@@ -1,4 +1,4 @@
-/** Pieces shared by the Ananta Partner pages: header, panels, badges, avatars, icons and table cells. */
+/** Pieces shared by the Ananta Partner Network pages: header, panels, badges, avatars, icons and table cells. */
 
 import Link from 'next/link';
 import { COMMISSION_STATUS_LABEL, PARTNER_STATUS_LABEL, REFERRAL_STATUS_LABEL, type CommissionStatus, type PartnerStatus, type ReferralStatus } from '@/lib/partners/constants';

@@ -14,7 +14,7 @@ const hr: GateModule = { key: 'hr', label: 'HR Intelligence', password: () => pr
 // The old in-app vendor pages; same password as the Vendor Intelligence app.
 const vendor: GateModule = { key: 'vendor', label: 'Vendor Intelligence', password: () => process.env.GATE_PASSWORD_VENDOR };
 // Deepam Partners. Its own sign-in, with the Customer Intelligence password until GATE_PASSWORD_PARTNERS is set.
-const partners: GateModule = { key: 'partners', label: 'Ananta Partner', password: () => process.env.GATE_PASSWORD_PARTNERS || process.env.GATE_PASSWORD_CUSTOMER };
+const partners: GateModule = { key: 'partners', label: 'Ananta Partner Network', password: () => process.env.GATE_PASSWORD_PARTNERS || process.env.GATE_PASSWORD_CUSTOMER };
 
 const under = (pathname: string, ...prefixes: string[]) =>
   prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));

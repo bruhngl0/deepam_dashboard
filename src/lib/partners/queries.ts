@@ -1,4 +1,4 @@
-/** Ananta Partner reads for the module pages and the partner dashboard. Call `refreshReferrals()` first on a page. */
+/** Ananta Partner Network reads for the module pages and the partner dashboard. Call `refreshReferrals()` first on a page. */
 
 import { sql, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
