@@ -1,5 +1,5 @@
 /**
- * Partner Network writes: applications, referral registrations, partner decisions, documents, commission validation
+ * Ananta Partner writes: applications, referral registrations, partner decisions, documents, commission validation
  * and payouts. The referral rules themselves are SQL (drizzle/0039: partner_referral_block, partner_refresh_referrals)
  * so a page load, a registration and a test all apply the same ones.
  */

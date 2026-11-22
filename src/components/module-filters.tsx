@@ -1,5 +1,5 @@
 /**
- * One filter box for a whole module (HR Intelligence, Partner Network), on the right of every page's title
+ * One filter box for a whole module (HR Intelligence, Ananta Partner), on the right of every page's title
  * (components/filter-box.tsx), always in the same order: the page's own filters (department, status…, search) →
  * Store → period (From/To, or Month on monthly pages) → Clear. Each page says which of these it uses in `pages`; a page not listed shows no strip.
  *

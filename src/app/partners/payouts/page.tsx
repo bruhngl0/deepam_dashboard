@@ -29,7 +29,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Prom
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <PartnerHeader icon="wallet" eyebrow="Partner Network" title={`Payouts · ${monthLabel(month)}`} description="Commission validated into this month's cycle. Pay each partner, then record the payment reference."
+      <PartnerHeader icon="wallet" eyebrow="Ananta Partner" title={`Payouts · ${monthLabel(month)}`} description="Commission validated into this month's cycle. Pay each partner, then record the payment reference."
         actions={<><span className="inline-flex overflow-hidden rounded-xl border border-line bg-surface shadow-sm"><Link href={`/partners/payouts?month=${shift(month, -1)}`} className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink hover:bg-inset"><Icon name="left" />{monthLabel(shift(month, -1))}</Link><Link href={`/partners/payouts?month=${shift(month, 1)}`} className="inline-flex items-center gap-1 border-l border-line px-3 py-2 text-sm font-medium text-ink hover:bg-inset">{monthLabel(shift(month, 1))}<Icon name="right" /></Link></span><a href={`/partners/payouts/export?month=${month}`} className={button}><Icon name="download" />Download CSV</a></>} />
       <Notices sp={sp} />
 
