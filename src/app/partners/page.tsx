@@ -1,5 +1,5 @@
 /**
- * Partner Network overview: applications waiting, partners, referrals and how many bought, commission to validate,
+ * Ananta Partner overview: applications waiting, partners, referrals and how many bought, commission to validate,
  * to pay and paid this month, then results by category and the top partners.
  */
 
@@ -36,7 +36,7 @@ export default async function PartnersOverviewPage({ searchParams }: { searchPar
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <PartnerHeader icon="handshake" title="Partner Network Management" description="Deepam Partners: applications, referral links, referred customers and monthly commission payouts."
+      <PartnerHeader icon="handshake" title="Ananta Partner" description="Deepam Partners: applications, referral links, referred customers and monthly commission payouts."
         meta={`Referrals and bills: ${rangeLabel(from, to)}${stores ? ' · filtered by store' : ''}`}
         actions={<><Link href="/partners/list?status=applied" className={button}><Icon name="inbox" />Review applications{o.applied > 0 && <span className="tnum rounded-full bg-amber-500/15 px-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300">{o.applied}</span>}</Link><Link href={withScope("/partners/referrals")} className={primaryButton}><Icon name="check" />Validate bills</Link></>} />
 

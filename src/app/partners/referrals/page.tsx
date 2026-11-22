@@ -44,7 +44,7 @@ export default async function ReferralsPage({ searchParams }: { searchParams: Pr
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <PartnerHeader icon="link" eyebrow="Partner Network" title="Referrals"
+      <PartnerHeader icon="link" eyebrow="Ananta Partner" title="Referrals"
         description={`Customers registered on a partner link. A bill on their number (or Customer ID) within ${rules.windowDays} days of registering is matched here; validate it to put the commission in a month's payout.`} />
       <Notices sp={sp} />
 

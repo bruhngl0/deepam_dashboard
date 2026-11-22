@@ -15,7 +15,7 @@ export default async function RulesPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="mx-auto w-full max-w-[64rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <PartnerHeader icon="sliders" eyebrow="Partner Network" title="Rules" description="Commission levels and referral terms. Changes apply from now on: a referral keeps the purchase window it registered with, and a validated bill keeps its rate." />
+      <PartnerHeader icon="sliders" eyebrow="Ananta Partner" title="Rules" description="Commission levels and referral terms. Changes apply from now on: a referral keeps the purchase window it registered with, and a validated bill keeps its rate." />
       <Notices sp={sp} />
       <form action={rulesAction} className="space-y-6">
         <input type="hidden" name="back" value="/partners/rules" />
