@@ -1,5 +1,5 @@
 /**
- * Ananta Partner (Deepam Partners): the fixed lists and labels. Tables and rules: drizzle/0039.
+ * Ananta Partner Network (Deepam Partners): the fixed lists and labels. Tables and rules: drizzle/0039.
  */
 
 /** Partner categories on the application form. Driver is to be added later: append it here, no migration needed. */
