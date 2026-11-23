@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
+import { gateAccess, siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
+import { OVERVIEW_ACCESS_HEADER } from '@/lib/overview/modules';
 import { SALES_ONLY_HEADER, SALES_SESSION_COOKIE, verifySalesSessionToken } from '@/lib/sales-session';
 import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from '@/lib/store-manager-session';
 
@@ -72,11 +73,16 @@ export default async function proxy(req: NextRequest) {
   // Only this proxy may say a request came in on a salesperson login alone; a header the browser sent is dropped.
   const headers = new Headers(req.headers);
   headers.delete(SALES_ONLY_HEADER);
+  headers.delete(OVERVIEW_ACCESS_HEADER);
   const pass = () => NextResponse.next({ request: { headers } });
   const locked = await salesLock(req);
   if (locked) return locked;
   const gated = await siteGate(req, gate);
-  if (!gated) return pass();
+  if (!gated) {
+    // The Overview shows a module's figures only to someone signed in to that module.
+    if (under(req.nextUrl.pathname, '/flow')) headers.set(OVERVIEW_ACCESS_HEADER, (await gateAccess(req, gate)).join(','));
+    return pass();
+  }
   if (SALES_APIS.includes(req.nextUrl.pathname)) {
     const employeeNumber = await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value);
     if (employeeNumber) {

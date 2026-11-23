@@ -1,174 +1,109 @@
 /**
- * Cross-module operating flow.
- *
- * This is deliberately a static architecture view rather than a dashboard:
- * until the external applications expose APIs/webhooks, it describes the
- * contract needed to safely connect them without coupling their databases.
+ * Overview: a master summary of every module, and each module's own KPIs under its header link.
+ * A visitor sees only the modules they have signed in to (see OVERVIEW_ACCESS_HEADER in proxy.ts).
  */
 
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { requireUser } from '@/lib/auth';
+import { button, card, control, eyebrow, Kpi, KpiGrid, PageHeader } from '@/components/ui';
+import { FilterBox, filterLabel, PlacedFilters } from '@/components/filter-box';
+import { monthToDate, pickRange, rangeLabel } from '@/lib/module-filters';
+import { loadModuleKpis, type Period } from '@/lib/overview/kpis';
+import { OVERVIEW_ACCESS_HEADER, OVERVIEW_MODULES, type OverviewKpi, type OverviewModule } from '@/lib/overview/modules';
 
-type ModuleCardProps = {
-  name: string;
-  description: string;
-  produces: string;
-  href: string;
-  external?: boolean;
-  icon: React.ReactNode;
-};
+export const dynamic = 'force-dynamic';
 
-function ModuleCard({ name, description, produces, href, external, icon }: ModuleCardProps) {
-  const className = 'card group flex min-h-44 flex-col rounded-2xl border border-line bg-surface p-5 transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent';
-  const content = (
-    <>
-      <span className="flex size-9 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">{icon}</span>
-      <h2 className="mt-4 text-base font-semibold tracking-tight text-ink">{name}</h2>
-      <p className="mt-1 text-sm text-ink-2">{description}</p>
-      <p className="mt-auto pt-4 text-xs font-medium text-accent">{produces} <span aria-hidden="true">{external ? '↗' : '→'}</span></p>
-    </>
-  );
-  // Other apps open through the gate's /__gate/go (signed in for an admin): a plain link, never prefetched.
-  return external
-    ? <a href={href} target="_blank" rel="noreferrer" className={className}>{content}</a>
-    : <Link href={href} className={className}>{content}</Link>;
+const external = (href: string) => href.startsWith('http') || href.startsWith('/__gate/');
+
+/** A module's name, as a link straight into that module. */
+function ModuleLink({ module: m }: { module: OverviewModule }) {
+  const className = 'rounded transition-colors hover:text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+  return external(m.href)
+    ? <a href={m.href} className={className}>{m.label}</a>
+    : <Link href={m.href} className={className}>{m.label}</Link>;
 }
 
-function Arrow({ label }: { label: string }) {
+function Unavailable({ locked, module: m }: { locked: boolean; module: OverviewModule }) {
   return (
-    <div className="flex flex-col items-center gap-1 py-3 text-center" aria-hidden="true">
-      <span className="rounded-full border border-line bg-page px-2.5 py-1 text-[11px] font-medium text-ink-muted">{label}</span>
-      <svg viewBox="0 0 20 24" className="h-6 w-5 text-accent fill-none stroke-current stroke-[1.75]">
-        <path d="M10 1v18M4 14l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+    <div className={`${card} px-5 py-6 text-sm text-ink-2`}>
+      {locked ? <>Sign in to {m.label} to see its figures.</> : 'These figures are not available right now. Try again in a moment.'}
     </div>
   );
 }
 
-export default async function FlowPage() {
-  await requireUser();
-
+function SummaryCard({ module: m, kpis, query }: { module: OverviewModule; kpis: OverviewKpi[] | null; query: string }) {
+  const shown = (m.headline as readonly string[]).map((label) => kpis?.find((k) => k.label === label)).filter((k): k is OverviewKpi => !!k);
   return (
-    <main className="mx-auto w-full max-w-[76rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-8 max-w-2xl">
-        <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Operating model</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">One customer journey, four specialist modules.</h1>
-        <p className="mt-3 text-sm leading-6 text-ink-2">
-          Each product remains the source of truth for its own work. Events move through one integration layer,
-          producing a dependable shared view without joining application databases directly.
-        </p>
-      </header>
-
-      <section aria-labelledby="flow-title" className="card overflow-hidden rounded-3xl border border-line bg-surface p-4 sm:p-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-grid pb-4">
-          <div>
-            <h2 id="flow-title" className="text-lg font-semibold tracking-tight text-ink">Module connection flow</h2>
-            <p className="mt-1 text-sm text-ink-2">From operational activity to a shared decision layer.</p>
-          </div>
-          <span className="rounded-full bg-accent-soft/50 px-3 py-1 text-xs font-medium text-accent">Recommended architecture</span>
-        </div>
-
-        <div className="mx-auto mt-6 max-w-5xl">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ModuleCard
-              name="Store Performance Tracker"
-              description="Store arrivals, enquiries and product interest."
-              produces="Visit · prospect · store event"
-              href="/__gate/go?to=https%3A%2F%2Fwalktrack.hemparshwa.com%2F"
-              external
-              icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="10" r="2.5" /></svg>}
-            />
-            <ModuleCard
-              name="Customer Intelligence"
-              description="Lead ownership, follow-up, sale and customer history."
-              produces="Lead · customer · order event"
-              href="/crm"
-              icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><circle cx="12" cy="8" r="3.5" /><path d="M5 21a7 7 0 0 1 14 0" strokeLinecap="round" /></svg>}
-            />
-            <ModuleCard
-              name="Vendor Intelligence"
-              description="SKU availability, purchase cost and stock movement."
-              produces="SKU · stock · cost event"
-              href="/__gate/go?to=https%3A%2F%2Fvendor.hemparshwa.com%2F"
-              external
-              icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="m3 7 9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10" strokeLinejoin="round" /></svg>}
-            />
-            <ModuleCard
-              name="Driver Network Management"
-              description="Delivery assignments, status and proof of delivery."
-              produces="Dispatch · delivery · cost event"
-              href="/__gate/go?to=https%3A%2F%2Frc.hemparshwa.com%2F"
-              external
-              icon={<svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="M3 6h11v11H3zM14 10h3l4 4v3h-7zM7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-            />
-          </div>
-
-          <Arrow label="Authenticated API calls & webhooks" />
-
-          <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-            <section className="rounded-2xl border border-accent/30 bg-accent-soft/25 p-5">
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-accent text-white">
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]"><path d="M7 7h10M7 12h10M7 17h6" strokeLinecap="round" /><path d="M4 4h16v16H4z" strokeLinejoin="round" /></svg>
-                </span>
-                <div>
-                  <h3 className="font-semibold tracking-tight text-ink">Integration layer</h3>
-                  <p className="text-sm text-ink-2">Validates, deduplicates and routes versioned events.</p>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
-                <span className="rounded-lg bg-surface px-3 py-2 text-ink-2">Webhook receiver</span>
-                <span className="rounded-lg bg-surface px-3 py-2 text-ink-2">Identity resolution</span>
-                <span className="rounded-lg bg-surface px-3 py-2 text-ink-2">Retry & audit log</span>
-              </div>
-            </section>
-            <section className="rounded-2xl border border-line bg-inset p-5">
-              <h3 className="font-semibold tracking-tight text-ink">Shared identifiers</h3>
-              <p className="mt-1 text-sm text-ink-2">The keys that make records joinable.</p>
-              <p className="mt-4 font-mono text-xs leading-6 text-ink-2">customer_id · normalized_phone<br />order_id · SKU · store_id · driver_id</p>
-            </section>
-          </div>
-
-          <Arrow label="Clean, linked event history" />
-
-          <section className="rounded-2xl border border-line bg-inset p-5 sm:p-6">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-              <div>
-                <h3 className="font-semibold tracking-tight text-ink">Unified decision layer</h3>
-                <p className="mt-1 text-sm text-ink-2">A warehouse retains history; reporting reads it without slowing operational apps.</p>
-              </div>
-              <span className="mt-2 text-xs font-medium text-status-good sm:mt-0">Read-only analytics</span>
+    <section className={`${card} flex flex-col p-5`} aria-label={m.label}>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-base font-semibold tracking-tight text-ink"><ModuleLink module={m} /></h2>
+        <Link href={`/flow?m=${m.key}${query}`} className="shrink-0 text-sm font-medium text-accent hover:underline">View KPIs</Link>
+      </div>
+      {shown.length ? (
+        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">
+          {shown.map((k) => (
+            <div key={k.label} className="min-w-0">
+              <dt className={eyebrow}>{k.label}</dt>
+              <dd className="tnum mt-1 truncate text-xl font-semibold tracking-tight text-ink">{k.value}</dd>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                ['Conversion', 'Walk-in → lead → sale by store and product'],
-                ['Availability', 'Missed demand where requested SKUs were unavailable'],
-                ['Fulfilment', 'Order → delivery time and delivery success rate'],
-                ['Profitability', 'Sales − vendor cost − delivery cost'],
-              ].map(([title, description]) => (
-                <div key={title} className="rounded-xl border border-line bg-surface p-4">
-                  <p className="font-medium text-ink">{title}</p>
-                  <p className="mt-1 text-sm leading-5 text-ink-2">{description}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      </section>
+          ))}
+        </dl>
+      ) : <p className="mt-4 text-sm text-ink-2">Not available right now.</p>}
+    </section>
+  );
+}
 
-      <section className="mt-6 grid gap-3 lg:grid-cols-3">
-        {[
-          ['1. Establish IDs', 'Normalize phone numbers and agree ownership for customer, order, SKU, store and driver identifiers.'],
-          ['2. Publish events', 'Start with visit-created, order-confirmed, stock-changed and delivery-completed webhooks.'],
-          ['3. Build the view', 'Load immutable events into an analytics store and calculate conversion, fulfilment and margin there.'],
-        ].map(([step, detail], index) => (
-          <article key={step} className="card rounded-2xl border border-line bg-surface p-5">
-            <span className="text-xs font-semibold text-accent">0{index + 1}</span>
-            <h2 className="mt-2 font-semibold tracking-tight text-ink">{step}</h2>
-            <p className="mt-1 text-sm leading-6 text-ink-2">{detail}</p>
-          </article>
-        ))}
-      </section>
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requireUser();
+  const sp = await searchParams;
+  const range = pickRange(sp, monthToDate());
+  const from = range.from!, to = range.to!;
+  const current = OVERVIEW_MODULES.find((m) => m.key === sp.m) ?? null;
+  const allDates = current?.key === 'marketing' && sp.all === '1';
+  const period: Period = { from, to, allDates };
+  const query = range.picked ? `&from=${from}&to=${to}` : '';
+
+  const access = new Set(((await headers()).get(OVERVIEW_ACCESS_HEADER) ?? '').split(',').filter(Boolean));
+  const allowed = (m: OverviewModule) => access.has('admin') || (!!m.gate && access.has(m.gate));
+
+  const filters = (
+    <PlacedFilters>
+      <FilterBox>
+        <form action="/flow" className="flex flex-wrap items-center justify-end gap-2">
+          {current && <input type="hidden" name="m" value={current.key} />}
+          <label className={`flex items-center gap-1.5 ${filterLabel}`}>From<input type="date" name="from" defaultValue={from} className={control} /></label>
+          <label className={`flex items-center gap-1.5 ${filterLabel}`}>To<input type="date" name="to" defaultValue={to} className={control} /></label>
+          <button className={button}>Apply</button>
+          {current?.key === 'marketing' && <Link href="/flow?m=marketing&all=1" className={button}>All dates</Link>}
+        </form>
+      </FilterBox>
+    </PlacedFilters>
+  );
+
+  if (current) {
+    const canSee = allowed(current);
+    const kpis = canSee ? await loadModuleKpis(current.key, period) : null;
+    return (
+      <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <PageHeader title={<ModuleLink module={current} />} description="The key figures from this module's own dashboard." meta={allDates ? 'All dates' : rangeLabel(from, to)} />
+        {filters}
+        {kpis ? <KpiGrid>{kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} caption={k.caption} />)}</KpiGrid> : <Unavailable locked={!canSee} module={current} />}
+      </main>
+    );
+  }
+
+  const visible = OVERVIEW_MODULES.filter(allowed);
+  const loaded = await Promise.all(visible.map(async (m) => ({ module: m, kpis: await loadModuleKpis(m.key, period) })));
+  const hidden = OVERVIEW_MODULES.length - visible.length;
+  return (
+    <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader title="Master summary" description="The headline figures from every module in one place." meta={rangeLabel(from, to)} />
+      {filters}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {loaded.map(({ module: m, kpis }) => <SummaryCard key={m.key} module={m} kpis={kpis} query={query} />)}
+      </div>
+      {hidden > 0 && <p className="text-sm text-ink-muted">{hidden} {hidden === 1 ? 'module is' : 'modules are'} hidden because you have not signed in to {hidden === 1 ? 'it' : 'them'}.</p>}
     </main>
   );
 }
