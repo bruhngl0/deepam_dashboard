@@ -264,6 +264,14 @@ async function goToPeer(req: NextRequest, cfg: GateConfig) {
 }
 
 /** Returns the response to send instead of the page, or null to let the request through. */
+/** The module keys this visitor is signed in to, plus `admin` for the Hemparshwa admin. */
+export async function gateAccess(req: NextRequest, cfg: GateConfig): Promise<string[]> {
+  if ((await adminSession(req)) || process.env.NODE_ENV !== 'production') return ['admin'];
+  const keys: string[] = [];
+  for (const m of cfg.modules) if (await signedIn(req, m)) keys.push(m.key);
+  return keys;
+}
+
 export async function siteGate(req: NextRequest, cfg: GateConfig): Promise<NextResponse | null> {
   const { pathname, search } = req.nextUrl;
   if (pathname === ADMIN_PASS_PATH && req.method === 'GET') return adminSignIn(req, cfg);

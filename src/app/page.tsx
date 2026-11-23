@@ -40,7 +40,7 @@ export default async function HeroPage() {
           </span>
           <h2 className="text-lg font-semibold tracking-tight text-ink">Overview</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
-            How the modules connect — one customer journey from walk-in to delivery.
+            A master summary of every module, with each module's key KPIs.
           </p>
         </Link>
 
