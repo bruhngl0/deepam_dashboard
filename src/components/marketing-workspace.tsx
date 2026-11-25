@@ -10,6 +10,7 @@ import { MarketingSalespeople } from './marketing-salespeople';
 import { MarketingImport } from './marketing-import';
 import { LeadActions } from './marketing-lead-actions';
 import { ExistingCustomerCallList } from './existing-customer-call-list';
+import { DriverDesk } from './driver-desk';
 import { MarketingConverted } from './marketing-converted';
 import { campaignBuyers } from '@/lib/marketing/campaign-buyers';
 import { useLeadTypeConversions } from './lead-type-conversions-panel';
@@ -78,7 +79,7 @@ export function MarketingWorkspace() {
   const contactedToday = scope.filter(l => l.interactions.some(i => i.type === 'call' && i.at.startsWith(today) && !!i.outcome?.startsWith('Connected'))).length;
   const convertedToday = new Set(leadSales(data, scope).filter(sale => sale.date.startsWith(today)).map(sale => sale.phone)).size;
 
-  const showFilters = section !== 'Team performance' && !(section === 'Leads' && ['Existing customers', 'Online customers', 'Import'].includes(leadsView));
+  const showFilters = section !== 'Team performance' && section !== 'Drivers' && !(section === 'Leads' && ['Existing customers', 'Online customers', 'Import'].includes(leadsView));
   const subNav = <T extends string>(label: string, items: readonly T[], current: T, choose: (item: T) => void, count?: (item: T) => number | null) =>
     <nav className="flex flex-wrap gap-2" aria-label={label}>{items.map(item => { const n = count?.(item); return <button key={item} className={current === item ? primary : button} aria-current={current === item ? 'page' : undefined} onClick={() => choose(item)}>{item}{n === null || n === undefined ? '' : ` (${n})`}</button>; })}</nav>;
 
@@ -136,6 +137,7 @@ export function MarketingWorkspace() {
 
     {section === 'Campaigns' && <CampaignPerformance filters={{ from, to, store, source }} />}
     {section === 'Team performance' && <MarketingSalespeople data={data} />}
+    {section === 'Drivers' && <DriverDesk mode="marketing" />}
     <p className="text-xs text-ink-muted">Leads and bills are shared by every desk and refresh automatically. Leads can arrive from a connected Google Sheet; no live POS sync is connected. Calls, WhatsApp and email open your apps; you record outcomes here. {stats.total} leads match the page filters.</p>
     <footer className="border-t border-line pt-5 text-xs text-ink-muted"><p>One lead per Contact No. · Multiple acquisition sources · Shared database</p></footer>
   </main>;

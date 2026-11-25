@@ -1,5 +1,5 @@
 /**
- * Marketing Intelligence's four sections. They are tabs in the site header (nav-tabs.tsx) and the page
+ * Marketing Intelligence's sections. They are tabs in the site header (nav-tabs.tsx) and the page
  * shows the one named in the URL: /marketing, /marketing?module=leads, …campaigns, …team.
  */
 export const MARKETING_MODULES = [
@@ -7,6 +7,7 @@ export const MARKETING_MODULES = [
   { label: 'Leads', slug: 'leads' },
   { label: 'Campaigns', slug: 'campaigns' },
   { label: 'Team performance', slug: 'team' },
+  { label: 'Drivers', slug: 'drivers' },
 ] as const;
 
 export type MarketingModule = (typeof MARKETING_MODULES)[number]['label'];
