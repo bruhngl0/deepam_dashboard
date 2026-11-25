@@ -1100,6 +1100,34 @@ export type VendorPurchaseItem = typeof vendorPurchaseItems.$inferSelect;
 export type VendorPayment = typeof vendorPayments.$inferSelect;
 export type VendorCustomerDemand = typeof vendorCustomerDemands.$inferSelect;
 export type SaleLineItem = typeof saleLineItems.$inferSelect;
+/** Drivers desk (Marketing → Drivers, and a tab on every calling desk): a shared list anyone may call, no claiming. */
+export const driverContacts = pgTable(
+  'driver_contacts',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    name: text('name').notNull(),
+    /** E.164, e.g. +919844262061. */
+    phone: text('phone').notNull(),
+    addedBy: text('added_by').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('driver_contacts_phone_uidx').on(t.phone)],
+);
+
+export const driverCalls = pgTable(
+  'driver_calls',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    driverId: bigint('driver_id', { mode: 'number' }).notNull().references(() => driverContacts.id, { onDelete: 'cascade' }),
+    caller: text('caller').notNull(),
+    outcome: text('outcome').notNull(),
+    note: text('note').notNull().default(''),
+    calledAt: timestamp('called_at', { mode: 'string' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('driver_calls_driver_idx').on(t.driverId, t.calledAt), index('driver_calls_caller_idx').on(t.caller, t.calledAt)],
+);
+
 export type OutreachContact = typeof outreachContacts.$inferSelect;
 export type StoreVisit = typeof storeVisits.$inferSelect;
 export type MarketingCall = typeof marketingCalls.$inferSelect;
