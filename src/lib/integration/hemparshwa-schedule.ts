@@ -15,6 +15,7 @@ import type { CustomerProjectionResult, ProjectionResult } from './hemparshwa-pr
 import type { HemparshwaIdsResult } from './hemparshwa-ids';
 import type { CrmConversionSync } from '@/lib/marketing/crm-conversions';
 import { startWalkInPushScheduler, type WalkInPush } from './hemparshwa-walkins';
+import type { PeoplePush } from './hemparshwa-people';
 
 export type HemparshwaRun = SyncResult & {
   customers: CustomerProjectionResult | null;
@@ -25,6 +26,8 @@ export type HemparshwaRun = SyncResult & {
   conversions: CrmConversionSync | { error: string } | null;
   /** WalkTrack walk-ins sent to Hemparshwa (hemparshwa-walkins.ts); an error here never fails the sync. */
   walkIns: WalkInPush | { error: string } | null;
+  /** HR's employee list sent to Hemparshwa's Auth Control (hemparshwa-people.ts); an error here never fails the sync. */
+  people: PeoplePush | { error: string } | null;
 };
 
 const state = globalThis as unknown as {
@@ -64,7 +67,13 @@ export function runHemparshwaSync(forceRebuild = false): Promise<HemparshwaRun> 
       console.error('[hemparshwa walk-ins]', error);
       return { error: error instanceof Error ? error.message : String(error) };
     });
-    return { ...sync, customers, projection, ids, conversions, walkIns };
+    // And HR's employee list (job titles, status) for Auth Control's role suggestions and leaver checks.
+    const { pushHrPeople } = await import('./hemparshwa-people');
+    const people = await pushHrPeople().catch((error: unknown) => {
+      console.error('[hemparshwa people]', error);
+      return { error: error instanceof Error ? error.message : String(error) };
+    });
+    return { ...sync, customers, projection, ids, conversions, walkIns, people };
   })().finally(() => {
     state.hemparshwaSyncRunning = undefined;
   });
