@@ -5,7 +5,7 @@
  * dashboard (`/daily`), HR Intelligence (`/hr`), Customer
  * Intelligence (`/crm`), Vendor Intelligence (`/vendor`), the external Driver
  * Network Management and Store Performance Tracker services, Marketing
- * Intelligence (`/marketing`), Auth Control (Hemparshwa OS `/auth-control`, admins only). Ananta Partner Network (`/partners`) opens from Ananta Retail in Hemparshwa OS.
+ * Intelligence (`/marketing`), Auth Control lives in Hemparshwa OS → Settings → Deepam by Ananta. Ananta Partner Network (`/partners`) opens from Ananta Retail in Hemparshwa OS.
  * This page is just the door between them, not
  * a dashboard of its own, so `NavTabs` shows nothing here (see
  * `components/nav-tabs.tsx`).
@@ -162,24 +162,6 @@ export default async function HeroPage() {
           <p className="max-w-[36ch] text-sm text-ink-2">
             Daily store closings and deposits, payment requests and approvals, payments, cheques and bank balances.
             Opens in Hemparshwa OS with your own sign-in.
-          </p>
-        </a>
-
-        <a
-          href="https://nvc57svvmb.ap-south-1.awsapprunner.com/auth-control"
-          rel="noreferrer"
-          className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]">
-              <path d="M12 3 5 6v5c0 4.5 3 8.2 7 10 4-1.8 7-5.5 7-10V6l-7-3Z" strokeLinejoin="round" />
-              <path d="m9 12 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <h2 className="text-lg font-semibold tracking-tight text-ink">Auth Control</h2>
-          <p className="max-w-[36ch] text-sm text-ink-2">
-            Who can open what: access roles, single-module grants and every change. Admins only; opens in Hemparshwa OS
-            with your own sign-in.
           </p>
         </a>
 
