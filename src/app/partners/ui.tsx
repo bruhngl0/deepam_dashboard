@@ -107,7 +107,7 @@ const BAD = 'bg-red-500/10 text-red-700 ring-red-600/20 dark:text-red-300';
 const QUIET = 'bg-inset text-ink-2 ring-line';
 
 const TONE: Record<string, string> = {
-  applied: WAIT, approved: GOOD, rejected: QUIET, suspended: BAD,
+  applied: WAIT, approved: GOOD, on_hold: WAIT, rejected: QUIET, suspended: BAD, terminated: QUIET,
   registered: INFO, converted: GOOD, expired: QUIET, declined: QUIET,
   pending: WAIT, validated: INFO, paid: GOOD,
 };

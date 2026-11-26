@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { OCCASIONS, PARTNER_CATEGORIES, REFERRAL_STORES } from '@/lib/partners/constants';
+import { OCCASIONS, REFERRAL_STORES } from '@/lib/partners/constants';
 import { applyAction, referAction, type FormState } from './actions';
 import { btn, errorText, input, label, select } from './styles';
 
@@ -16,7 +16,7 @@ function Message({ text }: { text: string }) {
   return text ? <p role="alert" className={`mb-[18px] ${errorText}`}>{text}</p> : null;
 }
 
-export function ApplicationForm() {
+export function ApplicationForm({ categories }: { categories: string[] }) {
   const [state, action, pending] = useActionState(applyAction, initial);
   const v = state.values;
   // A new key per attempt re-mounts the fields with what was typed, after React resets the form.
@@ -34,7 +34,7 @@ export function ApplicationForm() {
           <div><label htmlFor="p-category" className={label}>Partner Category {required}</label>
             <select id="p-category" name="category" required defaultValue={v.category ?? ''} className={select}>
               <option value="" disabled>Please select</option>
-              {PARTNER_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+              {categories.map((c) => <option key={c}>{c}</option>)}
             </select></div>
           <div><label htmlFor="p-city" className={label}>City {required}</label>
             <input id="p-city" name="city" type="text" required maxLength={80} autoComplete="address-level2" defaultValue={v.city} className={input} /></div>

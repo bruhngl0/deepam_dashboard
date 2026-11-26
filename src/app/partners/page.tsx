@@ -7,14 +7,15 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { monthLabel } from '@/lib/partners/constants';
 import { partnerLinkBase } from '@/lib/partners/links';
-import { getRules, overview } from '@/lib/partners/queries';
+import { overview } from '@/lib/partners/queries';
+import { rulesFor } from '@/lib/partners/rules';
 import { refreshReferrals } from '@/lib/partners/store';
 import { todayIst } from '@/lib/queries/daily';
 import { pickRange, pickStores, rangeLabel } from '@/lib/module-filters';
 import { formatCurrency, formatCurrencyCompact, formatNumber, formatPercent } from '@/lib/format';
 import { button, primaryButton } from '@/components/ui';
 import { WhatsAppShare } from '@/components/whatsapp-share';
-import { Bar, Callout, Empty, Icon, Panel, PanelLink, PartnerHeader, Stat, td, th, tr, Who } from './ui';
+import { Bar, Empty, Icon, Panel, PanelLink, PartnerHeader, Stat, td, th, tr, Who } from './ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,8 +28,7 @@ export default async function PartnersOverviewPage({ searchParams }: { searchPar
   const month = (to ?? todayIst()).slice(0, 7);
   const carry = new URLSearchParams(Object.entries({ store: stores ?? '', from: from ?? '', to: to ?? '' }).filter(([, v]) => v)).toString();
   const withScope = (href: string) => (carry ? `${href}${href.includes('?') ? '&' : '?'}${carry}` : href);
-  const [o, rules, base] = await Promise.all([overview({ from, to, stores }), getRules(), partnerLinkBase()]);
-  const ratesMissing = rules.levels.filter((l) => l.percent === null).length;
+  const [o, rules, base] = await Promise.all([overview({ from, to, stores }), rulesFor(), partnerLinkBase()]);
   const applyLink = base;
 
   const maxCat = Math.max(0, ...o.byCategory.map((c) => c.referrals));
@@ -40,23 +40,17 @@ export default async function PartnersOverviewPage({ searchParams }: { searchPar
         meta={`Referrals and bills: ${rangeLabel(from, to)}${stores ? ' · filtered by store' : ''}`}
         actions={<><Link href="/partners/list?status=applied" className={button}><Icon name="inbox" />Review applications{o.applied > 0 && <span className="tnum rounded-full bg-amber-500/15 px-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300">{o.applied}</span>}</Link><Link href={withScope("/partners/referrals")} className={primaryButton}><Icon name="check" />Validate bills</Link></>} />
 
-      {ratesMissing > 0 && (
-        <Callout tone="wait" title={`Commission % is not set for ${ratesMissing} of the 5 levels`}>
-          Bills are still matched, but cannot be validated for payout until the partner&rsquo;s level has a rate. <Link href="/partners/rules" className="font-medium underline">Set the rules</Link>
-        </Callout>
-      )}
-
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon="inbox" tone="wait" label="Applications to review" value={formatNumber(o.applied)} href="/partners/list?status=applied" caption={`${formatNumber(o.rejected)} rejected so far`} highlight={o.applied > 0} />
-        <Stat icon="users" label="Active partners" value={formatNumber(o.approved)} href="/partners/list?status=approved" caption={o.suspended ? `${formatNumber(o.suspended)} suspended` : 'Approved, link accepting registrations'} />
+        <Stat icon="users" label="Active partners" value={formatNumber(o.approved)} href="/partners/list?status=approved" caption={o.suspended ? `${formatNumber(o.suspended)} on hold or suspended` : 'Link accepting registrations'} />
         <Stat icon="link" tone="info" label="Referred customers" value={formatNumber(o.referrals)} href={withScope("/partners/referrals")}
-          caption={`${formatNumber(o.open)} inside the ${rules.windowDays}-day window · ${formatNumber(o.declined)} not accepted`} />
+          caption={`${formatNumber(o.open)} inside the ${rules.terms.referralDays}-day validity · ${formatNumber(o.declined)} not accepted`} />
         <Stat icon="bag" tone="good" label="Purchased" value={formatNumber(o.converted)} href={withScope("/partners/referrals?status=converted")}
           caption={`${formatPercent(o.converted, o.converted + o.expired)} of closed windows · ${formatCurrencyCompact(o.salesValue)} in bills`} />
         <Stat icon="receipt" tone="wait" label="Bills to validate" value={formatNumber(o.toValidate)} href={withScope("/partners/referrals")} caption={`${formatCurrencyCompact(o.toValidateValue)} in bills, matched to referrals`} highlight={o.toValidate > 0} />
         <Stat icon="wallet" tone="info" label="Validated, not yet paid" value={formatCurrency(o.validatedUnpaid)} href="/partners/payouts" caption="Commission in the payout cycle" />
         <Stat icon="rupee" tone="good" label={from || to || stores ? 'Commission paid' : `Paid · ${monthLabel(month)}`} value={formatCurrency(o.paidThisMonth)} href={`/partners/payouts?month=${month}`} caption={from || to || stores ? 'On bills in the period and stores picked' : 'Commission paid on bills so far'} />
-        <Stat icon="sliders" tone="quiet" label="Rules" value={`${rules.windowDays} days`} href="/partners/rules" caption={`Purchase window · a bill in the last ${rules.lookbackYears} years makes a number ineligible`} />
+        <Stat icon="sliders" tone="quiet" label="Rules" value={`${rules.levels[0].commissionPercent}–${rules.levels[4].commissionPercent}%`} href="/partners/rules" caption={`Whole-month commission by monthly sales · ${rules.terms.referralDays}-day referrals`} />
       </div>
 
       <section className="hero-card flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-5 text-on-dark sm:px-6">

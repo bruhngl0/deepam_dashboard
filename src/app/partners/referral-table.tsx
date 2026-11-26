@@ -25,17 +25,19 @@ export function ReferralTable({ referrals, back, showPartner = true, empty }: { 
                 {showPartner && <td className={td}><Link href={`/partners/${r.partnerCode ?? r.partnerId}`} className="text-ink hover:text-accent hover:underline">{r.partnerName}</Link><span className="tnum block text-xs text-ink-muted">{r.partnerCode}</span></td>}
                 <td className={`${td} text-ink-2`}>{r.occasion}<span className="block text-xs text-ink-muted">{[r.storeName, r.appointmentDate && formatDate(r.appointmentDate)].filter(Boolean).join(' · ')}</span></td>
                 <td className={`tnum ${td} text-ink-2`}>{formatDate(r.registeredAt)}{r.status !== 'declined' && <span className="block text-xs text-ink-muted">Window to {formatDate(r.windowEndsOn)}</span>}</td>
-                <td className={td}><ReferralBadge status={r.status} />{r.declineReason && <span className="mt-1 block max-w-[16rem] text-xs text-ink-muted">{DECLINE_LABEL[r.declineReason]}</span>}</td>
+                <td className={td}><ReferralBadge status={r.status} />{r.declineReason && <span className="mt-1 block max-w-[16rem] text-xs text-ink-muted">{DECLINE_LABEL[r.declineReason]}{r.verifyNote ? `: “${r.verifyNote}”` : ''}</span>}
+                  {r.verifyStatus === 'pending' && <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">Existing customer: to verify</span>}
+                  {r.verifyStatus === 'verified' && <span className="mt-1 block max-w-[16rem] text-xs text-ink-muted">Existing customer, verified{r.verifiedBy ? ` by ${r.verifiedBy}` : ''}</span>}</td>
                 <td className={td}>
                   {r.commissions.length === 0 ? <span className="text-ink-muted">—</span> : (
                     <ul className="space-y-2">
                       {r.commissions.map((c) => (
                         <li key={c.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-inset/50 px-3 py-2">
                           <span className="tnum inline-flex items-center gap-1 font-medium text-ink"><Icon name="receipt" className="size-3.5 text-ink-muted" />{c.voucherNo}</span>
-                          <span className="tnum text-ink-2">{formatDate(c.billedAt)} · {formatCurrency(c.billAmount)}{c.storeName ? ` · ${c.storeName}` : ''}</span>
+                          <span className="tnum text-ink-2">{formatDate(c.billedAt)} · {formatCurrency(c.billAmount)}{c.net !== c.billAmount ? ` (${formatCurrency(c.net)} before GST, less returns)` : ''}{c.storeName ? ` · ${c.storeName}` : ''}</span>
                           <CommissionBadge status={c.status} />
                           {c.amount !== null && <span className="tnum font-semibold text-ink">{formatCurrency(c.amount)} <span className="text-xs text-ink-muted">({c.percent}%{c.payoutMonth ? `, ${monthLabel(c.payoutMonth)}` : ''})</span></span>}
-                          {c.estimate !== null && <span className="tnum text-xs text-ink-muted">≈ {formatCurrency(c.estimate)} at current level</span>}
+                          {c.estimate !== null && <span className="tnum text-xs text-ink-muted">≈ {formatCurrency(c.estimate)} at the month&rsquo;s rate so far</span>}
                           {c.reference && <span className="text-xs text-ink-muted">Ref {c.reference}</span>}
                           {c.note && <span className="text-xs text-ink-muted">“{c.note}”</span>}
                           {(c.status === 'pending' || c.status === 'validated') && (
