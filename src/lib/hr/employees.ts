@@ -130,6 +130,9 @@ export async function saveEmployee(code: string, e: EmployeeInput, create: boole
   } else {
     await db.execute(sql`UPDATE employees SET (${cols}, updated_at) = (${v}, now()) WHERE employee_code = ${code}`);
   }
+  // Hemparshwa's Auth Control follows at once: someone marked Exited loses access to every app now.
+  const { sendHrPeopleNow } = await import('@/lib/integration/hemparshwa-people');
+  await sendHrPeopleNow();
 }
 
 /**
@@ -161,6 +164,10 @@ export async function applyBasicDetails(rows: BasicDetails[]) {
       updated += res.length;
     }
   });
+  if (updated) {
+    const { sendHrPeopleNow } = await import('@/lib/integration/hemparshwa-people');
+    await sendHrPeopleNow();
+  }
   return { updated, unchanged: rows.length - notOnList.length - updated, notOnList, conflicts };
 }
 

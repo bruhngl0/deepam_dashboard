@@ -6,7 +6,7 @@ import type { Employee } from '@/lib/hr/employees';
  * who have left but can still sign in; it never changes anyone's access by itself. Sent at the end of every sync.
  */
 
-export type PeoplePush = { received: number; withLogin: number; newTitles: number };
+export type PeoplePush = { received: number; withLogin: number; newTitles: number; exited?: number };
 
 /** What is sent for one employee: exported for tests. */
 export const hrPerson = (e: Employee) => ({
@@ -14,7 +14,7 @@ export const hrPerson = (e: Employee) => ({
   store: e.storeName ?? e.storeCode, status: e.status, exitDate: e.exitDate,
 });
 
-export async function pushHrPeople(): Promise<PeoplePush | null> {
+export async function pushHrPeople(timeoutMs = 60_000): Promise<PeoplePush | null> {
   const base = process.env.HEMPARSHWA_URL?.replace(/\/+$/, '');
   const token = process.env.HEMPARSHWA_INTEGRATION_TOKEN;
   if (!base || !token) return null;
@@ -26,8 +26,21 @@ export async function pushHrPeople(): Promise<PeoplePush | null> {
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ employees }),
     cache: 'no-store',
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`Hemparshwa /api/integration/hr-people returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
   return (await res.json()) as PeoplePush;
+}
+
+/**
+ * Right after HR saves an employee or imports details: so someone marked Exited loses every app at once (Hemparshwa
+ * exits them), not at the next sync. Never fails the save; the next sync sends it again anyway.
+ */
+export async function sendHrPeopleNow() {
+  try {
+    const r = await pushHrPeople(10_000);
+    if (r?.exited) console.log(`[hemparshwa people] ${r.exited} exited in Hemparshwa after an HR change`);
+  } catch (error) {
+    console.error('[hemparshwa people] after an HR change:', error instanceof Error ? error.message : error);
+  }
 }
