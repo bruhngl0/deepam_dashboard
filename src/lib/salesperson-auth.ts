@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
-import { getDriverCaller, getSalespersonByEmployeeNumber, type Salesperson } from './salespeople';
-import { SALES_SESSION_COOKIE, salesSessionToken, verifySalesSessionToken } from './sales-session';
+import { deskPerson, type DeskPerson } from './desk-access';
+import type { Desk } from './sales-pass';
+import { SALES_SESSION_COOKIE, salesSessionToken, verifySalesSession } from './sales-session';
+import type { Salesperson } from './salespeople';
 
 export const SALES_LOGIN_ROUTE = '/sales';
 /** Everyone signs in at Hemparshwa OS; a salesperson arrives from there at /sales/sso, signed in to their desk. */
@@ -15,23 +17,21 @@ const cookieOptions = {
   path: '/',
 };
 
-export async function getAuthenticatedSalesperson() {
-  const employeeNumber = await verifySalesSessionToken((await cookies()).get(SALES_SESSION_COOKIE)?.value);
-  return employeeNumber ? getSalespersonByEmployeeNumber(employeeNumber) : undefined;
+/** A salesperson signed in to their calling desk (not a drivers-only caller). The proxy has checked the desk still stands. */
+export async function getAuthenticatedSalesperson(): Promise<Salesperson | undefined> {
+  const person = await getDeskCaller();
+  if (!person || person.driversOnly) return undefined;
+  return { employeeNumber: person.employeeNumber, name: person.name, slug: person.slug };
 }
 
 /** Anyone signed in to a calling desk: a salesperson, or a driver caller (driversOnly: the Drivers list and nothing else). */
-export async function getDeskCaller(): Promise<(Salesperson & { driversOnly: boolean }) | undefined> {
-  const employeeNumber = await verifySalesSessionToken((await cookies()).get(SALES_SESSION_COOKIE)?.value);
-  if (!employeeNumber) return undefined;
-  const salesperson = getSalespersonByEmployeeNumber(employeeNumber);
-  if (salesperson) return { ...salesperson, driversOnly: false };
-  const caller = getDriverCaller(employeeNumber);
-  return caller ? { ...caller, driversOnly: true } : undefined;
+export async function getDeskCaller(): Promise<DeskPerson | undefined> {
+  return deskPerson(await verifySalesSession((await cookies()).get(SALES_SESSION_COOKIE)?.value));
 }
 
-export async function setSalespersonSession(salesperson: Salesperson) {
-  (await cookies()).set(SALES_SESSION_COOKIE, await salesSessionToken(salesperson.employeeNumber), {
+/** Signs someone in to a desk. desk and name come from the Hemparshwa OS pass (Auth Control). */
+export async function setSalespersonSession(person: Salesperson, desk?: Desk, name?: string) {
+  (await cookies()).set(SALES_SESSION_COOKIE, await salesSessionToken(person.employeeNumber, desk, name), {
     ...cookieOptions,
     maxAge: 60 * 60 * 12,
   });

@@ -3,8 +3,7 @@ import { desc, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { marketingCalls } from '@/db/schema';
 import { OUTCOMES } from '@/lib/marketing/local';
-import { SALES_ONLY_HEADER } from '@/lib/sales-session';
-import { getSalespersonByEmployeeNumber } from '@/lib/salespeople';
+import { SALES_NAME_HEADER, SALES_ONLY_HEADER } from '@/lib/sales-session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,7 +33,12 @@ function parse(value: unknown): Incoming | null {
 function salesOnly(request: Request) {
   const employeeNumber = request.headers.get(SALES_ONLY_HEADER);
   if (!employeeNumber) return undefined;
-  return getSalespersonByEmployeeNumber(employeeNumber)?.name ?? null;
+  const name = request.headers.get(SALES_NAME_HEADER);
+  try {
+    return name ? decodeURIComponent(name) || null : null;
+  } catch {
+    return null;
+  }
 }
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
