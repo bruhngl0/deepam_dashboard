@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server';
 import proxy from './proxy';
 import { SALES_SESSION_COOKIE, salesSessionToken } from '@/lib/sales-session';
 
-async function hit(path: string, sales: boolean) {
+async function hit(path: string, sales: boolean, employee = 'DBYA0012') {
   const headers = new Headers();
-  if (sales) headers.set('cookie', `${SALES_SESSION_COOKIE}=${await salesSessionToken('DBYA0012')}`);
+  if (sales) headers.set('cookie', `${SALES_SESSION_COOKIE}=${await salesSessionToken(employee)}`);
   return proxy(new NextRequest(new URL(path, 'http://localhost:3000'), { headers }));
 }
 const lockedTo = (res: Response) => (res.status === 303 ? new URL(res.headers.get('location')!).pathname : null);
@@ -34,5 +34,19 @@ describe('salesperson lock', () => {
   it('ignores a forged desk cookie', async () => {
     const res = await proxy(new NextRequest(new URL('/hr', 'http://localhost:3000'), { headers: { cookie: `${SALES_SESSION_COOKIE}=DBYA0012.forged` } }));
     expect(lockedTo(res)).toBeNull();
+  });
+});
+
+describe('driver caller lock', () => {
+  it('keeps a driver caller (Ravi) on the desk and away from the lead APIs', async () => {
+    for (const path of ['/', '/marketing', '/crm']) expect(lockedTo(await hit(path, true, 'DBYA0099')), path).toBe('/sales/workspace');
+    for (const path of ['/api/marketing/dataset', '/api/marketing/calls', '/api/marketing/drivers']) {
+      expect((await hit(path, true, 'DBYA0099')).status, path).toBe(403);
+    }
+    for (const path of ['/sales/workspace', '/sales/api/drivers']) {
+      const res = await hit(path, true, 'DBYA0099');
+      expect(res.status, path).not.toBe(303);
+      expect(res.status, path).not.toBe(403);
+    }
   });
 });

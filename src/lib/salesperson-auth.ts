@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { getSalespersonByEmployeeNumber, type Salesperson } from './salespeople';
+import { getDriverCaller, getSalespersonByEmployeeNumber, type Salesperson } from './salespeople';
 import { SALES_SESSION_COOKIE, salesSessionToken, verifySalesSessionToken } from './sales-session';
 
 export const SALES_LOGIN_ROUTE = '/sales';
@@ -18,6 +18,16 @@ const cookieOptions = {
 export async function getAuthenticatedSalesperson() {
   const employeeNumber = await verifySalesSessionToken((await cookies()).get(SALES_SESSION_COOKIE)?.value);
   return employeeNumber ? getSalespersonByEmployeeNumber(employeeNumber) : undefined;
+}
+
+/** Anyone signed in to a calling desk: a salesperson, or a driver caller (driversOnly: the Drivers list and nothing else). */
+export async function getDeskCaller(): Promise<(Salesperson & { driversOnly: boolean }) | undefined> {
+  const employeeNumber = await verifySalesSessionToken((await cookies()).get(SALES_SESSION_COOKIE)?.value);
+  if (!employeeNumber) return undefined;
+  const salesperson = getSalespersonByEmployeeNumber(employeeNumber);
+  if (salesperson) return { ...salesperson, driversOnly: false };
+  const caller = getDriverCaller(employeeNumber);
+  return caller ? { ...caller, driversOnly: true } : undefined;
 }
 
 export async function setSalespersonSession(salesperson: Salesperson) {

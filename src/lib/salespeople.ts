@@ -53,6 +53,23 @@ export const SALESPEOPLE = [
   { employeeNumber: 'DBYACHENNAI', name: 'Chennai', slug: 'chennai' },
 ] as const satisfies readonly Salesperson[];
 
+/**
+ * People who call drivers only (Marketing → Drivers): they sign in at Hemparshwa OS like salespeople, but their desk
+ * shows the Drivers list and nothing else, and every lead and customer API refuses them. Not salespeople: they never
+ * appear in lead assignment or Team performance.
+ */
+export const DRIVER_CALLERS = [
+  { employeeNumber: 'DBYA0099', name: 'Ravi', slug: 'ravi' },
+] as const satisfies readonly Salesperson[];
+
+export const isDriverCaller = (employeeNumber: string | undefined) =>
+  !!employeeNumber && DRIVER_CALLERS.some(person => person.employeeNumber === employeeNumber.trim().toUpperCase());
+
+export function getDriverCaller(employeeNumber: string) {
+  const normalized = employeeNumber.trim().toUpperCase();
+  return DRIVER_CALLERS.find(person => person.employeeNumber === normalized);
+}
+
 export function getSalesperson(slug: string) {
   return SALESPEOPLE.find((salesperson) => salesperson.slug === slug);
 }

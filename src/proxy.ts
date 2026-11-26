@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { gateAccess, siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
 import { OVERVIEW_ACCESS_HEADER } from '@/lib/overview/modules';
 import { SALES_ONLY_HEADER, SALES_SESSION_COOKIE, verifySalesSessionToken } from '@/lib/sales-session';
+import { isDriverCaller } from '@/lib/salespeople';
 import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from '@/lib/store-manager-session';
 
 // One password per module on the hub. The hub itself, the sales and store-manager
@@ -59,9 +60,11 @@ const SALES_DESK = '/sales/workspace';
  * everything, sign out of the desk.
  */
 async function salesLock(req: NextRequest) {
-  if (!(await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value))) return null;
+  const employeeNumber = await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value);
+  if (!employeeNumber) return null;
   const { pathname } = req.nextUrl;
-  if (under(pathname, '/sales') || SALES_APIS.includes(pathname) || under(pathname, '/api/health')) return null;
+  // A driver caller's desk loads only /sales/api/drivers; the lead APIs are for salespeople.
+  if (under(pathname, '/sales') || (SALES_APIS.includes(pathname) && !isDriverCaller(employeeNumber)) || under(pathname, '/api/health')) return null;
   if (under(pathname, '/api')) return NextResponse.json({ error: 'The calling desk login opens the calling desk only.' }, { status: 403 });
   const proto = req.headers.get('x-forwarded-proto')?.split(',')[0].trim() || req.nextUrl.protocol.replace(':', '');
   const host = req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host') || req.nextUrl.host;
