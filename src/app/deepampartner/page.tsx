@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { activeCategoryNames } from '@/lib/partners/rules';
 import { ApplicationForm } from './forms';
 import { frame, heading, kicker, page, tile } from './styles';
 
@@ -15,7 +16,10 @@ export const metadata: Metadata = {
 };
 
 /** Public partner application. Approved partners get a Partner ID, a referral link and a dashboard. */
-export default function PartnerApplicationPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function PartnerApplicationPage() {
+  const categories = await activeCategoryNames();
   return (
     <main className={page}>
       <div className="mx-auto mb-10 max-w-[720px] text-center">
@@ -34,7 +38,7 @@ export default function PartnerApplicationPage() {
         ))}
       </ol>
       <div className={`${frame} mx-auto max-w-[800px]`}>
-        <ApplicationForm />
+        <ApplicationForm categories={categories} />
       </div>
     </main>
   );

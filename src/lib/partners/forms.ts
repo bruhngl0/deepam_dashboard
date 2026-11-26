@@ -5,7 +5,7 @@
  */
 
 import { normalizePhone } from '@/lib/phone';
-import { APPOINTMENT_MAX_DAYS, OCCASIONS, PARTNER_CATEGORIES, REFERRAL_STORES, type PartnerCategory } from './constants';
+import { APPOINTMENT_MAX_DAYS, OCCASIONS, REFERRAL_STORES } from './constants';
 
 export type Read = (key: string) => unknown;
 type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -28,13 +28,14 @@ export const addDays = (day: string, n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-export type PartnerApplication = { fullName: string; contact: string; phone: string; email: string; category: PartnerCategory; city: string };
+export type PartnerApplication = { fullName: string; contact: string; phone: string; email: string; category: string; city: string };
 
-export function parseApplication(read: Read): Parsed<PartnerApplication> {
+/** `categories`: the active partner categories (partner_categories). */
+export function parseApplication(read: Read, categories: readonly string[]): Parsed<PartnerApplication> {
   const fullName = text(read, 'fullName', 120);
   const contact = text(read, 'contact', 40);
   const email = text(read, 'email', 160).toLowerCase();
-  const category = PARTNER_CATEGORIES.find((c) => c === text(read, 'category', 60));
+  const category = categories.find((c) => c === text(read, 'category', 60));
   const city = text(read, 'city', 80);
   if (!fullName) return { ok: false, message: 'Please enter your full name.' };
   const phone = normalizePhone(contact);

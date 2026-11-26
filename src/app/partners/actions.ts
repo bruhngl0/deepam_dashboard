@@ -3,10 +3,13 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
-import { MONTH, PARTNER_CATEGORIES } from '@/lib/partners/constants';
+import { MONTH, PARTNER_STATUS_LABEL, PARTNER_STATUSES, type PartnerStatus } from '@/lib/partners/constants';
 import {
-  approvePartner, markPaid, PartnerError, rejectCommission, reopenCommission, rotateDashboardLink, savePartnerDocuments,
-  saveRules, setPartnerInactive, setPartnerLevel, updatePartnerDetails, validateCommissions, type LevelInput,
+  addCategory, activeCategoryNames, cancelScheduledVersion, renameCategory, saveRuleVersion, setCategoryActive, type RuleLevel,
+} from '@/lib/partners/rules';
+import {
+  declineExistingReferral, markPaid, PartnerError, rejectCommission, reopenCommission, rotateDashboardLink, savePartnerDocuments,
+  setPartnerLevel, setPartnerStatus, updatePartnerDetails, validateCommissions, verifyReferral,
 } from '@/lib/partners/store';
 
 const str = (form: FormData, key: string, max = 500) => String(form.get(key) ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -38,23 +41,27 @@ const partnerId = (form: FormData) => {
   return id;
 };
 
-export async function approveAction(form: FormData) {
-  await act(form, '/partners/list', async () => `Approved as ${await approvePartner(partnerId(form), form.get('level'), orNull(str(form, 'note')))}`);
-}
-export async function rejectAction(form: FormData) {
-  await act(form, '/partners/list', async () => { await setPartnerInactive(partnerId(form), 'rejected', orNull(str(form, 'note'))); return 'Application rejected'; });
-}
-export async function suspendAction(form: FormData) {
-  await act(form, '/partners/list', async () => { await setPartnerInactive(partnerId(form), 'suspended', orNull(str(form, 'note'))); return 'Partner suspended: their link no longer accepts registrations'; });
+/** Any status change (approve, reject, hold, suspend, reactivate, terminate): `to`, a reason and the name of who made it. */
+export async function statusAction(form: FormData) {
+  await act(form, '/partners/list', async () => {
+    const to = PARTNER_STATUSES.find((x) => x === str(form, 'to', 20)) as PartnerStatus | undefined;
+    if (!to) throw new PartnerError('Choose the new status');
+    const code = await setPartnerStatus(partnerId(form), to, orNull(str(form, 'reason')), orNull(str(form, 'by', 80)));
+    return code ? `Approved as ${code}` : `Now ${PARTNER_STATUS_LABEL[to].toLowerCase()}`;
+  });
 }
 export async function levelAction(form: FormData) {
-  await act(form, '/partners/list', async () => { await setPartnerLevel(partnerId(form), form.get('level')); return 'Level changed'; });
+  await act(form, '/partners/list', async () => {
+    await setPartnerLevel(partnerId(form), form.get('level'), orNull(str(form, 'reason')), orNull(str(form, 'by', 80)));
+    return 'Partnership level changed';
+  });
 }
 export async function detailsAction(form: FormData) {
   await act(form, '/partners/list', async () => {
     const fullName = str(form, 'fullName', 120), email = str(form, 'email', 160).toLowerCase(), city = str(form, 'city', 80), category = str(form, 'category', 60);
     if (!fullName || !email || !city) throw new PartnerError('Name, email and city are required');
-    if (!PARTNER_CATEGORIES.includes(category as (typeof PARTNER_CATEGORIES)[number])) throw new PartnerError('Choose a partner category');
+    const allowed = await activeCategoryNames();
+    if (!allowed.includes(category) && category !== str(form, 'currentCategory', 60)) throw new PartnerError('Choose a partner category');
     await updatePartnerDetails(partnerId(form), { fullName, email, city, category, notes: orNull(String(form.get('notes') ?? '').trim().slice(0, 2000)) });
     return 'Details saved';
   });
@@ -68,13 +75,22 @@ export async function rotateLinkAction(form: FormData) {
 
 export async function validateAction(form: FormData) {
   await act(form, '/partners/referrals', async () => {
-    const month = str(form, 'month', 7);
-    if (!MONTH.test(month)) throw new PartnerError('Choose the payout month');
     const ids = form.getAll('commission').map(Number).filter((n) => Number.isInteger(n) && n > 0);
     if (!ids.length) throw new PartnerError('Tick at least one bill to validate');
-    const { validated, noRate } = await validateCommissions(ids, month);
-    if (!validated && noRate) throw new PartnerError('Set the commission % for these partners’ levels under Rules first');
-    return `${validated} validated${noRate ? `; ${noRate} left because their level has no commission % yet` : ''}`;
+    const { validated, unverified } = await validateCommissions(ids);
+    if (!validated && unverified) throw new PartnerError('Verify these existing customers’ referrals first');
+    return `${validated} validated${unverified ? `; ${unverified} wait for their referral to be verified` : ''}`;
+  });
+}
+export async function verifyReferralAction(form: FormData) {
+  await act(form, '/partners/referrals', async () => {
+    const id = Number(form.get('referral'));
+    if (str(form, 'decision', 10) === 'decline') {
+      await declineExistingReferral(id, orNull(str(form, 'by', 80)), orNull(str(form, 'note')));
+      return 'Referral not accepted: it will not earn';
+    }
+    await verifyReferral(id, orNull(str(form, 'by', 80)), orNull(str(form, 'note')));
+    return 'Referral verified: its bills can be validated';
   });
 }
 export async function rejectCommissionAction(form: FormData) {
@@ -93,18 +109,44 @@ export async function markPaidAction(form: FormData) {
   });
 }
 
+const amount = (form: FormData, key: string, label: string) => {
+  const raw = str(form, key, 20).replace(/[₹,\s%]/g, '');
+  const n = raw === '' ? NaN : Number(raw);
+  if (!Number.isFinite(n)) throw new PartnerError(`${label}: enter a number`);
+  return Math.round(n * 100) / 100;
+};
+
 export async function rulesAction(form: FormData) {
   await act(form, '/partners/rules', async () => {
-    const levels: LevelInput[] = [1, 2, 3, 4, 5].map((level) => {
-      const raw = str(form, `percent_${level}`, 10).replace('%', '');
-      const percent = raw === '' ? null : Number(raw);
-      if (percent !== null && (!Number.isFinite(percent) || percent < 0 || percent > 100)) throw new PartnerError(`Level ${level}: commission % should be from 0 to 100`);
-      return { level, name: str(form, `name_${level}`, 60) || `Level ${level}`, percent: percent === null ? null : Math.round(percent * 100) / 100, notes: orNull(str(form, `notes_${level}`, 300)) };
-    });
-    const windowDays = Number(str(form, 'windowDays', 4)), lookbackYears = Number(str(form, 'lookbackYears', 2));
-    if (!Number.isInteger(windowDays) || windowDays < 1 || windowDays > 365) throw new PartnerError('Purchase window should be 1 to 365 days');
-    if (!Number.isInteger(lookbackYears) || lookbackYears < 1 || lookbackYears > 10) throw new PartnerError('Look-back should be 1 to 10 years');
-    await saveRules(levels, windowDays, lookbackYears);
-    return 'Rules saved';
+    const levels: RuleLevel[] = [1, 2, 3, 4, 5].map((level) => ({
+      level,
+      name: str(form, `name_${level}`, 60) || `Level ${level}`,
+      minSales: level === 1 ? 0 : amount(form, `min_${level}`, `Level ${level} minimum sales`),
+      commissionPercent: amount(form, `percent_${level}`, `Level ${level} commission %`),
+      bonus: amount(form, `bonus_${level}`, `Level ${level} bonus`),
+      influencerLimit: amount(form, `influencer_${level}`, `Level ${level} influencer fee limit`),
+      personalDiscount: amount(form, `discount_${level}`, `Level ${level} personal discount`),
+      benefits: str(form, `benefits_${level}`, 300),
+    }));
+    const terms = {
+      referralDays: amount(form, 'referralDays', 'Referral validity'), lookbackYears: amount(form, 'lookbackYears', 'Look-back'),
+      reviewMonths: amount(form, 'reviewMonths', 'Months averaged'), downgradeAfter: amount(form, 'downgradeAfter', 'Reviews below'),
+      annualShoppingLimit: amount(form, 'annualShoppingLimit', 'Annual shopping limit'),
+    };
+    const effectiveMonth = str(form, 'effectiveMonth', 7);
+    await saveRuleVersion({ levels, terms, effectiveMonth, reason: str(form, 'reason'), changedBy: str(form, 'by', 80) });
+    return `Rules saved: in force from ${effectiveMonth}`;
+  });
+}
+export async function cancelRulesAction(form: FormData) {
+  await act(form, '/partners/rules', async () => { await cancelScheduledVersion(Number(form.get('version'))); return 'Scheduled rules cancelled'; });
+}
+export async function categoryAction(form: FormData) {
+  await act(form, '/partners/rules', async () => {
+    const op = str(form, 'op', 10), name = str(form, 'name', 60);
+    if (op === 'add') { await addCategory(name); return 'Category added'; }
+    if (op === 'rename') { await renameCategory(name, str(form, 'to', 60)); return 'Category renamed'; }
+    if (op === 'hide' || op === 'show') { await setCategoryActive(name, op === 'show'); return op === 'hide' ? 'Category hidden from the application form' : 'Category offered again'; }
+    throw new PartnerError('Unknown change');
   });
 }
