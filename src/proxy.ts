@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { gateAccess, siteGate, type GateConfig, type GateModule } from '@/lib/site-gate';
 import { OVERVIEW_ACCESS_HEADER } from '@/lib/overview/modules';
-import { SALES_ONLY_HEADER, SALES_SESSION_COOKIE, verifySalesSessionToken } from '@/lib/sales-session';
-import { isDriverCaller } from '@/lib/salespeople';
+import { deskPerson, driversOnly, sessionStillValid } from '@/lib/desk-access';
+import { SALES_NAME_HEADER, SALES_ONLY_HEADER, SALES_SESSION_COOKIE, verifySalesSession } from '@/lib/sales-session';
 import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from '@/lib/store-manager-session';
 
 // One password per module on the hub. The hub itself, the sales and store-manager
@@ -60,14 +60,22 @@ const SALES_DESK = '/sales/workspace';
  * everything, sign out of the desk.
  */
 async function salesLock(req: NextRequest) {
-  const employeeNumber = await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value);
-  if (!employeeNumber) return null;
+  const session = await verifySalesSession(req.cookies.get(SALES_SESSION_COOKIE)?.value);
+  if (!session) return null;
   const { pathname } = req.nextUrl;
-  // A driver caller's desk loads only /sales/api/drivers; the lead APIs are for salespeople.
-  if (under(pathname, '/sales') || (SALES_APIS.includes(pathname) && !isDriverCaller(employeeNumber)) || under(pathname, '/api/health')) return null;
-  if (under(pathname, '/api')) return NextResponse.json({ error: 'The calling desk login opens the calling desk only.' }, { status: 403 });
   const proto = req.headers.get('x-forwarded-proto')?.split(',')[0].trim() || req.nextUrl.protocol.replace(':', '');
   const host = req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host') || req.nextUrl.host;
+  // The desk was taken away in Auth Control (Hemparshwa OS): sign them out of it and back to OS sign-in.
+  if (!(await sessionStillValid(session))) {
+    const res = under(pathname, '/api') || under(pathname, '/sales/api')
+      ? NextResponse.json({ error: 'Your calling desk access has been removed.' }, { status: 401 })
+      : NextResponse.redirect(new URL(SALES_DESK, `${proto}://${host}`), { status: 303, headers: { 'Cache-Control': 'no-store' } });
+    res.cookies.delete(SALES_SESSION_COOKIE);
+    return res;
+  }
+  // A driver caller's desk loads only /sales/api/drivers; the lead APIs are for salespeople.
+  if (under(pathname, '/sales') || (SALES_APIS.includes(pathname) && !driversOnly(session)) || under(pathname, '/api/health')) return null;
+  if (under(pathname, '/api')) return NextResponse.json({ error: 'The calling desk login opens the calling desk only.' }, { status: 403 });
   return NextResponse.redirect(new URL(SALES_DESK, `${proto}://${host}`), { status: 303, headers: { 'Cache-Control': 'no-store' } });
 }
 
@@ -75,6 +83,7 @@ export default async function proxy(req: NextRequest) {
   // Only this proxy may say a request came in on a salesperson login alone; a header the browser sent is dropped.
   const headers = new Headers(req.headers);
   headers.delete(SALES_ONLY_HEADER);
+  headers.delete(SALES_NAME_HEADER);
   headers.delete(OVERVIEW_ACCESS_HEADER);
   const pass = () => NextResponse.next({ request: { headers } });
   const locked = await salesLock(req);
@@ -86,10 +95,11 @@ export default async function proxy(req: NextRequest) {
     return pass();
   }
   if (SALES_APIS.includes(req.nextUrl.pathname)) {
-    const employeeNumber = await verifySalesSessionToken(req.cookies.get(SALES_SESSION_COOKIE)?.value);
-    if (employeeNumber) {
+    const person = deskPerson(await verifySalesSession(req.cookies.get(SALES_SESSION_COOKIE)?.value));
+    if (person && !person.driversOnly) {
       // Signed in only as a salesperson (not as an admin): the APIs limit what they return to this person.
-      headers.set(SALES_ONLY_HEADER, employeeNumber);
+      headers.set(SALES_ONLY_HEADER, person.employeeNumber);
+      headers.set(SALES_NAME_HEADER, encodeURIComponent(person.name));
       return pass();
     }
   }
