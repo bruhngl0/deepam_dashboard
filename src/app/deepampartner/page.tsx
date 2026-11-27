@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { activeCategoryNames } from '@/lib/partners/rules';
+import { partnerPath } from '@/lib/partners/site';
 import { ApplicationForm } from './forms';
 import { frame, heading, kicker, page, tile } from './styles';
 
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function PartnerApplicationPage() {
-  const categories = await activeCategoryNames();
+  const [categories, rules] = await Promise.all([activeCategoryNames(), partnerPath('/rules')]);
   return (
     <main className={page}>
       <div className="mx-auto mb-10 max-w-[720px] text-center">
@@ -27,6 +29,7 @@ export default async function PartnerApplicationPage() {
         <h1 className={`${heading} mb-4`}><strong className="font-bold">Deepam</strong> Partners</h1>
         <p className="mb-[1em]">Makeup artists, stylists, photographers, wedding professionals and venues, influencers, community partners, our loyal customers and former colleagues: refer the people you work with to Deepam and earn on every purchase they make.</p>
         <p>Once your application is approved, we collect a few documents, then send you your Deepam Partner ID, your own referral link and a dashboard to follow your referrals.</p>
+        <p className="mt-3"><Link href={rules} className="font-semibold text-[#7f1835] underline underline-offset-4">Read the programme rules</Link>: commission levels, bonuses and when you are paid.</p>
       </div>
       <ol className="mx-auto mb-10 grid max-w-[960px] gap-3 sm:grid-cols-3">
         {STEPS.map(([title, text], i) => (
