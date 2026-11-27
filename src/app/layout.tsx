@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import { headers } from "next/headers";
+import { PARTNER_SITE_HEADER } from "@/lib/partners/site";
 import { SiteHeader } from "@/components/site-header";
 import { SiteHeaderSlot } from "@/components/site-header-slot";
 import "./globals.css";
@@ -23,7 +25,7 @@ export const metadata: Metadata = {
   description: "Lead-to-sale attribution across Meta, WhatsApp, Google Ads and other sources.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -43,9 +45,12 @@ export default function RootLayout({
               }
             } catch {}`}
         </Script>
-        <SiteHeaderSlot>
-          <SiteHeader />
-        </SiteHeaderSlot>
+        {/* The public partner site never carries the internal header (lib/partners/site.ts). */}
+        {(await headers()).get(PARTNER_SITE_HEADER) !== "1" && (
+          <SiteHeaderSlot>
+            <SiteHeader />
+          </SiteHeaderSlot>
+        )}
         {children}
       </body>
     </html>

@@ -3,6 +3,7 @@ import { gateAccess, siteGate, type GateConfig, type GateModule } from '@/lib/si
 import { OVERVIEW_ACCESS_HEADER } from '@/lib/overview/modules';
 import { deskPerson, driversOnly, sessionStillValid } from '@/lib/desk-access';
 import { SALES_NAME_HEADER, SALES_ONLY_HEADER, SALES_SESSION_COOKIE, verifySalesSession } from '@/lib/sales-session';
+import { isPartnerHost, PARTNER_SITE_HEADER } from '@/lib/partners/site';
 import { STORE_MANAGER_COOKIE, STORE_MANAGER_COOKIE_PATH, STORE_MANAGER_MAX_AGE, STORE_MANAGER_TOKEN } from '@/lib/store-manager-session';
 
 // One password per module on the hub. The hub itself, the sales and store-manager
@@ -86,6 +87,17 @@ export default async function proxy(req: NextRequest) {
   headers.delete(SALES_ONLY_HEADER);
   headers.delete(SALES_NAME_HEADER);
   headers.delete(OVERVIEW_ACCESS_HEADER);
+  headers.delete(PARTNER_SITE_HEADER);
+  // The public partner site (PARTNER_SITE_URL): partner pages only, no gate, no CRM. /x is served from /deepampartner/x.
+  if (isPartnerHost(req.headers.get('x-forwarded-host') || req.headers.get('host'))) {
+    headers.set(PARTNER_SITE_HEADER, '1');
+    const { pathname } = req.nextUrl;
+    if (under(pathname, '/deepampartner')) return NextResponse.next({ request: { headers } });
+    if (under(pathname, '/api', '/trpc')) return new NextResponse('Not found', { status: 404 });
+    const url = req.nextUrl.clone();
+    url.pathname = pathname === '/' ? '/deepampartner' : `/deepampartner${pathname}`;
+    return NextResponse.rewrite(url, { request: { headers } });
+  }
   const pass = () => NextResponse.next({ request: { headers } });
   const locked = await salesLock(req);
   if (locked) return locked;
