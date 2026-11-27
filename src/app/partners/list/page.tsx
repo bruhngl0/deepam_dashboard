@@ -1,7 +1,8 @@
 /** Every partner and applicant, awaiting a decision first. Filter by status, category or a search. */
 
 import { requireUser } from '@/lib/auth';
-import { PARTNER_CATEGORIES, PARTNER_STATUSES } from '@/lib/partners/constants';
+import { PARTNER_STATUSES } from '@/lib/partners/constants';
+import { categories } from '@/lib/partners/rules';
 import { listPartners } from '@/lib/partners/queries';
 import { pickRange, pickStores, rangeLabel } from '@/lib/module-filters';
 import { refreshReferrals } from '@/lib/partners/store';
@@ -16,7 +17,7 @@ export default async function PartnerListPage({ searchParams }: { searchParams: 
   await refreshReferrals();
   const sp = await searchParams;
   const status = PARTNER_STATUSES.find((s) => s === one(sp.status)) ?? '';
-  const category = PARTNER_CATEGORIES.find((c) => c === one(sp.category)) ?? '';
+  const category = (await categories()).find((c) => c.name === one(sp.category))?.name ?? '';
   const search = one(sp.q).slice(0, 80);
   const { from, to } = pickRange(sp, { from: null, to: null });
   const stores = pickStores(sp);

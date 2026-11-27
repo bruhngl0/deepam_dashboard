@@ -330,6 +330,20 @@
       "when": 1795418400000,
       "tag": "0046_driver_desk",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795504800000,
+      "tag": "0047_partner_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1795591200000,
+      "tag": "0048_partner_program",
+      "breakpoints": true
     }
   ]
 }

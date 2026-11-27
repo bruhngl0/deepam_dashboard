@@ -47,9 +47,11 @@ const HR_TABS = [
 // Ananta Partner Network (Deepam Partners). Partners also lights for a partner's own page.
 const PARTNER_TABS = [
   { href: '/partners', label: 'Overview' },
-  { href: '/partners/list', label: 'Partners', pattern: /^\/partners\/(?!referrals|payouts|rules)[^/]+$/ },
+  { href: '/partners/list', label: 'Partners', pattern: /^\/partners\/(?!referrals|payouts|settlements|controls|programs|rules)[^/]+$/ },
   { href: '/partners/referrals', label: 'Referrals' },
-  { href: '/partners/payouts', label: 'Payouts' },
+  { href: '/partners/controls', label: 'Controls' },
+  { href: '/partners/settlements', label: 'Settlements', also: '/partners/payouts' },
+  { href: '/partners/programs', label: 'Programs' },
   { href: '/partners/rules', label: 'Rules' },
 ] as const;
 
