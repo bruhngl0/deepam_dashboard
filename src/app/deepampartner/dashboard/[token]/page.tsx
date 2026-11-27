@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { COMMISSION_STATUS_LABEL, DECLINE_SHORT, monthLabel, REFERRAL_STATUS_LABEL } from '@/lib/partners/constants';
 import { partnerLinkBase } from '@/lib/partners/links';
-import { partnerPath } from '@/lib/partners/site';
 import { dashboardFor } from '@/lib/partners/queries';
 import { activeCampaignsToday, partnerSettlements } from '@/lib/partners/program-queries';
 import { SETTLEMENT_LABEL, shoppingAllowance } from '@/lib/partners/program';
@@ -58,7 +57,6 @@ export default async function PartnerDashboardPage({ params }: { params: Promise
   const soon = weekAhead();
   const expiring = d.referrals.filter((r) => r.status === 'registered' && r.windowEndsOn.slice(0, 10) <= soon);
   const link = `${await partnerLinkBase()}/${d.code}`;
-  const rulesHref = await partnerPath('/rules');
   const share = `Planning a visit to Deepam? Book your appointment here: ${link}`;
   const tiles: [string, string][] = [
     ['Referrals', formatNumber(d.totals.referrals)],
@@ -204,7 +202,6 @@ export default async function PartnerDashboardPage({ params }: { params: Promise
           )}
         </section>
       </div>
-      <p className="mx-auto mt-10 max-w-[960px] text-center text-xs text-[#5c5c5c]">How commission, levels and payouts work: <a href={rulesHref} className="font-semibold text-[#7f1835] underline underline-offset-4">programme rules</a>.</p>
     </main>
   );
 }
