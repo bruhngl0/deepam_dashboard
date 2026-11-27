@@ -94,6 +94,14 @@ export default async function proxy(req: NextRequest) {
     const { pathname } = req.nextUrl;
     if (under(pathname, '/deepampartner')) return NextResponse.next({ request: { headers } });
     if (under(pathname, '/api', '/trpc')) return new NextResponse('Not found', { status: 404 });
+    // Only the partner pages exist here; anything else (an old CRM address, a typo) goes to the partner home page.
+    const partnerPage = pathname === '/' || under(pathname, '/rules', '/thank-you', '/dashboard') || /^\/dpr-\d{5,}(\/thank-you)?\/?$/i.test(pathname);
+    if (!partnerPage) {
+      const home = req.nextUrl.clone();
+      home.pathname = '/';
+      home.search = '';
+      return NextResponse.redirect(home, { status: 307, headers: { 'Cache-Control': 'no-store' } });
+    }
     const url = req.nextUrl.clone();
     url.pathname = pathname === '/' ? '/deepampartner' : `/deepampartner${pathname}`;
     return NextResponse.rewrite(url, { request: { headers } });
