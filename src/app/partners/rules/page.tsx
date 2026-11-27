@@ -105,6 +105,25 @@ export default async function RulesPage({ searchParams }: { searchParams: Promis
           </Panel>
         </div>
 
+        <Panel title="Settlement" icon="wallet">
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-7">
+            {([
+              ['tdsPercent', 'TDS %', base.terms.tdsPercent ?? 2, 0.01, 'On commission (s.194H).'],
+              ['tdsAnnualThreshold', 'TDS from (₹ a year)', base.terms.tdsAnnualThreshold ?? 20000, 1, 'Once the financial year total passes this; the year so far is caught up.'],
+              ['minPayout', 'Minimum payout (₹)', base.terms.minPayout ?? 0, 1, 'Below this the balance carries forward.'],
+              ['largeBillFlag', 'Review bills from (₹)', base.terms.largeBillFlag ?? 500000, 1, 'A single referred bill this large is flagged.'],
+              ['verifyByDay', 'Accounts verify by (day)', base.terms.verifyByDay ?? 5, 1, 'Of the following month.'],
+              ['approveByDay', 'Management approve by', base.terms.approveByDay ?? 10, 1, ''],
+              ['payByDay', 'Paid by', base.terms.payByDay ?? 15, 1, ''],
+            ] as const).map(([name, label, value, step, hint]) => (
+              <label key={name} className="text-sm text-ink">{label}
+                <input name={name} type="number" min={0} step={step} required defaultValue={value} className={`${field} mt-1`} />
+                {hint && <span className="mt-1 block text-xs text-ink-muted">{hint}</span>}
+              </label>
+            ))}
+          </div>
+        </Panel>
+
         <Panel title="Save as a new version" icon="check" tone="good">
           <div className="grid gap-4 md:grid-cols-[12rem_minmax(0,1fr)_14rem_auto] md:items-end">
             <label className="text-sm text-ink">Takes effect from

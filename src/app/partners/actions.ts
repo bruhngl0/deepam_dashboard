@@ -132,6 +132,10 @@ export async function rulesAction(form: FormData) {
       referralDays: amount(form, 'referralDays', 'Referral validity'), lookbackYears: amount(form, 'lookbackYears', 'Look-back'),
       reviewMonths: amount(form, 'reviewMonths', 'Months averaged'), downgradeAfter: amount(form, 'downgradeAfter', 'Reviews below'),
       annualShoppingLimit: amount(form, 'annualShoppingLimit', 'Annual shopping limit'),
+      tdsPercent: amount(form, 'tdsPercent', 'TDS %'), tdsAnnualThreshold: amount(form, 'tdsAnnualThreshold', 'TDS threshold'),
+      minPayout: amount(form, 'minPayout', 'Minimum payout'), largeBillFlag: amount(form, 'largeBillFlag', 'Large bill review'),
+      verifyByDay: amount(form, 'verifyByDay', 'Verify by'), approveByDay: amount(form, 'approveByDay', 'Approve by'), payByDay: amount(form, 'payByDay', 'Pay by'),
+      existingCustomers: true,
     };
     const effectiveMonth = str(form, 'effectiveMonth', 7);
     await saveRuleVersion({ levels, terms, effectiveMonth, reason: str(form, 'reason'), changedBy: str(form, 'by', 80) });

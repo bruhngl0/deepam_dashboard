@@ -13,7 +13,12 @@ export type RuleLevel = {
   level: number; name: string; minSales: number; commissionPercent: number; bonus: number;
   influencerLimit: number; personalDiscount: number; benefits: string;
 };
-export type RuleTerms = { referralDays: number; lookbackYears: number; reviewMonths: number; downgradeAfter: number; annualShoppingLimit: number };
+export type RuleTerms = {
+  referralDays: number; lookbackYears: number; reviewMonths: number; downgradeAfter: number; annualShoppingLimit: number;
+  // Settlement (drizzle/0048): TDS, the minimum payout, the settlement calendar and the large-bill review threshold.
+  tdsPercent: number; tdsAnnualThreshold: number; minPayout: number; verifyByDay: number; approveByDay: number; payByDay: number; largeBillFlag: number;
+  existingCustomers?: boolean;
+};
 export type RuleVersion = { id: number; effectiveMonth: string; levels: RuleLevel[]; terms: RuleTerms; reason: string; changedBy: string; createdAt: string };
 
 const toVersion = (r: Record<string, unknown>): RuleVersion => ({
@@ -80,6 +85,13 @@ export function checkTerms(t: RuleTerms): RuleTerms {
   whole(t.reviewMonths, 1, 12, 'Months averaged for the level review');
   whole(t.downgradeAfter, 1, 12, 'Reviews below before a downgrade');
   if (!Number.isFinite(t.annualShoppingLimit) || t.annualShoppingLimit < 0) throw new PartnerError('Annual personal shopping limit should be ₹0 or more');
+  if (!Number.isFinite(t.tdsPercent) || t.tdsPercent < 0 || t.tdsPercent > 30) throw new PartnerError('TDS % should be from 0 to 30');
+  for (const [v, what] of [[t.tdsAnnualThreshold, 'TDS threshold'], [t.minPayout, 'Minimum payout'], [t.largeBillFlag, 'Large bill review']] as const) {
+    if (!Number.isFinite(v) || v < 0) throw new PartnerError(`${what} should be ₹0 or more`);
+  }
+  whole(t.verifyByDay, 1, 28, 'Verify by (day)');
+  whole(t.approveByDay, t.verifyByDay, 28, 'Approve by (day), on or after verify by');
+  whole(t.payByDay, t.approveByDay, 28, 'Pay by (day), on or after approve by');
   return t;
 }
 

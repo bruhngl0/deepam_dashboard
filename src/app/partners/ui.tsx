@@ -257,3 +257,13 @@ export const td = 'px-4 py-3 align-top first:pl-5 last:pr-5';
 export const tr = 'border-t border-grid transition-colors hover:bg-inset/50';
 /** A table's <thead> row (keeps the old eyebrow look off the header cells). */
 export const headRow = 'text-left';
+
+/** A status pill in one of the module's tones (settlements, claims, flags, campaigns…). */
+export function Pill({ tone, children }: { tone: 'good' | 'wait' | 'info' | 'bad' | 'quiet'; children: React.ReactNode }) {
+  return <Badge tone={{ good: GOOD, wait: WAIT, info: INFO, bad: BAD, quiet: QUIET }[tone]}>{children}</Badge>;
+}
+
+/** The "Your name" box every decision form carries (the Partners module has no per-person login). */
+export function ByField({ className = 'w-40' }: { className?: string }) {
+  return <input name="by" required maxLength={80} placeholder="Your name" aria-label="Your name" className={`rounded-lg border border-line bg-surface px-2.5 py-1 text-sm text-ink ${className}`} />;
+}

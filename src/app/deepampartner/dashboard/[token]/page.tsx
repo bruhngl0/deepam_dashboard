@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { COMMISSION_STATUS_LABEL, DECLINE_SHORT, monthLabel, REFERRAL_STATUS_LABEL } from '@/lib/partners/constants';
 import { partnerLinkBase } from '@/lib/partners/links';
 import { dashboardFor } from '@/lib/partners/queries';
+import { activeCampaignsToday, partnerSettlements } from '@/lib/partners/program-queries';
+import { SETTLEMENT_LABEL, shoppingAllowance } from '@/lib/partners/program';
 import { refreshReferrals } from '@/lib/partners/store';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/format';
 import { CopyLink } from '../../forms';
@@ -9,6 +11,9 @@ import { btn, frame, heading, kicker, page, tile } from '../../styles';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Partner dashboard · Deepam Partners', referrer: 'no-referrer' };
+
+/** The IST date a week from now: referrals whose window closes by then are called out. */
+const weekAhead = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(Date.now() + 7 * 86400000));
 
 const cell = 'border-t border-[#efe7da] px-3 py-3 text-left align-top';
 const STATUS_CHIP: Record<string, string> = {
@@ -37,6 +42,20 @@ export default async function PartnerDashboardPage({ params }: { params: Promise
       </main>
     );
   }
+  const [statements, campaigns, shopping] = await Promise.all([partnerSettlements(d.id), activeCampaignsToday(), shoppingAllowance(d.id)]);
+  const statementMonths = new Set(statements.map((s) => s.month));
+  // Estimated: this month and statements still being worked out; verified: waiting for approval; approved: to be paid.
+  const earn = {
+    estimated: d.month.commission + d.month.bonus + statements.filter((s) => s.status === 'pending_verification').reduce((a, s) => a + s.net, 0),
+    verified: statements.filter((s) => s.status === 'pending_approval').reduce((a, s) => a + s.net, 0),
+    approved: statements.filter((s) => ['approved', 'partially_paid', 'on_hold'].includes(s.status)).reduce((a, s) => a + s.net - s.paid, 0),
+    // Statement payments, plus months paid on the older Payouts page (before statements began).
+    paid: statements.reduce((a, s) => a + s.paid, 0)
+      + d.referrals.flatMap((r) => r.commission).filter((c) => c.status === 'paid' && !statementMonths.has(c.payoutMonth ?? '')).reduce((a, c) => a + (c.amount ?? 0), 0)
+      + d.totals.bonusesPaid - statements.filter((s) => s.paid > 0 && s.paid >= s.net).reduce((a, s) => a + s.bonus, 0),
+  };
+  const soon = weekAhead();
+  const expiring = d.referrals.filter((r) => r.status === 'registered' && r.windowEndsOn.slice(0, 10) <= soon);
   const link = `${await partnerLinkBase()}/${d.code}`;
   const share = `Planning a visit to Deepam? Book your appointment here: ${link}`;
   const tiles: [string, string][] = [
@@ -89,6 +108,53 @@ export default async function PartnerDashboardPage({ params }: { params: Promise
           )}
           <p className="text-xs text-[#5c5c5c]">Estimated until the month ends and our team verifies it. Eligible sales are the value before GST, less returns.</p>
         </section>
+
+        <section aria-labelledby="earn-heading" className={`${frame} space-y-3`}>
+          <h2 id="earn-heading" className="text-[1.2em] font-semibold">Your earnings</h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {([['Estimated', earn.estimated, 'This month and months being checked'], ['Verified', earn.verified, 'Checked by accounts, awaiting approval'],
+               ['Approved', earn.approved, 'Approved, to be paid'], ['Paid', earn.paid, 'Paid to you so far']] as const).map(([k, v, note]) => (
+              <div key={k} className={`${tile} px-4 py-4 text-center`}>
+                <p className="text-xs uppercase tracking-[0.08em] text-[#5c5c5c]">{k}</p>
+                <p className="mt-1 text-xl font-semibold text-[#7f1835]">{formatCurrency(v)}</p>
+                <p className="mt-1 text-xs text-[#5c5c5c]">{note}</p>
+              </div>
+            ))}
+          </div>
+          {statements.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead><tr className="text-xs uppercase tracking-[0.06em] text-[#5c5c5c]">{['Month', 'Eligible sales', 'Commission & bonus', 'Other', 'TDS', 'Net', 'Status'].map((h) => <th key={h} scope="col" className="px-3 py-2 text-left font-semibold">{h}</th>)}</tr></thead>
+                <tbody>{statements.map((s) => (
+                  <tr key={s.id}>
+                    <td className={cell}>{monthLabel(s.month)}</td>
+                    <td className={cell}>{formatCurrency(s.eligibleSales)}{s.level ? <span className="block text-xs text-[#5c5c5c]">Level {s.level} · {s.percent}%</span> : null}</td>
+                    <td className={cell}>{formatCurrency(s.standard + s.campaign + s.bonus)}</td>
+                    <td className={cell}>{s.collab + s.incentives + s.adjustments + s.opening ? formatCurrency(s.collab + s.incentives + s.adjustments + s.opening) : '—'}</td>
+                    <td className={cell}>{s.tds ? formatCurrency(s.tds) : '—'}</td>
+                    <td className={cell}>{formatCurrency(s.net)}</td>
+                    <td className={cell}>{SETTLEMENT_LABEL[s.status]}{s.paid > 0 && s.status !== 'paid' ? <span className="block text-xs text-[#5c5c5c]">{formatCurrency(s.paid)} paid</span> : null}</td>
+                  </tr>))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section aria-label="Campaigns and personal shopping" className="grid gap-3 md:grid-cols-2">
+          <div className={`${tile} px-5 py-5`}>
+            <p className="text-xs uppercase tracking-[0.08em] text-[#5c5c5c]">Running now</p>
+            {campaigns.length === 0 ? <p className="mt-2 text-[#5c5c5c]">No special campaigns at the moment.</p> : campaigns.map((c) => (
+              <p key={c.name} className="mt-2"><strong>{c.name}</strong>: {c.percent}% commission until {formatDate(c.endsOn)}{c.stores.length ? ` (${c.stores.map((s) => s.replace('_', ' ')).join(', ')})` : ''}</p>))}
+          </div>
+          <div className={`${tile} px-5 py-5`}>
+            <p className="text-xs uppercase tracking-[0.08em] text-[#5c5c5c]">Personal shopping {shopping.year}</p>
+            <p className="mt-2 text-xl font-semibold text-[#7f1835]">{formatCurrency(shopping.left)} left</p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#efe7da]"><div className="h-full bg-[#7f1835]" style={{ width: `${shopping.limit ? Math.min(100, (shopping.used / shopping.limit) * 100) : 0}%` }} /></div>
+            <p className="mt-2 text-xs text-[#5c5c5c]">{formatCurrency(shopping.used)} of {formatCurrency(shopping.limit)} used, before discount and GST{d.personalDiscount ? ` · ${d.personalDiscount}% at your level` : ''}. Resets on 1 January.</p>
+          </div>
+        </section>
+        {expiring.length > 0 && <p className="text-center text-[#5c5c5c]">{expiring.length} {expiring.length === 1 ? 'referral closes' : 'referrals close'} within 7 days: {expiring.map((r) => `${r.name} (${formatDate(r.windowEndsOn)})`).join(', ')}.</p>}
 
         <section aria-label="Totals" className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {tiles.map(([k, v]) => (

@@ -347,7 +347,9 @@ export async function monthProgress(partnerId: number): Promise<MonthProgress> {
   const level = levelFor(rules.levels, eligibleSales);
   const nextLevel = rules.levels.find((l) => l.level === level.level + 1);
   return {
-    month, eligibleSales, level, commission: Math.round(eligibleSales * level.commissionPercent) / 100, bonus: level.bonus,
+    // The month's own figures when it has any (campaign rates, holds and shares included); otherwise nothing yet.
+    month, eligibleSales, level: m ? (rules.levels.find((l) => l.level === m.commissionLevel) ?? level) : level,
+    commission: m ? m.commission : 0, bonus: m && eligibleSales > 0 ? m.bonus : 0,
     next: nextLevel ? { level: nextLevel, needed: Math.max(0, nextLevel.minSales - eligibleSales) } : null,
   };
 }
@@ -394,7 +396,7 @@ export async function reviewOutlook(partnerId: number, approvedAt: string | null
 
 /** What a partner sees on their private link: their own referrals, statuses and commission. No phone numbers or bill amounts. */
 export type PartnerDashboard = {
-  code: string; name: string; category: string; status: PartnerStatus; level: number; levelName: string; windowDays: number;
+  id: number; code: string; name: string; category: string; status: PartnerStatus; level: number; levelName: string; windowDays: number;
   personalDiscount: number; month: MonthProgress;
   referrals: { id: number; name: string; occasion: string; registeredAt: string; windowEndsOn: string; status: ReferralStatus; declineReason: DeclineReason | null;
     toVerify: boolean; commission: { status: CommissionStatus; amount: number | null; payoutMonth: string | null }[] }[];
@@ -422,7 +424,7 @@ export async function dashboardFor(token: string): Promise<PartnerDashboard | nu
   }));
   const lines = referrals.flatMap((r) => r.commissions);
   return {
-    code: String(p.partner_code), name: String(p.full_name), category: String(p.category), status: p.status as PartnerStatus,
+    id: Number(p.id), code: String(p.partner_code), name: String(p.full_name), category: String(p.category), status: p.status as PartnerStatus,
     level: level.level, levelName: level.name, windowDays: rules.terms.referralDays, personalDiscount: level.personalDiscount, month, referrals: list,
     totals: {
       referrals: referrals.filter((r) => r.status !== 'declined').length, open: referrals.filter((r) => r.status === 'registered').length,

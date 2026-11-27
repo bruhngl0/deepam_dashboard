@@ -24,9 +24,17 @@ export class PartnerError extends Error {}
  * commission level, whole-month commission and bonus), then runs any month-end level review that is due.
  */
 export async function refreshReferrals(): Promise<void> {
-  await db.execute(sql`SELECT partner_refresh_referrals()`);
-  await db.execute(sql`SELECT partner_refresh_months()`);
-  await db.execute(sql`SELECT partner_run_reviews()`);
+  // One at a time across requests: every page load runs this, and two at once would race on the same rows.
+  await db.transaction(async (t) => {
+    await t.execute(sql`SELECT pg_advisory_xact_lock(hashtext('partner-refresh'))`);
+    await t.execute(sql`SELECT partner_refresh_referrals()`);
+    await t.execute(sql`SELECT partner_detect_flags()`); // fraud flags hold bills (0048)
+    await t.execute(sql`SELECT partner_refresh_months()`); // holds, exclusions, campaigns, then each unsettled month
+    await t.execute(sql`SELECT partner_run_reviews()`);
+    await t.execute(sql`SELECT partner_evaluate_incentives()`);
+    await t.execute(sql`SELECT partner_detect_adjustments()`); // settled months that changed since → next statement
+    await t.execute(sql`SELECT partner_refresh_settlements()`);
+  });
 }
 
 // ── Public forms ──────────────────────────────────────────────────────────────
