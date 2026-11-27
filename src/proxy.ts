@@ -96,10 +96,10 @@ export default async function proxy(req: NextRequest) {
     // Only the partner pages exist here; anything else (an old CRM address, a typo) goes to the partner home page.
     const partnerPage = pathname === '/' || under(pathname, '/rules', '/thank-you', '/dashboard') || /^\/dpr-\d{5,}(\/thank-you)?\/?$/i.test(pathname);
     if (!partnerPage) {
-      const home = req.nextUrl.clone();
-      home.pathname = '/';
-      home.search = '';
-      return NextResponse.redirect(home, { status: 307, headers: { 'Cache-Control': 'no-store' } });
+      // Behind Caddy / App Runner the request's own URL holds the container's address: use the forwarded host.
+      const proto = req.headers.get('x-forwarded-proto')?.split(',')[0].trim() || req.nextUrl.protocol.replace(':', '');
+      const host = req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host') || req.nextUrl.host;
+      return NextResponse.redirect(new URL('/', `${proto}://${host}`), { status: 307, headers: { 'Cache-Control': 'no-store' } });
     }
     const url = req.nextUrl.clone();
     url.pathname = pathname === '/' ? '/deepampartner' : `/deepampartner${pathname}`;
