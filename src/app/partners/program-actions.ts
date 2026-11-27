@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
+import { partnerLabel, reportToOs, settlementLabel } from '@/lib/os-alerts';
 import { PartnerError, refreshReferrals } from '@/lib/partners/store';
 import * as P from '@/lib/partners/program';
 
@@ -33,6 +34,23 @@ async function act(form: FormData, fallback: string, run: () => Promise<string |
     throw e;
   }
   revalidatePath('/partners', 'layout');
+  // Every settlement, control and programme decision is reported to Hemparshwa OS for the admins' email.
+  const area = fallback.endsWith('/settlements') ? 'Partner settlement' : fallback.endsWith('/controls') ? 'Partner controls' : 'Partner programmes';
+  await reportToOs({
+    subject: `${area}: ${notice || 'changed'}`,
+    lines: [
+      fallback.endsWith('/settlements') && form.has('id') && (await settlementLabel(form.get('id')).catch(() => null)),
+      form.has('partner') && (await partnerLabel(form.get('partner')).catch(() => null)),
+      str(form, 'name', 120) && `Name: ${str(form, 'name', 120)}`,
+      str(form, 'voucher', 40) && `Bill: ${str(form, 'voucher', 40)}`,
+      str(form, 'amount', 20) && `Amount: ₹${str(form, 'amount', 20)}`,
+      str(form, 'month', 7) && `Month: ${str(form, 'month', 7)}`,
+      str(form, 'reference', 120) && `Reference: ${str(form, 'reference', 120)}`,
+      str(form, 'reason') && `Reason: ${str(form, 'reason')}`,
+    ],
+    path: fallback.endsWith('/settlements') && form.has('id') ? `/partners/settlements/${Number(form.get('id'))}` : fallback,
+    actor: str(form, 'by', 80) || null,
+  }).catch((e) => console.error('os alert:', (e as Error).message));
   redirect(notice ? withParam(to, 'notice', notice) : to);
 }
 

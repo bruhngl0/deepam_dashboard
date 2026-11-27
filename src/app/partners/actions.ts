@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
+import { partnerLabel, reportToOs } from '@/lib/os-alerts';
 import { MONTH, PARTNER_STATUS_LABEL, PARTNER_STATUSES, type PartnerStatus } from '@/lib/partners/constants';
 import {
   addCategory, activeCategoryNames, cancelScheduledVersion, renameCategory, saveRuleVersion, setCategoryActive, type RuleLevel,
@@ -20,8 +21,11 @@ const back = (form: FormData, fallback: string) => {
 };
 const withParam = (path: string, key: string, value: string) => `${path}${path.includes('?') ? '&' : '?'}${key}=${encodeURIComponent(value)}`;
 
-/** Runs a change, then returns to the page it came from: with `notice` on success, or the error to show. */
-async function act(form: FormData, fallback: string, run: () => Promise<string | void>) {
+/**
+ * Runs a change, then returns to the page it came from: with `notice` on success, or the error to show. With `alert`,
+ * a successful change is also reported to Hemparshwa OS for the admins' email (lib/os-alerts.ts).
+ */
+async function act(form: FormData, fallback: string, run: () => Promise<string | void>, alert?: string) {
   await requireUser();
   const to = back(form, fallback);
   let notice: string | void;
@@ -32,6 +36,20 @@ async function act(form: FormData, fallback: string, run: () => Promise<string |
     throw e;
   }
   revalidatePath('/partners', 'layout');
+  if (alert) {
+    await reportToOs({
+      subject: `${alert}: ${notice || 'changed'}`,
+      lines: [
+        form.has('id') && (await partnerLabel(form.get('id')).catch(() => null)),
+        str(form, 'month', 7) && `Month: ${str(form, 'month', 7)}`,
+        str(form, 'effectiveMonth', 7) && `In force from: ${str(form, 'effectiveMonth', 7)}`,
+        str(form, 'reference', 120) && `Reference: ${str(form, 'reference', 120)}`,
+        (str(form, 'reason') || str(form, 'note')) && `Reason: ${str(form, 'reason') || str(form, 'note')}`,
+      ],
+      path: fallback,
+      actor: str(form, 'by', 80) || null,
+    }).catch((e) => console.error('os alert:', (e as Error).message));
+  }
   redirect(notice ? withParam(to, 'notice', notice) : to);
 }
 
@@ -48,13 +66,13 @@ export async function statusAction(form: FormData) {
     if (!to) throw new PartnerError('Choose the new status');
     const code = await setPartnerStatus(partnerId(form), to, orNull(str(form, 'reason')), orNull(str(form, 'by', 80)));
     return code ? `Approved as ${code}` : `Now ${PARTNER_STATUS_LABEL[to].toLowerCase()}`;
-  });
+  }, 'Partner status');
 }
 export async function levelAction(form: FormData) {
   await act(form, '/partners/list', async () => {
     await setPartnerLevel(partnerId(form), form.get('level'), orNull(str(form, 'reason')), orNull(str(form, 'by', 80)));
     return 'Partnership level changed';
-  });
+  }, 'Partner level');
 }
 export async function detailsAction(form: FormData) {
   await act(form, '/partners/list', async () => {
@@ -94,7 +112,7 @@ export async function verifyReferralAction(form: FormData) {
   });
 }
 export async function rejectCommissionAction(form: FormData) {
-  await act(form, '/partners/referrals', async () => { await rejectCommission(Number(form.get('commission')), str(form, 'note')); return 'Commission rejected'; });
+  await act(form, '/partners/referrals', async () => { await rejectCommission(Number(form.get('commission')), str(form, 'note')); return 'Commission rejected'; }, 'Partner commission');
 }
 export async function reopenCommissionAction(form: FormData) {
   await act(form, '/partners/referrals', async () => { await reopenCommission(Number(form.get('commission'))); return 'Moved back to validate'; });
@@ -106,7 +124,7 @@ export async function markPaidAction(form: FormData) {
     if (!MONTH.test(month)) throw new PartnerError('Unknown month');
     const n = await markPaid(partnerId(form), month, str(form, 'reference', 120));
     return `${n} commission ${n === 1 ? 'line' : 'lines'} marked paid`;
-  });
+  }, 'Partner payout');
 }
 
 const amount = (form: FormData, key: string, label: string) => {
@@ -140,10 +158,10 @@ export async function rulesAction(form: FormData) {
     const effectiveMonth = str(form, 'effectiveMonth', 7);
     await saveRuleVersion({ levels, terms, effectiveMonth, reason: str(form, 'reason'), changedBy: str(form, 'by', 80) });
     return `Rules saved: in force from ${effectiveMonth}`;
-  });
+  }, 'Partner rules');
 }
 export async function cancelRulesAction(form: FormData) {
-  await act(form, '/partners/rules', async () => { await cancelScheduledVersion(Number(form.get('version'))); return 'Scheduled rules cancelled'; });
+  await act(form, '/partners/rules', async () => { await cancelScheduledVersion(Number(form.get('version'))); return 'Scheduled rules cancelled'; }, 'Partner rules');
 }
 export async function categoryAction(form: FormData) {
   await act(form, '/partners/rules', async () => {
@@ -152,5 +170,5 @@ export async function categoryAction(form: FormData) {
     if (op === 'rename') { await renameCategory(name, str(form, 'to', 60)); return 'Category renamed'; }
     if (op === 'hide' || op === 'show') { await setCategoryActive(name, op === 'show'); return op === 'hide' ? 'Category hidden from the application form' : 'Category offered again'; }
     throw new PartnerError('Unknown change');
-  });
+  }, 'Partner categories');
 }
