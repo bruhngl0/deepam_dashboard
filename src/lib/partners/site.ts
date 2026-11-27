@@ -21,17 +21,12 @@ export function partnerSiteUrl(): string | null {
   }
 }
 
-/**
- * Whether `host` (Host / X-Forwarded-Host) serves the partner site: PARTNER_SITE_URL's host, or one of
- * PARTNER_SITE_HOSTS (comma-separated; e.g. a temporary address used before the real domain is set up). Extra hosts
- * serve the pages only: partners' links keep pointing at PARTNER_SITE_URL / PARTNER_LINK_BASE / this app.
- */
+/** Whether `host` (Host / X-Forwarded-Host, without port for localhost tests too) is the partner site. */
 export function isPartnerHost(host: string | null | undefined): boolean {
-  if (!host) return false;
-  const h = host.split(',')[0].trim().toLowerCase();
   const site = partnerSiteUrl();
-  const hosts = (process.env.PARTNER_SITE_HOSTS ?? '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
-  return (site !== null && new URL(site).host.toLowerCase() === h) || hosts.includes(h);
+  if (!site || !host) return false;
+  const want = new URL(site).host.toLowerCase();
+  return host.split(',')[0].trim().toLowerCase() === want;
 }
 
 /** A partner page's path for links on the page being rendered: short on the partner site, /deepampartner/... here. */
