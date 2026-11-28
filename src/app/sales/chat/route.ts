@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { chatPass } from '@/lib/sales-pass';
 import { getDeskCaller, HEMPARSHWA_OS_URL, SALES_LOGIN_ROUTE } from '@/lib/salesperson-auth';
 
@@ -9,11 +9,12 @@ import { getDeskCaller, HEMPARSHWA_OS_URL, SALES_LOGIN_ROUTE } from '@/lib/sales
  */
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const caller = await getDeskCaller();
   const secret = process.env.ADMIN_SSO_SECRET;
   const os = new URL(process.env.HEMPARSHWA_URL || HEMPARSHWA_OS_URL).origin;
   const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' };
-  if (!caller || !secret || secret.length < 32) return NextResponse.redirect(new URL(SALES_LOGIN_ROUTE, req.nextUrl), { status: 303, headers });
+  // Relative: behind the proxy req.nextUrl is the container's own address.
+  if (!caller || !secret || secret.length < 32) return new Response(null, { status: 303, headers: { ...headers, Location: SALES_LOGIN_ROUTE } });
   return NextResponse.redirect(`${os}/chat/sso?${new URLSearchParams({ t: chatPass(caller.employeeNumber, os, secret) })}`, { status: 303, headers });
 }
