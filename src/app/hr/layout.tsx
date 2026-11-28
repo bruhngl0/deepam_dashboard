@@ -26,7 +26,7 @@ export default async function HrLayout({ children }: { children: React.ReactNode
     { path: '/hr/employees', store: true, period: 'range', periodLabel: 'Joined', fields: [department,
       { kind: 'select', param: 'status', label: 'Status', all: 'Any status', options: STATUSES.map((s) => ({ value: s, label: s })) },
       { kind: 'search', param: 'q', placeholder: 'Name, ID or designation' }] },
-    { path: '/hr/performance', store: true, period: 'range', fields: [department], note: 'Sales and calling KPIs for the dates and stores picked. Default: this month to date.' },
+    { path: '/hr/performance', store: true, period: 'range', fields: [department, { kind: 'search', param: 'q', placeholder: 'Name, ID or designation' }], note: 'Sales and calling KPIs for the dates and stores picked. Default: this month to date.' },
     { path: '/hr/attendance', store: true, period: 'range', fields: [department], note: 'Default: this month. Up to 62 days at a time.' },
     { path: '/hr/salespeople', prefix: true, store: true, period: 'range' },
     { path: '/hr/counter-targets', store: true, stores: mainStores, period: 'month' },
