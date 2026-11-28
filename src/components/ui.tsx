@@ -35,8 +35,9 @@ export function PageHeader({ eyebrow: kicker, title, description, meta, actions 
         {description && <p className="mt-1 max-w-3xl text-sm text-ink-2">{description}</p>}
         {meta && <p className="tnum mt-1 text-xs text-ink-muted">{meta}</p>}
       </div>
-      <div className="flex min-w-0 flex-wrap items-end justify-end gap-2">
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {/* Buttons line up with the filter box, not with the note under it: same 1px border + py-2 as the box. */}
+      <div className="flex min-w-0 flex-wrap items-start justify-end gap-2">
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2 border border-transparent py-2">{actions}</div>}
         <FilterSlot />
       </div>
     </header>

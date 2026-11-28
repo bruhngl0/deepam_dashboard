@@ -38,11 +38,15 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
   const range = { from: picked.from! }, to = picked.to!;
   const stores = pickStores(sp);
   const dept = typeof sp.department === 'string' ? sp.department : '';
+  const needle = (typeof sp.q === 'string' ? sp.q : '').trim().toUpperCase();
+  // Same search as Employees: name, employee ID or designation.
+  const found = (e: { fullName: string; employeeCode: string; designation?: string | null }) =>
+    !needle || e.fullName.toUpperCase().includes(needle) || e.employeeCode.toUpperCase().includes(needle) || (e.designation ?? '').toUpperCase().includes(needle);
   const carry = `from=${range.from}&to=${to}${stores ? `&store=${stores}` : ''}`;
 
   const [employees, stats] = await Promise.all([listEmployees(), salespersonStats({ from: range.from, to, store: stores }).catch(() => null)]);
   const byKey = new Map((stats ?? []).map((s) => [s.empCode, s]));
-  const onPayroll = employees.filter((e) => (e.status === 'Active' || e.status === 'On leave') && storeMatches(stores, e.storeCode));
+  const onPayroll = employees.filter((e) => (e.status === 'Active' || e.status === 'On leave') && storeMatches(stores, e.storeCode) && found(e));
   const departments = [...new Set([...Object.keys(DEPARTMENT_KPIS), ...onPayroll.map((e) => e.department).filter((d): d is string => !!d)])]
     .filter((d) => !dept || d === dept)
     .sort((a, b) => (a === 'Sales' ? -1 : b === 'Sales' ? 1 : a.localeCompare(b)));
@@ -56,11 +60,14 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
         actions={<Link href={`/hr/salespeople?${carry}`} className={button}>Every salesperson in detail</Link>}
       />
 
+      {needle && !onPayroll.length && <p className="py-10 text-center text-sm text-ink-muted">No employee matches “{needle.toLowerCase()}”.</p>}
+
 
       {departments.map((d) => {
         const kpis = kpisFor(d);
         const people = onPayroll.filter((e) => e.department === d);
-        if (!kpis.length && !people.length) return null;
+        // While searching, only the departments with someone matching.
+        if (!people.length && (needle || !kpis.length)) return null;
         return (
           <section key={d} className="space-y-3">
             <SectionLabel>{d} · {formatNumber(people.length)} {people.length === 1 ? 'employee' : 'employees'}</SectionLabel>
