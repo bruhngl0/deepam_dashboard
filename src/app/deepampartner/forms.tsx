@@ -6,7 +6,7 @@ import { applyAction, referAction, type FormState } from './actions';
 import { btn, errorText, input, label, select } from './styles';
 
 const initial: FormState = { message: '', values: {}, attempt: 0 };
-const required = <span aria-hidden="true" className="text-[#a12b2b]">*</span>;
+const required = <span aria-hidden="true" className="text-status-critical">*</span>;
 const PHONE_PATTERN = '(?=(?:\\D*\\d){10,})[\\d\\s+\\-()]+';
 
 /** Hidden from people; bots fill it. */
@@ -41,7 +41,7 @@ export function ApplicationForm({ categories }: { categories: string[] }) {
         </div>
       </fieldset>
       <label className="mb-[26px] flex items-start gap-3">
-        <input name="consent" type="checkbox" required defaultChecked={v.consent === 'on'} className="mt-1 size-4 shrink-0 accent-[#7f1835]" />
+        <input name="consent" type="checkbox" required defaultChecked={v.consent === 'on'} className="mt-1 size-4 shrink-0 accent-[var(--accent)]" />
         <span>I hereby agree to the Ananta Partners programme terms, confirm the details above are correct, and consent to Ananta contacting me about my application. {required}</span>
       </label>
       <Honeypot />
@@ -93,7 +93,7 @@ function ReferralFields({ action, pending, message, v, partner, today, lastDay }
         </div>
       </fieldset>
       <label className="mb-[26px] flex items-start gap-3">
-        <input name="consent" type="checkbox" required defaultChecked={v.consent === 'on'} className="mt-1 size-4 shrink-0 accent-[#7f1835]" />
+        <input name="consent" type="checkbox" required defaultChecked={v.consent === 'on'} className="mt-1 size-4 shrink-0 accent-[var(--accent)]" />
         <span>I consent to be contacted by Ananta Partners and the brand I chose, by phone, SMS or WhatsApp, about my visit. {required}</span>
       </label>
       <Honeypot />
@@ -117,7 +117,7 @@ export function CopyLink({ url }: { url: string }) {
   };
   return (
     <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-      <code className="min-w-0 flex-1 break-all border border-[#bfbfbf] bg-white px-4 py-3 text-left text-sm">{url}</code>
+      <code className="min-w-0 flex-1 break-all border border-line bg-surface px-4 py-3 text-left text-sm">{url}</code>
       <button type="button" onClick={copy} className={btn} aria-live="polite">Copy link</button>
     </div>
   );

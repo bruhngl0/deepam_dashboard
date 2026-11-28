@@ -1,7 +1,7 @@
 -- Ananta Partner Network TEST data (owner, 28 Nov 2026): about 30 rows on every Partner Network page, on the live CRM.
 -- Every row is marked so scripts/partner-test-data-remove.sql takes all of it out:
---   partners    "TEST …" names, phones +91 90000 00001–00030, Partner IDs APR-90001–APR-90030, notes 'TEST DATA'
---   referrals   phones +91 90001 00001–…        bills / invoices  TEST-INV-…, TEST-PP-…, TEST-EXCL-…
+--   partners    "TEST …" names, phones +91 55555 00001–00030, Partner IDs APR-90001–APR-90030, notes 'TEST DATA'
+--   referrals   phones +91 55554 00001–…        bills / invoices  TEST-INV-…, TEST-PP-…, TEST-EXCL-…
 --   campaigns, incentives, claims, exclusions   names / reasons starting "TEST"; created_by 'TEST seed'
 -- Inserted with SQL, so no alert emails or Marketing follow-ups are made. Rules and categories are not touched.
 -- Run once; it stops if test partners already exist. Afterwards the app's own functions work out months and statements.
@@ -17,11 +17,11 @@ DECLARE
   mg int; jy int; pid int; rid bigint; s text; lvl int; reg date; bill numeric; billed timestamptz; mon text; i int; sid int;
   pids int[] := '{}'; rids bigint[] := '{}';
 BEGIN
-  IF EXISTS (SELECT 1 FROM partners WHERE phone_e164 LIKE '+9190000%' OR partner_code LIKE 'APR-9%') THEN
+  IF EXISTS (SELECT 1 FROM partners WHERE phone_e164 LIKE '+9155555%' OR partner_code LIKE 'APR-9%') THEN
     RAISE EXCEPTION 'Test partners are already there: run partner-test-data-remove.sql first';
   END IF;
-  IF EXISTS (SELECT 1 FROM customers WHERE phone_e164 LIKE '+9190000%' OR phone_e164 LIKE '+9190001%') THEN
-    RAISE EXCEPTION 'A real customer uses a +91 90000/90001 number; pick other test numbers';
+  IF EXISTS (SELECT 1 FROM customers WHERE phone_e164 LIKE '+9155555%' OR phone_e164 LIKE '+9155554%') THEN
+    RAISE EXCEPTION 'A customer uses a +91 55555/55554 number; pick other test numbers';
   END IF;
   SELECT array_agg(name ORDER BY name) INTO cats FROM partner_categories;
   IF cats IS NULL THEN cats := ARRAY['Makeup artist','Stylist','Photographer']; END IF;
@@ -35,7 +35,7 @@ BEGIN
     INSERT INTO partners (partner_code, full_name, contact, phone_e164, email, category, city, consent_at, status, status_note, level,
                           documents, dashboard_token, notes, applied_at, approved_at, decided_at)
     VALUES (CASE WHEN s IN ('approved','on_hold','suspended','terminated') THEN 'APR-9' || lpad(i::text, 4, '0') END,
-            'TEST ' || names[i], '90000 ' || lpad(i::text, 5, '0'), '+9190000' || lpad(i::text, 5, '0'),
+            'TEST ' || names[i], '55555 ' || lpad(i::text, 5, '0'), '+9155555' || lpad(i::text, 5, '0'),
             'test.partner' || i || '@example.com', cats[1 + (i % array_length(cats, 1))], cities[1 + (i % 5)], now() - (i + 60) * interval '1 day',
             s, CASE s WHEN 'applied' THEN NULL WHEN 'approved' THEN 'Application approved' ELSE 'TEST: ' || s END, lvl,
             CASE WHEN s = 'approved' THEN jsonb_build_object('agreement', '2026-10-05', 'pan', '2026-10-05', 'id_proof', '2026-10-06', 'bank', '2026-10-06')
@@ -68,7 +68,7 @@ BEGIN
     s := CASE WHEN i % 9 = 0 THEN 'declined' WHEN i <= 30 THEN 'converted' WHEN reg + 30 < (now() AT TIME ZONE 'Asia/Kolkata')::date THEN 'expired' ELSE 'registered' END;
     INSERT INTO partner_referrals (partner_id, full_name, contact, phone_e164, occasion, preferred_store_id, appointment_date, consent_at, status,
                                    decline_reason, registered_at, registered_on, window_ends_on, converted_at, verify_status, brand, preferred_store_label)
-    VALUES (pid, 'TEST Customer ' || i, '90001 ' || lpad(i::text, 5, '0'), '+9190001' || lpad(i::text, 5, '0'),
+    VALUES (pid, 'TEST Customer ' || i, '55554 ' || lpad(i::text, 5, '0'), '+9155554' || lpad(i::text, 5, '0'),
             (ARRAY['Wedding','Engagement','Reception','Festival','Gifting','Everyday wear'])[1 + (i % 6)],
             CASE i % 4 WHEN 0 THEN mg WHEN 1 THEN jy END, reg + 3, reg, s,
             CASE WHEN s = 'declined' THEN 'already_referred' END, reg + time '11:00', reg, reg + 30,
@@ -175,7 +175,7 @@ WHERE x.settlement_id = s.id AND p.id = s.partner_id AND p.notes = 'TEST DATA';
 COMMIT;
 
 SELECT 'partners' AS t, count(*) FROM partners WHERE notes = 'TEST DATA'
-UNION ALL SELECT 'referrals', count(*) FROM partner_referrals WHERE phone_e164 LIKE '+9190001%'
+UNION ALL SELECT 'referrals', count(*) FROM partner_referrals WHERE phone_e164 LIKE '+9155554%'
 UNION ALL SELECT 'commissions', count(*) FROM partner_commissions WHERE voucher_no LIKE 'TEST-INV-%'
 UNION ALL SELECT 'settlements', count(*) FROM partner_settlements s JOIN partners p ON p.id = s.partner_id WHERE p.notes = 'TEST DATA'
 UNION ALL SELECT 'campaigns', count(*) FROM partner_campaigns WHERE created_by = 'TEST seed'

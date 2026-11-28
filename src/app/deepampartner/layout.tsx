@@ -1,8 +1,4 @@
 import type { Metadata } from 'next';
-import { Montserrat } from 'next/font/google';
-
-// Same face and weights as the forms on deepam.com.
-const montserrat = Montserrat({ subsets: ['latin'], weight: ['200', '300', '600', '700'] });
 
 export const metadata: Metadata = {
   title: 'Ananta Partners',
@@ -13,10 +9,13 @@ export const metadata: Metadata = {
 /** Public Ananta Partners pages (Deepam and Kalaniketan): the application, customer registration on a referral link, and the partner dashboard. */
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${montserrat.className} flex flex-1 flex-col bg-white text-sm font-light leading-[1.6] text-black antialiased [color-scheme:light]`}>
+    <div className="flex flex-1 flex-col text-sm text-ink-2 antialiased">
       {/* Wordmark, not a brand logo: the network covers Deepam and Kalaniketan. */}
-      <div className="px-4 pt-9 text-center sm:px-[30px] md:pt-14">
-        <p className="text-[1.05rem] font-semibold uppercase tracking-[0.32em] text-[#7f1835]">Ananta Partners</p>
+      <div className="px-4 pt-8 text-center">
+        <p className="inline-flex items-center gap-2 text-base font-semibold text-ink">
+          <span aria-hidden="true" className="flex size-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">A</span>
+          Ananta Partners
+        </p>
       </div>
       {children}
     </div>
