@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { readSalesPass } from './sales-pass';
+import { chatPass, readSalesPass } from './sales-pass';
 
 const SECRET = 'x'.repeat(40);
 const ORIGIN = 'https://crm.example.com';
@@ -25,5 +25,20 @@ describe('sales pass from Hemparshwa OS', () => {
     expect(readSalesPass(mint({ sub: 'DBYA0027', role: 'sales', aud: 'https://other.example.com', exp: soon() }), ORIGIN)).toBeNull();
     expect(readSalesPass(mint({ sub: 'DBYA0027', role: 'sales', aud: ORIGIN, exp: soon() + 3600 }), ORIGIN)).toBeNull();
     expect(readSalesPass('garbage', ORIGIN)).toBeNull();
+  });
+});
+
+describe('chat pass to Hemparshwa OS', () => {
+  it('is signed for the OS origin with role chat and never opens a desk here', () => {
+    const before = process.env.ADMIN_SSO_SECRET;
+    process.env.ADMIN_SSO_SECRET = SECRET;
+    const pass = chatPass('DBYA0012', 'https://os.example.com', SECRET);
+    const [body, sig] = pass.split('.');
+    expect(sig).toBe(createHmac('sha256', SECRET).update(body).digest('base64url'));
+    const claims = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    expect(claims).toMatchObject({ sub: 'DBYA0012', role: 'chat', aud: 'https://os.example.com' });
+    expect(claims.exp).toBeGreaterThan(Date.now() / 1000);
+    expect(readSalesPass(pass, 'https://os.example.com')).toBeNull();
+    process.env.ADMIN_SSO_SECRET = before;
   });
 });

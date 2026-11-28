@@ -5,7 +5,7 @@
  * dashboard (`/daily`), HR Intelligence (`/hr`), Customer
  * Intelligence (`/crm`), Vendor Intelligence (`/vendor`), the external Driver
  * Network Management and Store Performance Tracker services, Marketing
- * Intelligence (`/marketing`). Ananta Partner (`/partners`) opens from Ananta Retail in Hemparshwa OS.
+ * Intelligence (`/marketing`), Auth Control lives in Hemparshwa OS → Settings → Deepam by Ananta. Ananta Partner Network (`/partners`) opens from Ananta Retail in Hemparshwa OS.
  * This page is just the door between them, not
  * a dashboard of its own, so `NavTabs` shows nothing here (see
  * `components/nav-tabs.tsx`).
@@ -40,7 +40,7 @@ export default async function HeroPage() {
           </span>
           <h2 className="text-lg font-semibold tracking-tight text-ink">Overview</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
-            How the modules connect — one customer journey from walk-in to delivery.
+            A master summary of every module, with each module's key KPIs.
           </p>
         </Link>
 
@@ -161,6 +161,24 @@ export default async function HeroPage() {
           <h2 className="text-lg font-semibold tracking-tight text-ink">Cash Management &amp; Payment Approvals</h2>
           <p className="max-w-[36ch] text-sm text-ink-2">
             Daily store closings and deposits, payment requests and approvals, payments, cheques and bank balances.
+            Opens in Hemparshwa OS with your own sign-in.
+          </p>
+        </a>
+
+        <a
+          href="https://nvc57svvmb.ap-south-1.awsapprunner.com/tasks"
+          rel="noreferrer"
+          className="card card-interactive group flex flex-col gap-2 rounded-2xl border border-line bg-surface p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft/50 text-accent">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-[1.8]">
+              <rect x="4" y="4" width="16" height="16" rx="3" />
+              <path d="m8.5 12 2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <h2 className="text-lg font-semibold tracking-tight text-ink">E-commerce Task Tracker</h2>
+          <p className="max-w-[36ch] text-sm text-ink-2">
+            Daily tasks and end-of-day reports for the e-commerce team; each person sees only their own.
             Opens in Hemparshwa OS with your own sign-in.
           </p>
         </a>

@@ -22,6 +22,7 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { MARKETING_MODULES, marketingModuleHref, marketingModuleOf } from '@/lib/marketing/modules';
+import { OVERVIEW_MODULES } from '@/lib/overview/modules';
 
 const CARRIED_PARAMS = ['from', 'to', 'store'];
 
@@ -43,12 +44,14 @@ const HR_TABS = [
   { href: '/hr/incentives', label: 'Incentives' },
 ] as const;
 
-// Ananta Partner (Deepam Partners). Partners also lights for a partner's own page.
+// Ananta Partner Network (Deepam Partners). Partners also lights for a partner's own page.
 const PARTNER_TABS = [
   { href: '/partners', label: 'Overview' },
-  { href: '/partners/list', label: 'Partners', pattern: /^\/partners\/(?!referrals|payouts|rules)[^/]+$/ },
+  { href: '/partners/list', label: 'Partners', pattern: /^\/partners\/(?!referrals|payouts|settlements|controls|programs|rules)[^/]+$/ },
   { href: '/partners/referrals', label: 'Referrals' },
-  { href: '/partners/payouts', label: 'Payouts' },
+  { href: '/partners/controls', label: 'Controls' },
+  { href: '/partners/settlements', label: 'Settlements', also: '/partners/payouts' },
+  { href: '/partners/programs', label: 'Programs' },
   { href: '/partners/rules', label: 'Rules' },
 ] as const;
 
@@ -64,9 +67,32 @@ const VENDOR_TABS = [
   { href: '/vendor/import', label: 'Import' },
 ] as const;
 
+// Short names, so all the links fit in one well-spaced row; each page's heading has the full name.
+const OVERVIEW_SHORT: Record<string, string> = {
+  'HR Intelligence': 'HR', 'Customer Intelligence': 'Customer', 'Vendor Intelligence': 'Vendor', 'Driver Network Management': 'Driver Network',
+  'Store Performance Tracker': 'Store Performance', 'Cash Management': 'Cash & Payments', 'Marketing Intelligence': 'Marketing',
+};
+
 export function NavTabs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Overview: the master summary, then one link per module.
+  if (pathname === '/flow') {
+    const dates = ['from', 'to'].flatMap((k) => { const v = searchParams.get(k); return v ? [`${k}=${v}`] : []; });
+    const current = searchParams.get('m');
+    const links = [{ key: null as string | null, label: 'Summary' }, ...OVERVIEW_MODULES.map((m) => ({ key: m.key as string | null, label: m.label.replace(' & Payment Approvals', '') }))];
+    return (
+      <nav aria-label="Overview modules" className="flex min-w-0 items-center gap-4 overflow-x-auto">
+        {links.map(({ key, label }) => {
+          const active = key === current || (!key && !OVERVIEW_MODULES.some((m) => m.key === current));
+          const query = [...(key ? [`m=${key}`] : []), ...dates].join('&');
+          return <Link key={label} href={`/flow${query ? `?${query}` : ''}`} aria-current={active ? 'page' : undefined}
+            className={`shrink-0 whitespace-nowrap rounded-lg px-2 py-1.5 text-[13px] font-medium tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${active ? 'bg-inset text-ink' : 'text-ink-2 hover:bg-inset hover:text-ink'}`}>{OVERVIEW_SHORT[label] ?? label}</Link>;
+        })}
+      </nav>
+    );
+  }
 
   // Marketing Intelligence: its four sections, kept in the URL (lib/marketing/modules).
   if (pathname === '/marketing' || pathname.startsWith('/marketing/')) {

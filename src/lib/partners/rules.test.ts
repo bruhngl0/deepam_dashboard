@@ -11,7 +11,7 @@ import { Client } from 'pg';
 const url = process.env.DATABASE_URL || config({ path: '.env.local' }).parsed?.DATABASE_URL;
 
 describe.skipIf(!url)('partner referral rules', () => {
-  it('blocks recent buyers and open referrals, matches bills by IST date inside the window, and expires', async () => {
+  it('marks recent buyers for verification, blocks open referrals, matches bills by IST date inside the window, and expires', async () => {
     const client = new Client({ connectionString: url });
     await client.connect();
     const q = async <T = Record<string, unknown>>(text: string, values: unknown[] = []) => (await client.query(text, values)).rows as T[];
@@ -39,6 +39,8 @@ describe.skipIf(!url)('partner referral rules', () => {
          VALUES ('PTEST-' || $1::text || '-' || floor(random() * 1e9)::text, $2, $3, (((now() AT TIME ZONE 'Asia/Kolkata')::date + $4::int) + time '12:00') AT TIME ZONE 'Asia/Kolkata', $1::bigint, $5, '{}')
          RETURNING voucher_no`, [customerId, batch, store, days, amount])).voucher_no;
       const block = async (p: string, partnerId: number) => (await one<{ b: string | null }>(`SELECT partner_referral_block($1, $2) AS b`, [p, partnerId])).b;
+      // Since the program rules (drizzle/0047) an existing customer can be referred; staff verify the partner's part.
+      const existing = async (p: string) => (await one<{ e: boolean }>(`SELECT partner_is_existing_customer($1) AS e`, [p])).e;
       /** A referral registered `daysAgo` days ago with the 60-day window. */
       const refer = async (p: string, partnerId: number, daysAgo: number) => (await one<{ id: number }>(
         `INSERT INTO partner_referrals (partner_id, full_name, contact, phone_e164, occasion, consent_at, status, registered_at, registered_on, window_ends_on)
@@ -61,12 +63,13 @@ describe.skipIf(!url)('partner referral rules', () => {
       const lead = await customer(phone(3)); // a lead: in the CRM, never bought
       expect(await block(phone(3), a)).toBeNull();
       await bill(lead, -400); // bought 13 months ago
-      expect(await block(phone(3), a)).toBe('recent_purchase');
+      expect(await block(phone(3), a)).toBeNull();
+      expect(await existing(phone(3))).toBe(true);
       const lapsed = await customer(phone(4));
       await bill(lapsed, -800); // bought over two years ago
-      expect(await block(phone(4), a)).toBeNull();
+      expect(await existing(phone(4))).toBe(false);
       await q(`INSERT INTO loyalty_customers (customer_id, batch_id, last_bill_date, raw) VALUES ($1, $2, (now() AT TIME ZONE 'Asia/Kolkata')::date - 100, '{}')`, [lapsed, batch]);
-      expect(await block(phone(4), a)).toBe('recent_purchase'); // the loyalty list knows a newer bill
+      expect(await existing(phone(4))).toBe(true); // the loyalty list knows a newer bill
 
       const first = await refer(phone(5), a, 0);
       expect(await block(phone(5), b)).toBe('already_referred');
@@ -120,7 +123,7 @@ describe.skipIf(!url)('partner referral rules', () => {
       expect(await status(kept)).toBe('registered');
 
       // An expired referral no longer blocks the number for another partner.
-      expect(await block(phone(7), a)).toBe('recent_purchase'); // phone 7 bought today, so it is now a customer
+      expect(await existing(phone(7))).toBe(true); // phone 7 bought today, so it is now a customer
       const quiet = await refer(phone(9), a, 70);
       await q(`SELECT partner_refresh_referrals()`);
       expect(await status(quiet)).toBe('expired');

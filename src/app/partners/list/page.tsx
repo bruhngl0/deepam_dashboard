@@ -1,7 +1,8 @@
 /** Every partner and applicant, awaiting a decision first. Filter by status, category or a search. */
 
 import { requireUser } from '@/lib/auth';
-import { PARTNER_CATEGORIES, PARTNER_STATUSES } from '@/lib/partners/constants';
+import { PARTNER_STATUSES } from '@/lib/partners/constants';
+import { categories } from '@/lib/partners/rules';
 import { listPartners } from '@/lib/partners/queries';
 import { pickRange, pickStores, rangeLabel } from '@/lib/module-filters';
 import { refreshReferrals } from '@/lib/partners/store';
@@ -16,7 +17,7 @@ export default async function PartnerListPage({ searchParams }: { searchParams: 
   await refreshReferrals();
   const sp = await searchParams;
   const status = PARTNER_STATUSES.find((s) => s === one(sp.status)) ?? '';
-  const category = PARTNER_CATEGORIES.find((c) => c === one(sp.category)) ?? '';
+  const category = (await categories()).find((c) => c.name === one(sp.category))?.name ?? '';
   const search = one(sp.q).slice(0, 80);
   const { from, to } = pickRange(sp, { from: null, to: null });
   const stores = pickStores(sp);
@@ -25,7 +26,7 @@ export default async function PartnerListPage({ searchParams }: { searchParams: 
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <PartnerHeader icon="users" eyebrow="Ananta Partner" title="Partners" description="Applications from the public form and every approved partner. Open one to approve it, collect documents and send the links."
+      <PartnerHeader icon="users" eyebrow="Ananta Partner Network" title="Partners" description="Applications from the public form and every approved partner. Open one to approve it, collect documents and send the links."
         meta={`${formatNumber(partners.length)} ${filtered ? 'matching' : 'in all'}${from || to ? ` · applied ${rangeLabel(from, to)}` : ''}`} actions={<a href="/deepampartner" target="_blank" rel="noreferrer" className={button}><Icon name="plus" />Add an application</a>} />
       <Notices sp={sp} />
 

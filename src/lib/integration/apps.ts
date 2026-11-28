@@ -27,13 +27,13 @@ export type StockAlerts = {
   }[];
 };
 
-async function getJson<T>(base: string | undefined, token: string | undefined, path: string, scope: string): Promise<T | null> {
+async function getJson<T>(base: string | undefined, token: string | undefined, path: string, scope: string, timeoutMs = TIMEOUT_MS): Promise<T | null> {
   if (!base || !token) return null;
   try {
     const response = await fetch(new URL(path, base), {
       headers: { authorization: `Bearer ${token}` },
       cache: 'no-store',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
       console.warn(`[${scope}] ${response.status}`);
@@ -45,6 +45,10 @@ async function getJson<T>(base: string | undefined, token: string | undefined, p
     return null;
   }
 }
+
+/** One module's KPIs for the Overview, from that app's /api/integration/overview. */
+export const getOverviewFeed = async (base: string | undefined, token: string | undefined, path: string, name: string) =>
+  (await getJson<{ kpis: { label: string; value: string; caption?: string }[] }>(base, token, path, `overview ${name}`, 20_000))?.kpis ?? null;
 
 export const getRcDaily = (date: string) =>
   getJson<RcDaily>(process.env.RC_URL, process.env.RC_INTEGRATION_TOKEN, `/api/integration/daily?date=${date}`, 'rc daily');

@@ -1,29 +1,39 @@
 /**
- * Ananta Partner (Deepam Partners): the fixed lists and labels. Tables and rules: drizzle/0039.
+ * Ananta Partner Network (Deepam Partners): the fixed lists and labels. Tables and rules: drizzle/0039.
  */
 
-/** Partner categories on the application form. Driver is to be added later: append it here, no migration needed. */
-export const PARTNER_CATEGORIES = [
-  'Loyal customer',
-  'Makeup artist',
-  'Stylist',
-  'Influencer',
-  'Wedding professional',
-  'Wedding venue',
-  'Community partner',
-  'Former Deepam employee',
-  'Photographer',
-] as const;
-export type PartnerCategory = (typeof PARTNER_CATEGORIES)[number];
+/** Partner categories live in the database (partner_categories, edited under Rules; drizzle/0047). */
 
-export const PARTNER_STATUSES = ['applied', 'approved', 'rejected', 'suspended'] as const;
+export const PARTNER_STATUSES = ['applied', 'approved', 'on_hold', 'suspended', 'rejected', 'terminated'] as const;
 export type PartnerStatus = (typeof PARTNER_STATUSES)[number];
 export const PARTNER_STATUS_LABEL: Record<PartnerStatus, string> = {
-  applied: 'Awaiting decision',
-  approved: 'Approved',
-  rejected: 'Rejected',
+  applied: 'Pending approval',
+  approved: 'Active',
+  on_hold: 'On hold',
   suspended: 'Suspended',
+  rejected: 'Rejected',
+  terminated: 'Terminated',
 };
+/** What each status does (program rules §19). */
+export const PARTNER_STATUS_MEANING: Record<PartnerStatus, string> = {
+  applied: 'Cannot register customers yet.',
+  approved: 'Full access: the referral link registers customers and earnings are paid.',
+  on_hold: 'New referrals and payouts stopped while under review. Earnings keep counting.',
+  suspended: 'New referrals and privileges stopped. Earned commission is kept.',
+  rejected: 'Application declined.',
+  terminated: 'Partnership closed. Outstanding earnings are settled as agreed.',
+};
+/** Status changes staff can make from each status. */
+export const STATUS_MOVES: Record<PartnerStatus, PartnerStatus[]> = {
+  applied: ['approved', 'rejected'],
+  approved: ['on_hold', 'suspended', 'terminated'],
+  on_hold: ['approved', 'suspended', 'terminated'],
+  suspended: ['approved', 'terminated'],
+  rejected: ['approved'],
+  terminated: [],
+};
+/** Statuses with a Partner ID: the dashboard still opens for all of them. */
+export const ISSUED_STATUSES: PartnerStatus[] = ['approved', 'on_hold', 'suspended', 'terminated'];
 
 /** Partner ID: DPR-00001, issued on approval. */
 export const PARTNER_CODE = /^DPR-\d{5,}$/;

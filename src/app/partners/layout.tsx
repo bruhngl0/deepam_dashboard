@@ -1,5 +1,5 @@
 /**
- * Ananta Partner module shell: Overview, Partners, Referrals, Payouts and Rules (tabs in nav-tabs.tsx).
+ * Ananta Partner Network module shell: Overview, Partners, Referrals, Payouts and Rules (tabs in nav-tabs.tsx).
  * The public side (application, referral links, partner dashboards) is /deepampartner.
  * Each page calls `refreshReferrals()` itself: a layout is not re-rendered when moving between its pages.
  *
@@ -10,18 +10,19 @@
 import { requireUser } from '@/lib/auth';
 import { getFilterOptions } from '@/lib/queries/customers';
 import { todayIst } from '@/lib/queries/daily';
-import { PARTNER_CATEGORIES, PARTNER_STATUS_LABEL, PARTNER_STATUSES, REFERRAL_STATUS_LABEL, REFERRAL_STATUSES } from '@/lib/partners/constants';
+import { PARTNER_STATUS_LABEL, PARTNER_STATUSES, REFERRAL_STATUS_LABEL, REFERRAL_STATUSES } from '@/lib/partners/constants';
 import { ModuleFilters, type FilterPage } from '@/components/module-filters';
+import { categories } from '@/lib/partners/rules';
 
 export default async function PartnersLayout({ children }: { children: React.ReactNode }) {
   await requireUser();
-  const options = await getFilterOptions();
+  const [options, cats] = await Promise.all([getFilterOptions(), categories()]);
 
   const pages: FilterPage[] = [
     { path: '/partners', store: true, period: 'range', note: 'Referrals by registration date and store; bills by bill date and store. Partner counts are as they stand today. Default: all dates.' },
     { path: '/partners/list', store: true, period: 'range', periodLabel: 'Applied', fields: [
       { kind: 'select', param: 'status', label: 'Status', all: 'All', options: PARTNER_STATUSES.map((s) => ({ value: s, label: PARTNER_STATUS_LABEL[s] })) },
-      { kind: 'select', param: 'category', label: 'Category', all: 'All', options: PARTNER_CATEGORIES.map((c) => ({ value: c, label: c })) },
+      { kind: 'select', param: 'category', label: 'Category', all: 'All', options: cats.map((c) => ({ value: c.name, label: c.name })) },
       { kind: 'search', param: 'q', placeholder: 'Name, Partner ID, phone, email, city' }],
       note: 'Store: partners with a referral who chose that store or billed there.' },
     { path: '/partners/referrals', store: true, period: 'range', periodLabel: 'Registered', fields: [

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, isBot, parseApplication, parseReferral } from './forms';
+
+const CATEGORIES = ['Makeup artist', 'Loyal Customers'];
 import { withPartnerReferral } from './lead';
 import { makeLead } from '@/lib/marketing/local';
 
@@ -9,7 +11,7 @@ describe('partner application', () => {
   const good = { fullName: '  Priya   Sharma ', contact: '+91 98450 12345', email: 'Priya@Example.com', category: 'Makeup artist', city: 'Bengaluru', consent: 'on' };
 
   it('accepts a complete form and normalizes the phone and email', () => {
-    expect(parseApplication(reader(good))).toEqual({ ok: true, value: {
+    expect(parseApplication(reader(good), CATEGORIES)).toEqual({ ok: true, value: {
       fullName: 'Priya Sharma', contact: '+91 98450 12345', phone: '+919845012345', email: 'priya@example.com', category: 'Makeup artist', city: 'Bengaluru',
     } });
   });
@@ -23,13 +25,13 @@ describe('partner application', () => {
     [{ city: '' }, 'city'],
     [{ consent: undefined }, 'agree'],
   ])('rejects %o', (change, message) => {
-    const result = parseApplication(reader({ ...good, ...change }));
+    const result = parseApplication(reader({ ...good, ...change }), CATEGORIES);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.message.toLowerCase()).toContain(message);
   });
 
   it('takes consent as true from JSON', () => {
-    expect(parseApplication(reader({ ...good, consent: true })).ok).toBe(true);
+    expect(parseApplication(reader({ ...good, consent: true }), CATEGORIES).ok).toBe(true);
   });
 
   it('spots the honeypot', () => {
