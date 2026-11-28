@@ -35,8 +35,10 @@ export const STATUS_MOVES: Record<PartnerStatus, PartnerStatus[]> = {
 /** Statuses with a Partner ID: the dashboard still opens for all of them. */
 export const ISSUED_STATUSES: PartnerStatus[] = ['approved', 'on_hold', 'suspended', 'terminated'];
 
-/** Partner ID: DPR-00001, issued on approval. */
-export const PARTNER_CODE = /^DPR-\d{5,}$/;
+/** Partner ID: APR-00001 (Ananta Partner), issued on approval. Until 28 Nov 2026 it was DPR-00001 (drizzle/0049). */
+export const PARTNER_CODE = /^APR-\d{5,}$/;
+/** A Partner ID as typed or from an old link: upper-cased, and DPR-00001 read as APR-00001. */
+export const normalizePartnerCode = (code: string) => code.trim().toUpperCase().replace(/^DPR-(?=\d{5,}$)/, 'APR-');
 export const LEVELS = [1, 2, 3, 4, 5] as const;
 
 /** Legal documents collected after approval. Only the date each was received is stored, never the numbers. */
@@ -53,11 +55,25 @@ export const REQUIRED_DOCUMENTS = PARTNER_DOCUMENTS.filter((d) => !('optional' i
 /** Shopping occasions on the customer registration form. */
 export const OCCASIONS = ['Wedding', 'Engagement', 'Reception', 'Festival', 'Party or celebration', 'Gifting', 'Everyday wear', 'Other'] as const;
 
-/** Stores a referred customer can choose: `code` is stores.code, `marketing` the Marketing Intelligence store value. */
-export const REFERRAL_STORES = [
-  { code: 'MG_ROAD', label: 'MG Road', marketing: 'MG' },
-  { code: 'JAYANAGAR', label: 'Jayanagar', marketing: 'JAYNAGAR' },
+/** Brands a referred customer can choose on the referral form, each with its stores. */
+export const REFERRAL_BRANDS = [
+  { key: 'deepam', label: 'Deepam' },
+  { key: 'kalaniketan', label: 'Kalaniketan' },
 ] as const;
+export type ReferralBrand = (typeof REFERRAL_BRANDS)[number]['key'];
+
+/**
+ * Stores a referred customer can choose. Deepam's are CRM stores: `code` is stores.code, `marketing` the Marketing
+ * Intelligence store value. Kalaniketan's are not in the CRM (no `code`): the store is kept by name.
+ */
+export const REFERRAL_STORES = [
+  { brand: 'deepam', code: 'MG_ROAD', label: 'MG Road, Bengaluru', marketing: 'MG' },
+  { brand: 'deepam', code: 'JAYANAGAR', label: 'Jayanagar, Bengaluru', marketing: 'JAYNAGAR' },
+  { brand: 'kalaniketan', code: 'KN_JUHU', label: 'Juhu, Mumbai', marketing: null },
+  { brand: 'kalaniketan', code: 'KN_SURAT', label: 'Ghod Dod Road, Surat', marketing: null },
+] as const;
+/** Stores that are CRM stores (stores.code). */
+export const CRM_REFERRAL_STORES = ['MG_ROAD', 'JAYANAGAR'];
 
 /** Furthest ahead a customer can pick an appointment. */
 export const APPOINTMENT_MAX_DAYS = 90;

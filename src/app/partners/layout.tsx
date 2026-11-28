@@ -27,7 +27,7 @@ export default async function PartnersLayout({ children }: { children: React.Rea
       note: 'Store: partners with a referral who chose that store or billed there.' },
     { path: '/partners/referrals', store: true, period: 'range', periodLabel: 'Registered', fields: [
       { kind: 'select', param: 'status', label: 'Status', all: 'All', options: REFERRAL_STATUSES.map((s) => ({ value: s, label: REFERRAL_STATUS_LABEL[s] })) },
-      { kind: 'search', param: 'q', placeholder: 'Customer, phone, CUS- or DPR- ID, partner' }],
+      { kind: 'search', param: 'q', placeholder: 'Customer, phone, CUS- or APR- ID, partner' }],
       note: 'Bills to validate are narrowed by bill date and store; referrals by registration date and preferred store (or a bill there).' },
     { path: '/partners/payouts', period: 'month', note: 'A payout covers every store: each partner is paid once per month.' },
   ];

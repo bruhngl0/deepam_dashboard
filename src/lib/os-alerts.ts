@@ -37,7 +37,7 @@ export async function reportToOs(a: OsAlert) {
   });
 }
 
-/** "DPR-00012 Asha Rao" for a partner id, for alert text. */
+/** "APR-00012 Asha Rao" for a partner id, for alert text. */
 export async function partnerLabel(id: unknown): Promise<string | null> {
   const n = Number(id);
   if (!Number.isInteger(n) || n <= 0) return null;

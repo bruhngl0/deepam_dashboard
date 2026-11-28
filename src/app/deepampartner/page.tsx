@@ -10,8 +10,8 @@ const STEPS: [string, string][] = [
 ];
 
 export const metadata: Metadata = {
-  title: 'Become a Deepam Partner',
-  description: 'Apply to the Deepam Partner Programme: refer your clients and community to Deepam and earn on every purchase.',
+  title: 'Become an Ananta Partner',
+  description: 'Apply to Ananta Partners: refer your clients and community to Deepam and Kalaniketan and earn on every purchase.',
   robots: { index: true, follow: true },
 };
 
@@ -24,9 +24,9 @@ export default async function PartnerApplicationPage() {
     <main className={page}>
       <div className="mx-auto mb-10 max-w-[720px] text-center">
         <p className={`${kicker} mb-3`}>Partner Programme</p>
-        <h1 className={`${heading} mb-4`}><strong className="font-bold">Deepam</strong> Partners</h1>
-        <p className="mb-[1em]">Makeup artists, stylists, photographers, wedding professionals and venues, influencers, community partners, our loyal customers and former colleagues: refer the people you work with to Deepam and earn on every purchase they make.</p>
-        <p>Once your application is approved, we collect a few documents, then send you your Deepam Partner ID, your own referral link and a dashboard to follow your referrals.</p>
+        <h1 className={`${heading} mb-4`}><strong className="font-bold">Ananta</strong> Partners</h1>
+        <p className="mb-[1em]">Makeup artists, stylists, photographers, wedding professionals and venues, influencers, community partners, our loyal customers and former colleagues: refer the people you work with to Deepam and Kalaniketan and earn on every purchase they make.</p>
+        <p>Once your application is approved, we collect a few documents, then send you your Ananta Partner ID, your own referral link and a dashboard to follow your referrals.</p>
       </div>
       <ol className="mx-auto mb-10 grid max-w-[960px] gap-3 sm:grid-cols-3">
         {STEPS.map(([title, text], i) => (

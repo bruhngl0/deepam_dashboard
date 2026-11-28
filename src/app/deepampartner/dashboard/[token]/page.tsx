@@ -10,7 +10,7 @@ import { CopyLink } from '../../forms';
 import { btn, frame, heading, kicker, page, tile } from '../../styles';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Partner dashboard · Deepam Partners', referrer: 'no-referrer' };
+export const metadata: Metadata = { title: 'Partner dashboard · Ananta Partners', referrer: 'no-referrer' };
 
 /** The IST date a week from now: referrals whose window closes by then are called out. */
 const weekAhead = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(Date.now() + 7 * 86400000));
@@ -37,7 +37,7 @@ export default async function PartnerDashboardPage({ params }: { params: Promise
       <main className={page}>
         <div className="mx-auto max-w-[720px] text-center">
           <h1 className={`${heading} mb-3`}>This dashboard link is not active</h1>
-          <p>Please ask the Deepam team for your current dashboard link.</p>
+          <p>Please ask the Ananta Partners team for your current dashboard link.</p>
         </div>
       </main>
     );
@@ -57,7 +57,7 @@ export default async function PartnerDashboardPage({ params }: { params: Promise
   const soon = weekAhead();
   const expiring = d.referrals.filter((r) => r.status === 'registered' && r.windowEndsOn.slice(0, 10) <= soon);
   const link = `${await partnerLinkBase()}/${d.code}`;
-  const share = `Planning a visit to Deepam? Book your appointment here: ${link}`;
+  const share = `Planning a visit to Deepam or Kalaniketan? Book your appointment here: ${link}`;
   const tiles: [string, string][] = [
     ['Referrals', formatNumber(d.totals.referrals)],
     ['Purchased', formatNumber(d.totals.converted)],
@@ -69,10 +69,10 @@ export default async function PartnerDashboardPage({ params }: { params: Promise
     <main className={page}>
       <div className="mx-auto max-w-[960px] space-y-10">
         <header className="text-center">
-          <p className={kicker}>Deepam Partner {d.code}</p>
+          <p className={kicker}>Ananta Partner {d.code}</p>
           <p className="mt-1 text-xs uppercase tracking-[0.08em] text-[#5c5c5c]">{d.category} · Partnership {d.levelName}{d.personalDiscount ? ` · ${d.personalDiscount}% personal shopping discount` : ''}</p>
           <h1 className={`${heading} mt-2`}>Welcome, <strong className="font-bold">{d.name.split(/\s+/)[0]}</strong></h1>
-          {(d.status === 'suspended' || d.status === 'on_hold') && <p className="mt-3 text-[#a12b2b]">Your referral link is paused. Please contact the Deepam team.</p>}
+          {(d.status === 'suspended' || d.status === 'on_hold') && <p className="mt-3 text-[#a12b2b]">Your referral link is paused. Please contact the Ananta Partners team.</p>}
           {d.status === 'terminated' && <p className="mt-3 text-[#a12b2b]">Your partnership has closed. Earnings already made are settled as agreed.</p>}
         </header>
 
@@ -81,7 +81,7 @@ export default async function PartnerDashboardPage({ params }: { params: Promise
             <h2 id="link-heading" className="text-[1.2em] font-semibold">Your referral link</h2>
             <CopyLink url={link} />
             <div><a href={`https://wa.me/?text=${encodeURIComponent(share)}`} target="_blank" rel="noopener noreferrer" className={btn}>Share on WhatsApp</a></div>
-            <p className="text-[#5c5c5c]">A purchase counts when the customer registers on your link and buys within {d.windowDays} days. For someone who already shops at Deepam, our team confirms your part first.</p>
+            <p className="text-[#5c5c5c]">A purchase counts when the customer registers on your link and buys within {d.windowDays} days. For someone who already shops with us, our team confirms your part first.</p>
           </section>
         )}
 

@@ -2,7 +2,7 @@
 
 import { sql, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
-import { ISSUED_STATUSES, PARTNER_CODE, REQUIRED_DOCUMENTS, type CommissionStatus, type DeclineReason, type PartnerStatus, type ReferralStatus } from './constants';
+import { ISSUED_STATUSES, normalizePartnerCode, PARTNER_CODE, REQUIRED_DOCUMENTS, type CommissionStatus, type DeclineReason, type PartnerStatus, type ReferralStatus } from './constants';
 import { levelFor, rulesFor, shiftMonth, thisMonthIst, type RuleLevel } from './rules';
 import { rowsOf } from './store';
 
@@ -106,9 +106,9 @@ export async function listPartners(f: PartnerFilters = {}): Promise<Partner[]> {
   return rows.map(toPartner);
 }
 
-/** By numeric id or Partner ID (DPR-00001). */
+/** By numeric id or Partner ID (APR-00001; an old DPR-00001 still finds it). */
 export async function getPartner(key: string): Promise<Partner | null> {
-  const code = key.toUpperCase();
+  const code = normalizePartnerCode(key);
   const cond = PARTNER_CODE.test(code) ? sql`p.partner_code = ${code}` : /^\d+$/.test(key) ? sql`p.id = ${Number(key)}` : null;
   if (!cond) return null;
   const [row] = rowsOf<PartnerRow>(await db.execute(sql`${PARTNER_SELECT} WHERE ${cond}`));
@@ -147,7 +147,7 @@ export async function listReferrals(f: ReferralFilters = {}): Promise<Referral[]
       : sql`(lower(r.full_name) LIKE ${like} OR lower(p.full_name) LIKE ${like} OR lower(coalesce(p.partner_code, '')) LIKE ${like} OR lower(coalesce(c.customer_code, '')) LIKE ${like})`);
   }
   const rows = rowsOf<Record<string, unknown>>(await db.execute(sql`
-    SELECT r.*, p.partner_code, p.full_name AS partner_name, c.customer_code, st.name AS store_name,
+    SELECT r.*, p.partner_code, p.full_name AS partner_name, c.customer_code, COALESCE(r.preferred_store_label, st.name) AS store_name,
       coalesce((
         SELECT json_agg(json_build_object('id', pc.id, 'voucher_no', pc.voucher_no, 'store_name', cs.name, 'billed_at', pc.billed_at,
           'bill_amount', pc.bill_amount, 'net', coalesce(pc.net_amount, pc.bill_amount), 'status', pc.status, 'percent', pc.commission_percent,

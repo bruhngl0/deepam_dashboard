@@ -15,6 +15,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { PartnerError, rowsOf } from './store';
 import { rulesFor, shiftMonth, thisMonthIst } from './rules';
+import { normalizePartnerCode } from './constants';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -232,7 +233,7 @@ export async function resolveClaim(id: number, resolution: string, sharePercent:
  */
 export async function requestRetro(voucherText: string | null, partnerCode: string | null, reasonText: string | null, byText: string | null) {
   const voucher = need(voucherText, 'Enter the invoice number').toUpperCase(), reason = need(reasonText, 'Give the reason'), by = need(byText, 'Enter your name');
-  const code = need(partnerCode, 'Enter the Partner ID').toUpperCase();
+  const code = normalizePartnerCode(need(partnerCode, 'Enter the Partner ID'));
   await db.transaction(async (t) => {
     const [s] = rowsOf<{ voucher_no: string; store_id: number; billed_at: Date; bill_amount: string; phone: string | null }>(await t.execute(sql`
       SELECT s.voucher_no, s.store_id, s.billed_at, s.bill_amount, c.phone_e164 AS phone FROM sales s LEFT JOIN customers c ON c.id = s.customer_id WHERE upper(s.voucher_no) = ${voucher}`));

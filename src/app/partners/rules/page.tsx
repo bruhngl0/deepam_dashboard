@@ -5,7 +5,7 @@
 
 import { requireUser } from '@/lib/auth';
 import { monthLabel } from '@/lib/partners/constants';
-import { categories, ruleHistory, rulesFor, scheduledVersions, shiftMonth, thisMonthIst, versionChanges } from '@/lib/partners/rules';
+import { categories, levelRanges, ruleHistory, rulesFor, scheduledVersions, shiftMonth, thisMonthIst, versionChanges } from '@/lib/partners/rules';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import { button, control, primaryButton } from '@/components/ui';
 import { cancelRulesAction, categoryAction, rulesAction } from '../actions';
@@ -23,6 +23,8 @@ export default async function RulesPage({ searchParams }: { searchParams: Promis
   const num = `${field} text-right tnum`;
   const months = [0, 1, 2, 3].map((k) => shiftMonth(month, k));
   const ordered = [...history].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const ranges = levelRanges(base.levels, formatCurrency);
+  const toOf = new Map(ranges.map((l) => [l.level, l.to]));
 
   return (
     <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -49,12 +51,27 @@ export default async function RulesPage({ searchParams }: { searchParams: Promis
       <form action={rulesAction} className="space-y-6">
         <input type="hidden" name="back" value="/partners/rules" />
         <Panel title="Levels" icon="rupee" flush
-          description={<>In force for {monthLabel(month)}: version {current.id}, from {monthLabel(current.effectiveMonth)}. A level holds from its minimum up to the next level&rsquo;s. Commission level and bonus come from the month&rsquo;s own sales; personal discount from the partnership level.</>}>
+          description={<>In force for {monthLabel(month)}: version {current.id}, from {monthLabel(current.effectiveMonth)}. A level runs from its From amount to just below the next level&rsquo;s. Commission level and bonus come from the month&rsquo;s own sales; personal discount from the partnership level.</>}>
+          {/* The levels as the program rules state them. */}
+          <div className="overflow-x-auto border-b border-line px-5 py-4">
+            <p className="mb-3 text-sm text-ink-2">Ananta Partners operates through {ranges.length} performance based partnership levels.</p>
+            <table className="w-full max-w-3xl border-collapse text-sm">
+              <thead><tr>{['Level', 'Monthly eligible sales', 'Commission'].map((h) => <th key={h} scope="col" className={`${th} text-left`}>{h}</th>)}</tr></thead>
+              <tbody>{ranges.map((l) => (
+                <tr key={l.level} className={tr}>
+                  <td className={`${td} font-medium text-ink`}>Level {l.level}</td>
+                  <td className={`tnum ${td} text-ink-2`}>{l.words}</td>
+                  <td className={`tnum ${td} text-ink-2`}>{l.commissionPercent}%</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            <p className="mt-3 text-xs text-ink-muted">Eligible sales generated across all participating brands and locations are combined when determining a partner&rsquo;s performance.</p>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm" style={{ minWidth: '72rem' }}>
+            <table className="w-full border-collapse text-sm" style={{ minWidth: '80rem' }}>
               <thead><tr>
-                {['Level', 'Name', 'Monthly eligible sales from (₹)', 'Commission %', 'Monthly bonus (₹)', 'Influencer fee limit (₹)', 'Personal discount %', 'Other benefits'].map((h, i) =>
-                  <th key={h} scope="col" className={`${th} ${i >= 2 && i <= 6 ? 'text-right' : 'text-left'}`}>{h}</th>)}
+                {['Level', 'Name', 'Monthly eligible sales from (₹)', 'To', 'Commission %', 'Monthly bonus (₹)', 'Influencer fee limit (₹)', 'Personal discount %', 'Other benefits'].map((h, i) =>
+                  <th key={h} scope="col" className={`${th} ${i >= 2 && i <= 7 ? 'text-right' : 'text-left'}`}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {base.levels.map((l) => (
@@ -64,6 +81,7 @@ export default async function RulesPage({ searchParams }: { searchParams: Promis
                     <td className={td}>{l.level === 1
                       ? <span className="tnum block px-3 text-right text-ink-2">0</span>
                       : <input name={`min_${l.level}`} type="number" min={0} step={1} required defaultValue={l.minSales} className={num} aria-label={`Level ${l.level} minimum monthly sales`} />}</td>
+                    <td className={`tnum ${td} whitespace-nowrap text-right text-ink-2`}>{toOf.get(l.level) != null ? `below ${formatCurrency(toOf.get(l.level))}` : 'and above'}</td>
                     <td className={td}><input name={`percent_${l.level}`} type="number" min={0} max={100} step={0.01} required defaultValue={l.commissionPercent} className={num} aria-label={`Level ${l.level} commission percent`} /></td>
                     <td className={td}><input name={`bonus_${l.level}`} type="number" min={0} step={1} required defaultValue={l.bonus} className={num} aria-label={`Level ${l.level} bonus`} /></td>
                     <td className={td}><input name={`influencer_${l.level}`} type="number" min={0} step={1} required defaultValue={l.influencerLimit} className={num} aria-label={`Level ${l.level} influencer fee limit`} /></td>

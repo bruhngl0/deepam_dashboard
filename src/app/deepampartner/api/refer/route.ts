@@ -10,7 +10,7 @@ export function OPTIONS() {
 }
 
 /**
- * `{ partner: "DPR-00001", fullName, contact, occasion, store: "MG_ROAD" | "JAYANAGAR", appointmentDate: "YYYY-MM-DD", consent: true }`
+ * `{ partner: "APR-00001", brand: "deepam" | "kalaniketan" (default deepam), fullName, contact, occasion, store: "MG_ROAD" | "JAYANAGAR" | "KN_JUHU" | "KN_SURAT", appointmentDate: "YYYY-MM-DD", consent: true }`
  * → `{ ok: true }`, or `{ ok: false, error, declined? }` (declined: the number cannot be referred; show `error` as is).
  */
 export async function POST(request: Request) {

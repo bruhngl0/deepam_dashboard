@@ -1,0 +1,24 @@
+-- Removes everything scripts/partner-test-data.sql added (and nothing else), then lets the app recompute months.
+BEGIN;
+CREATE TEMP TABLE test_partners ON COMMIT DROP AS SELECT id FROM partners WHERE notes = 'TEST DATA' AND phone_e164 LIKE '+9190000%';
+DELETE FROM partner_settlement_payments WHERE settlement_id IN (SELECT id FROM partner_settlements WHERE partner_id IN (SELECT id FROM test_partners));
+DELETE FROM partner_adjustments WHERE partner_id IN (SELECT id FROM test_partners) OR created_by = 'TEST seed';
+UPDATE partner_adjustments SET applied_settlement_id = NULL WHERE applied_settlement_id IN (SELECT id FROM partner_settlements WHERE partner_id IN (SELECT id FROM test_partners));
+DELETE FROM partner_incentive_awards WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partner_settlements WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partner_incentive_awards WHERE incentive_id IN (SELECT id FROM partner_incentives WHERE created_by = 'TEST seed');
+DELETE FROM partner_incentives WHERE created_by = 'TEST seed';
+DELETE FROM partner_collaborations WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partner_personal_purchases WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partner_flags WHERE partner_id IN (SELECT id FROM test_partners) OR created_by = 'TEST seed';
+DELETE FROM partner_claims WHERE created_by = 'TEST seed';
+DELETE FROM partner_exclusions WHERE created_by = 'TEST seed';
+DELETE FROM partner_commissions WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partner_campaigns WHERE created_by = 'TEST seed';
+DELETE FROM partner_referrals WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partner_months WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partner_level_reviews WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partner_status_log WHERE partner_id IN (SELECT id FROM test_partners);
+DELETE FROM partners WHERE id IN (SELECT id FROM test_partners);
+COMMIT;
+SELECT count(*) AS test_partners_left FROM partners WHERE notes = 'TEST DATA';
