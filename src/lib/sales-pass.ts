@@ -38,3 +38,12 @@ export function readSalesPassClaims(pass: string | null | undefined, origin: str
     return null;
   }
 }
+
+/**
+ * The other way (owner, 28 Nov 2026): a desk person's one-minute pass to Hemparshwa OS Team Chat (OS /chat/sso), role
+ * "chat", audience the OS origin. OS opens chat pages only with it.
+ */
+export function chatPass(employeeNumber: string, osOrigin: string, secret: string, now = Date.now()) {
+  const body = Buffer.from(JSON.stringify({ sub: employeeNumber, role: 'chat', aud: osOrigin, exp: Math.floor(now / 1000) + 60 })).toString('base64url');
+  return `${body}.${createHmac('sha256', secret).update(body).digest('base64url')}`;
+}
