@@ -344,6 +344,13 @@
       "when": 1795591200000,
       "tag": "0048_partner_program",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1795677600000,
+      "tag": "0049_ananta_partners",
+      "breakpoints": true
     }
   ]
 }

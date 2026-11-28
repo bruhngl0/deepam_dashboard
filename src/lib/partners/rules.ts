@@ -187,3 +187,18 @@ export async function renameCategory(from: string, to: string) {
     await t.execute(sql`DELETE FROM partner_categories WHERE name = ${from}`);
   });
 }
+
+/**
+ * Each level's monthly eligible sales as From / To, the way the program rules state them: "Below ₹2,00,000",
+ * "₹2,00,000 to below ₹5,00,000", "₹10,00,000 and above". A level runs from its minimum to just below the next one's.
+ */
+export function levelRanges<L extends { level: number; minSales: number }>(levels: readonly L[], money: (n: number) => string) {
+  const sorted = [...levels].sort((a, b) => a.level - b.level);
+  return sorted.map((l, i) => {
+    const next = sorted[i + 1];
+    const to = next ? next.minSales : null;
+    const words = l.minSales <= 0 && to !== null ? `Below ${money(to)}`
+      : to === null ? `${money(l.minSales)} and above` : `${money(l.minSales)} to below ${money(to)}`;
+    return { ...l, from: l.minSales, to, words };
+  });
+}

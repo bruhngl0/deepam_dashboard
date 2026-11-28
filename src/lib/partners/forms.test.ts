@@ -46,8 +46,19 @@ describe('referral registration', () => {
 
   it('accepts a complete form', () => {
     expect(parseReferral(reader(good), today)).toEqual({ ok: true, value: {
-      fullName: 'Asha Rao', contact: '9886012345', phone: '+919886012345', occasion: 'Wedding', storeCode: 'MG_ROAD', appointmentDate: '2026-11-20',
+      brand: 'deepam', fullName: 'Asha Rao', contact: '9886012345', phone: '+919886012345', occasion: 'Wedding', storeCode: 'MG_ROAD', appointmentDate: '2026-11-20',
     } });
+  });
+
+  it('takes a Kalaniketan store when the brand is Kalaniketan', () => {
+    const r = parseReferral(reader({ ...good, brand: 'kalaniketan', store: 'KN_SURAT' }), today);
+    expect(r.ok && [r.value.brand, r.value.storeCode]).toEqual(['kalaniketan', 'KN_SURAT']);
+  });
+
+  it("refuses a store of the other brand, and an unknown brand", () => {
+    expect(parseReferral(reader({ ...good, brand: 'kalaniketan' }), today).ok).toBe(false);
+    const r = parseReferral(reader({ ...good, brand: 'Taneira' }), today);
+    expect(!r.ok && r.message).toContain('brand');
   });
 
   it('accepts the store by its name, as the deepam.com form may send it', () => {
@@ -103,5 +114,15 @@ describe('partner referral lead', () => {
     expect(twice.followups).toHaveLength(1);
     expect(twice.followups[0].note).toContain('Festival');
     expect(twice.interactions).toHaveLength(existing.interactions.length + 2);
+  });
+});
+
+describe('Partner ID', () => {
+  it('reads old DPR- IDs as APR-, and leaves others alone', async () => {
+    const { normalizePartnerCode, PARTNER_CODE } = await import('./constants');
+    expect(normalizePartnerCode(' dpr-00003 ')).toBe('APR-00003');
+    expect(normalizePartnerCode('APR-00033')).toBe('APR-00033');
+    expect(PARTNER_CODE.test('APR-00033')).toBe(true);
+    expect(PARTNER_CODE.test('DPR-00033')).toBe(false);
   });
 });

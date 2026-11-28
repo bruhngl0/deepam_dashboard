@@ -5,7 +5,7 @@
  */
 
 import { normalizePhone } from '@/lib/phone';
-import { APPOINTMENT_MAX_DAYS, OCCASIONS, REFERRAL_STORES } from './constants';
+import { APPOINTMENT_MAX_DAYS, OCCASIONS, REFERRAL_BRANDS, REFERRAL_STORES, type ReferralBrand } from './constants';
 
 export type Read = (key: string) => unknown;
 type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -48,7 +48,7 @@ export function parseApplication(read: Read, categories: readonly string[]): Par
 }
 
 export type ReferralRegistration = {
-  fullName: string; contact: string; phone: string; occasion: string;
+  brand: ReferralBrand; fullName: string; contact: string; phone: string; occasion: string;
   storeCode: (typeof REFERRAL_STORES)[number]['code']; appointmentDate: string;
 };
 
@@ -57,8 +57,14 @@ export function parseReferral(read: Read, today: string): Parsed<ReferralRegistr
   const fullName = text(read, 'fullName', 120);
   const contact = text(read, 'contact', 40);
   const occasion = OCCASIONS.find((o) => o === text(read, 'occasion', 60));
-  const store = REFERRAL_STORES.find((s) => s.code === text(read, 'store', 40) || s.label === text(read, 'store', 40));
+  // Posted from other sites without a brand: Deepam, as before brands were added.
+  const brandText = text(read, 'brand', 40).toLowerCase() || 'deepam';
+  const brand = REFERRAL_BRANDS.find((b) => b.key === brandText || b.label.toLowerCase() === brandText);
+  const storeText = text(read, 'store', 40);
+  // Old Deepam forms send "MG Road" / "Jayanagar".
+  const store = REFERRAL_STORES.find((s) => s.brand === brand?.key && (s.code === storeText || s.label === storeText || s.label.split(',')[0] === storeText));
   const appointmentDate = text(read, 'appointmentDate', 10);
+  if (!brand) return { ok: false, message: 'Please choose the brand you would like to visit.' };
   if (!fullName) return { ok: false, message: 'Please enter your full name.' };
   const phone = normalizePhone(contact);
   if (!phone.ok) return { ok: false, message: 'Please enter a valid 10-digit Indian mobile number.' };
@@ -69,5 +75,5 @@ export function parseReferral(read: Read, today: string): Parsed<ReferralRegistr
     return { ok: false, message: `Please choose an appointment date between today and the next ${APPOINTMENT_MAX_DAYS} days.` };
   }
   if (!ticked(read, 'consent')) return { ok: false, message: 'Please tick the box so we can contact you about your visit.' };
-  return { ok: true, value: { fullName, contact, phone: phone.e164, occasion, storeCode: store.code, appointmentDate } };
+  return { ok: true, value: { brand: brand.key, fullName, contact, phone: phone.e164, occasion, storeCode: store.code, appointmentDate } };
 }

@@ -92,7 +92,7 @@ export default async function ControlsPage({ searchParams }: { searchParams: Pro
           <Panel title="Retrospective attribution" description="A bill the matching did not attach (bought before the referral was entered, or just outside the window). Requested with a reason; approved on Flags by someone else. A bill already attributed cannot be moved (use a claim)." icon="link">
             <form action={retroAction} className="grid gap-2 sm:grid-cols-2"><Hidden values={{}} />
               <input name="voucher" required placeholder="Invoice" aria-label="Invoice" className={control} />
-              <input name="partner" required placeholder="Partner ID (DPR-00001)" aria-label="Partner ID" className={control} />
+              <input name="partner" required placeholder="Partner ID (APR-00001)" aria-label="Partner ID" className={control} />
               <input name="reason" required placeholder="Why it should count" aria-label="Reason" className={`${control} sm:col-span-2`} />
               <ByField className="w-full" /><button className={primaryButton}>Request</button>
             </form>

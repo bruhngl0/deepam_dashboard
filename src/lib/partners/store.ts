@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { upsertLeadByPhone } from '@/lib/marketing/store';
-import { LEVELS, PARTNER_CODE, PARTNER_DOCUMENTS, PARTNER_STATUS_LABEL, REFERRAL_STORES, STATUS_MOVES, type DeclineReason, type PartnerStatus } from './constants';
+import { LEVELS, normalizePartnerCode, PARTNER_CODE, PARTNER_DOCUMENTS, PARTNER_STATUS_LABEL, REFERRAL_BRANDS, REFERRAL_STORES, STATUS_MOVES, type DeclineReason, type PartnerStatus } from './constants';
 import { isBot, parseApplication, parseReferral, type Read } from './forms';
 import { withPartnerReferral } from './lead';
 
@@ -59,7 +59,7 @@ export type ActivePartner = { id: number; code: string; fullName: string; catego
 
 /** The approved partner behind a referral link, or null (unknown, not yet approved, rejected or suspended). */
 export async function activePartner(code: string): Promise<ActivePartner | null> {
-  const upper = code.trim().toUpperCase();
+  const upper = normalizePartnerCode(code);
   if (!PARTNER_CODE.test(upper)) return null;
   const [p] = rowsOf<{ id: number; partner_code: string; full_name: string; category: string }>(await db.execute(sql`
     SELECT id, partner_code, full_name, category FROM partners WHERE partner_code = ${upper} AND status = 'approved'`));
@@ -86,6 +86,9 @@ export async function registerReferral(partnerCode: string, read: Read): Promise
   const parsed = parseReferral(read, todayIst());
   if (!parsed.ok) return { kind: 'invalid', message: parsed.message };
   const r = parsed.value;
+  const store = REFERRAL_STORES.find((s) => s.code === r.storeCode)!;
+  // Kalaniketan stores aren't CRM stores: kept by name (preferred_store_id stays empty).
+  const storeLabel = `${REFERRAL_BRANDS.find((b) => b.key === r.brand)!.label} ${store.label}`;
 
   const reason = await db.transaction(async (t) => {
     // Two registrations of one number at the same moment must not both be accepted.
@@ -95,18 +98,21 @@ export async function registerReferral(partnerCode: string, read: Read): Promise
     const [{ block }] = rowsOf<{ block: DeclineReason | null }>(await t.execute(sql`SELECT partner_referral_block(${r.phone}, ${partner.id}) AS block`));
     await t.execute(sql`
       INSERT INTO partner_referrals (partner_id, full_name, contact, phone_e164, customer_id, occasion, preferred_store_id,
-                                     appointment_date, consent_at, status, decline_reason, registered_on, window_ends_on, verify_status)
+                                     appointment_date, consent_at, status, decline_reason, registered_on, window_ends_on, verify_status,
+                                     brand, preferred_store_label)
       SELECT ${partner.id}, ${r.fullName}, ${r.contact}, ${r.phone}, (SELECT id FROM customers WHERE phone_e164 = ${r.phone}),
              ${r.occasion}, (SELECT id FROM stores WHERE code = ${r.storeCode}), ${r.appointmentDate}::date, now(),
              ${block ? 'declined' : 'registered'}, ${block}, d.today, d.today + partner_setting_int('partner_purchase_window_days', 30),
-             CASE WHEN ${block}::text IS NULL AND partner_is_existing_customer(${r.phone}) THEN 'pending' END
+             CASE WHEN ${block}::text IS NULL AND partner_is_existing_customer(${r.phone}) THEN 'pending' END,
+             ${r.brand}, ${storeLabel}
       FROM (SELECT (now() AT TIME ZONE 'Asia/Kolkata')::date AS today) d`);
     return block;
   });
   if (reason) return { kind: 'declined', reason };
 
   // The registration is saved; a failure here must not cost the customer their thank-you.
-  const store = REFERRAL_STORES.find((s) => s.code === r.storeCode)!;
+  // Marketing Intelligence follows up Deepam visits only (it has no Kalaniketan stores).
+  if (!store.marketing) return { kind: 'saved' };
   await upsertLeadByPhone(r.phone, (existing) => withPartnerReferral(existing, {
     phone: r.phone, name: r.fullName, partnerCode: partner.code, partnerName: partner.fullName, partnerCategory: partner.category,
     occasion: r.occasion, store: store.marketing, storeLabel: store.label, appointmentDate: r.appointmentDate,
@@ -143,7 +149,7 @@ export async function setPartnerStatus(id: number, to: PartnerStatus, reasonText
     if (to === 'approved') {
       [{ partner_code: code }] = rowsOf<{ partner_code: string }>(await t.execute(sql`
         UPDATE partners SET status = 'approved', status_note = ${reason},
-          partner_code = CASE WHEN partner_code IS NULL THEN 'DPR-' || lpad(nextval('partner_code_seq')::text, 5, '0') ELSE partner_code END,
+          partner_code = CASE WHEN partner_code IS NULL THEN 'APR-' || lpad(nextval('partner_code_seq')::text, 5, '0') ELSE partner_code END,
           dashboard_token = COALESCE(dashboard_token, ${newToken()}),
           level = CASE WHEN approved_at IS NULL THEN 1 ELSE level END, below_streak = CASE WHEN approved_at IS NULL THEN 0 ELSE below_streak END,
           approved_at = COALESCE(approved_at, now()), decided_at = now(), updated_at = now()

@@ -1,12 +1,12 @@
 'use client';
 
-import { useActionState } from 'react';
-import { OCCASIONS, REFERRAL_STORES } from '@/lib/partners/constants';
+import { useActionState, useState } from 'react';
+import { OCCASIONS, REFERRAL_BRANDS, REFERRAL_STORES } from '@/lib/partners/constants';
 import { applyAction, referAction, type FormState } from './actions';
 import { btn, errorText, input, label, select } from './styles';
 
 const initial: FormState = { message: '', values: {}, attempt: 0 };
-const required = <span aria-hidden="true" className="text-[#a12b2b]">*</span>;
+const required = <span aria-hidden="true" className="text-status-critical">*</span>;
 const PHONE_PATTERN = '(?=(?:\\D*\\d){10,})[\\d\\s+\\-()]+';
 
 /** Hidden from people; bots fill it. */
@@ -41,8 +41,8 @@ export function ApplicationForm({ categories }: { categories: string[] }) {
         </div>
       </fieldset>
       <label className="mb-[26px] flex items-start gap-3">
-        <input name="consent" type="checkbox" required defaultChecked={v.consent === 'on'} className="mt-1 size-4 shrink-0 accent-[#7f1835]" />
-        <span>I hereby agree to the Deepam Partner Programme terms, confirm the details above are correct, and consent to Deepam contacting me about my application. {required}</span>
+        <input name="consent" type="checkbox" required defaultChecked={v.consent === 'on'} className="mt-1 size-4 shrink-0 accent-[var(--accent)]" />
+        <span>I hereby agree to the Ananta Partners programme terms, confirm the details above are correct, and consent to Ananta contacting me about my application. {required}</span>
       </label>
       <Honeypot />
       <Message text={state.message} />
@@ -54,12 +54,26 @@ export function ApplicationForm({ categories }: { categories: string[] }) {
 export function ReferralForm({ partner, today, lastDay }: { partner: string; today: string; lastDay: string }) {
   const [state, action, pending] = useActionState(referAction, initial);
   const v = state.values;
+  return <ReferralFields key={state.attempt} action={action} pending={pending} message={state.message} v={v} partner={partner} today={today} lastDay={lastDay} />;
+}
+
+/** The fields, re-mounted per attempt with what was typed. The store list follows the brand picked first. */
+function ReferralFields({ action, pending, message, v, partner, today, lastDay }: {
+  action: (form: FormData) => void; pending: boolean; message: string; v: Record<string, string>; partner: string; today: string; lastDay: string;
+}) {
+  const [brand, setBrand] = useState(v.brand ?? '');
+  const stores = REFERRAL_STORES.filter((s) => s.brand === brand);
   return (
-    <form key={state.attempt} action={action} className="mx-auto max-w-[720px]">
+    <form action={action} className="mx-auto max-w-[720px]">
       <input type="hidden" name="partner" value={partner} />
       <fieldset className="mb-[30px]">
         <legend className="mb-5 text-[1.35em] font-semibold">Book your visit</legend>
         <div className="grid gap-x-[26px] gap-y-[22px] min-[601px]:grid-cols-2">
+          <div className="min-[601px]:col-span-2"><label htmlFor="r-brand" className={label}>Choose Brand {required}</label>
+            <select id="r-brand" name="brand" required value={brand} onChange={(e) => setBrand(e.target.value)} className={select}>
+              <option value="" disabled>Please select</option>
+              {REFERRAL_BRANDS.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
+            </select></div>
           <div className="min-[601px]:col-span-2"><label htmlFor="r-name" className={label}>Full Name {required}</label>
             <input id="r-name" name="fullName" type="text" required maxLength={120} autoComplete="name" defaultValue={v.fullName} className={input} /></div>
           <div><label htmlFor="r-contact" className={label}>Contact No. {required}</label>
@@ -70,20 +84,20 @@ export function ReferralForm({ partner, today, lastDay }: { partner: string; tod
               {OCCASIONS.map((o) => <option key={o}>{o}</option>)}
             </select></div>
           <div><label htmlFor="r-store" className={label}>Preferred Store {required}</label>
-            <select id="r-store" name="store" required defaultValue={v.store ?? ''} className={select}>
-              <option value="" disabled>Please select</option>
-              {REFERRAL_STORES.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
+            <select id="r-store" key={brand} name="store" required disabled={!brand} defaultValue={stores.some((s) => s.code === v.store) ? v.store : ''} className={select}>
+              <option value="" disabled>{brand ? 'Please select' : 'Choose a brand first'}</option>
+              {stores.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
             </select></div>
           <div><label htmlFor="r-date" className={label}>Preferred Appointment Date {required}</label>
             <input id="r-date" name="appointmentDate" type="date" required min={today} max={lastDay} defaultValue={v.appointmentDate} className={input} /></div>
         </div>
       </fieldset>
       <label className="mb-[26px] flex items-start gap-3">
-        <input name="consent" type="checkbox" required defaultChecked={v.consent === 'on'} className="mt-1 size-4 shrink-0 accent-[#7f1835]" />
-        <span>I consent to be contacted by Deepam by phone, SMS or WhatsApp about my visit. {required}</span>
+        <input name="consent" type="checkbox" required defaultChecked={v.consent === 'on'} className="mt-1 size-4 shrink-0 accent-[var(--accent)]" />
+        <span>I consent to be contacted by Ananta Partners and the brand I chose, by phone, SMS or WhatsApp, about my visit. {required}</span>
       </label>
       <Honeypot />
-      <Message text={state.message} />
+      <Message text={message} />
       <div className="text-center"><button className={btn} disabled={pending}>{pending ? 'Submitting…' : 'Submit'}</button></div>
     </form>
   );
@@ -103,7 +117,7 @@ export function CopyLink({ url }: { url: string }) {
   };
   return (
     <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-      <code className="min-w-0 flex-1 break-all border border-[#bfbfbf] bg-white px-4 py-3 text-left text-sm">{url}</code>
+      <code className="min-w-0 flex-1 break-all border border-line bg-surface px-4 py-3 text-left text-sm">{url}</code>
       <button type="button" onClick={copy} className={btn} aria-live="polite">Copy link</button>
     </div>
   );
